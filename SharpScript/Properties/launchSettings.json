@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "SharpScript (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "SharpScript (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}

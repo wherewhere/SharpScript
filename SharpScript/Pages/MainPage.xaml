@@ -1,0 +1,96 @@
+<Page
+    x:Class="SharpScript.Pages.MainPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:monaco="using:Monaco"
+    Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"
+    mc:Ignorable="d">
+    <Page.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.ThemeDictionaries>
+                <ResourceDictionary x:Key="Default">
+                    <monaco:EditorThemes x:Key="DefaultEditorThemes">VisualStudioDark</monaco:EditorThemes>
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="Light">
+                    <monaco:EditorThemes x:Key="DefaultEditorThemes">VisualStudioLight</monaco:EditorThemes>
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="HighContrast">
+                    <monaco:EditorThemes x:Key="DefaultEditorThemes">HighContrastDark</monaco:EditorThemes>
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
+        </ResourceDictionary>
+    </Page.Resources>
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition x:Name="TopPaddingRow" Height="32" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <Grid.ChildrenTransitions>
+            <TransitionCollection>
+                <ReorderThemeTransition />
+            </TransitionCollection>
+        </Grid.ChildrenTransitions>
+        <Grid
+            x:Name="CustomTitleBar"
+            Grid.Row="0"
+            HorizontalAlignment="Stretch"
+            VerticalAlignment="Stretch"
+            Background="{ThemeResource SystemControlTransparentBrush}"
+            Canvas.ZIndex="1"
+            IsHitTestVisible="True">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition x:Name="LeftPaddingColumn" Width="0" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition x:Name="RightPaddingColumn" Width="0" />
+            </Grid.ColumnDefinitions>
+            <Grid.ChildrenTransitions>
+                <TransitionCollection>
+                    <ReorderThemeTransition />
+                </TransitionCollection>
+            </Grid.ChildrenTransitions>
+            <TextBlock
+                x:Name="AppTitle"
+                Grid.Column="1"
+                Padding="12,0"
+                HorizontalAlignment="Left"
+                VerticalAlignment="Center"
+                MaxLines="1"
+                Style="{StaticResource CaptionTextBlockStyle}"
+                Text="SharpScript"
+                TextTrimming="CharacterEllipsis" />
+        </Grid>
+        <TwoPaneView
+            Grid.Row="1"
+            Pane1Length="*"
+            Pane2Length="*">
+            <TwoPaneView.Pane1>
+                <monaco:MonacoEditor
+                    x:Name="Input"
+                    Margin="0,4"
+                    EditorContentChanged="Input_EditorContentChanged"
+                    EditorLanguage="csharp"
+                    EditorTheme="{StaticResource DefaultEditorThemes}" />
+            </TwoPaneView.Pane1>
+            <TwoPaneView.Pane2>
+                <ItemsView
+                    x:Name="Output"
+                    Padding="16,4"
+                    SelectionMode="None">
+                    <ItemsView.ItemTemplate>
+                        <DataTemplate x:DataType="x:String">
+                            <ItemContainer>
+                                <TextBlock
+                                    FontFamily="{StaticResource CodeThemeFontFamily}"
+                                    IsTextSelectionEnabled="True"
+                                    Text="{x:Bind}"
+                                    TextWrapping="Wrap" />
+                            </ItemContainer>
+                        </DataTemplate>
+                    </ItemsView.ItemTemplate>
+                </ItemsView>
+            </TwoPaneView.Pane2>
+        </TwoPaneView>
+    </Grid>
+</Page>
