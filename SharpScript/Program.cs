@@ -1,7 +1,7 @@
-﻿using SharpScript.WinRT;
-using Microsoft.UI.Dispatching;
+﻿using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.Win32;
+using SharpScript.WinRT;
 using System;
 using System.Collections.Generic;
 using System.IO;

@@ -10,7 +10,6 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
-using System.Reflection;
 using System.Threading.Tasks;
 using Windows.ApplicationModel.Core;
 
@@ -24,7 +23,28 @@ namespace SharpScript.Pages
     /// </summary>
     public sealed partial class MainPage : Page
     {
-        private static readonly ScriptOptions options = ScriptOptions.Default.WithAllowUnsafe(true).WithReferences(Assembly.GetExecutingAssembly().GetReferencedAssemblies().Select(x => MetadataReference.CreateFromFile(Assembly.Load(x.Name).Location)));
+        private static readonly ScriptOptions options =
+            ScriptOptions.Default
+                .WithAllowUnsafe(true)
+                .WithReferences(
+                    "System.Private.CoreLib.dll",
+                    "System.Runtime.dll",
+                    "System.Console.dll",
+                    "netstandard.dll",
+                    "System.Text.RegularExpressions.dll",
+                    "System.Linq.dll",
+                    "System.Linq.Expressions.dll",
+                    "System.IO.dll",
+                    "System.Net.Primitives.dll",
+                    "System.Net.Http.dll",
+                    "System.Private.Uri.dll",
+                    "System.Reflection.dll",
+                    "System.ComponentModel.Primitives.dll",
+                    "System.Globalization.dll",
+                    "System.Collections.Concurrent.dll",
+                    "System.Collections.NonGeneric.dll",
+                    "Microsoft.CSharp.dll",
+                    "System.Net.WebClient.dll");
 
         public MainPage() => InitializeComponent();
 

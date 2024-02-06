@@ -6,6 +6,7 @@ using System;
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 using System.Threading.Tasks;
 using Windows.Storage;
 using Windows.UI.ViewManagement;
@@ -15,6 +16,7 @@ namespace SharpScript.Helpers
 {
     public static partial class SettingsHelper
     {
+        public const string CachedCode = nameof(CachedCode);
         public const string SelectedAppTheme = nameof(SelectedAppTheme);
         public const string SelectedBackdrop = nameof(SelectedBackdrop);
         public const string IsExtendsTitleBar = nameof(IsExtendsTitleBar);
@@ -26,6 +28,10 @@ namespace SharpScript.Helpers
 
         public static void SetDefaultSettings()
         {
+            if (!LocalObject.KeyExists(CachedCode))
+            {
+                LocalObject.Save(CachedCode, "1 + 1");
+            }
             if (!LocalObject.KeyExists(SelectedAppTheme))
             {
                 LocalObject.Save(SelectedAppTheme, ElementTheme.Default);
@@ -64,6 +70,7 @@ namespace SharpScript.Helpers
         public string Serialize<T>(T value) => value switch
         {
             bool => JsonSerializer.Serialize(value, SourceGenerationContext.Default.Boolean),
+            string => JsonSerializer.Serialize(value, SourceGenerationContext.Default.String),
             ElementTheme => JsonSerializer.Serialize(value, SourceGenerationContext.Default.ElementTheme),
 #if DEBUG
             _ => JsonSerializer.Serialize(value)
@@ -76,19 +83,25 @@ namespace SharpScript.Helpers
         {
             if (string.IsNullOrEmpty(value)) { return default; }
             Type type = typeof(T);
-            return type == typeof(bool) && JsonSerializer.Deserialize(value, SourceGenerationContext.Default.Boolean) is T @bool
-                ? @bool
-                : type == typeof(ElementTheme) && JsonSerializer.Deserialize(value, SourceGenerationContext.Default.ElementTheme) is T ElementTheme
-                    ? ElementTheme
+            return type == typeof(bool)
+                ? Deserialize<T>(value, SourceGenerationContext.Default.Boolean)
+                : type == typeof(string)
+                    ? Deserialize<T>(value, SourceGenerationContext.Default.String)
+                    : type == typeof(ElementTheme)
+                        ? Deserialize<T>(value, SourceGenerationContext.Default.ElementTheme)
 #if DEBUG
                         : JsonSerializer.Deserialize<T>(value);
 #else
                         : default;
 #endif
         }
+
+        private T Deserialize<T>(string value, JsonTypeInfo context) =>
+            JsonSerializer.Deserialize(value, context) is T result ? result : default;
     }
 
     [JsonSerializable(typeof(bool))]
+    [JsonSerializable(typeof(string))]
     [JsonSerializable(typeof(ElementTheme))]
     public partial class SourceGenerationContext : JsonSerializerContext;
 }
