@@ -15,6 +15,9 @@
     <UseWinUI>True</UseWinUI>
     <VersionPrefix>0.0.1</VersionPrefix>
   </PropertyGroup>
+  <ItemGroup>
+    <None Remove="Pages\EditorPage.xaml" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.WinUI.UI" Version="7.1.2" />
@@ -50,6 +53,11 @@
   -->
   <ItemGroup Condition="'$(DisableMsixProjectCapabilityAddedByProject)'!='true' and '$(EnableMsixTooling)'=='true'">
     <ProjectCapability Include="Msix" />
+  </ItemGroup>
+  <ItemGroup>
+    <Page Update="Pages\EditorPage.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
   </ItemGroup>
 
   <!-- 
