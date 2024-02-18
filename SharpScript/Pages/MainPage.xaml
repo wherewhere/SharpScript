@@ -4,24 +4,9 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-    xmlns:monaco="using:Monaco"
+    xmlns:editor="using:WinUIEditor"
     Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"
     mc:Ignorable="d">
-    <Page.Resources>
-        <ResourceDictionary>
-            <ResourceDictionary.ThemeDictionaries>
-                <ResourceDictionary x:Key="Default">
-                    <monaco:EditorThemes x:Key="DefaultEditorThemes">VisualStudioDark</monaco:EditorThemes>
-                </ResourceDictionary>
-                <ResourceDictionary x:Key="Light">
-                    <monaco:EditorThemes x:Key="DefaultEditorThemes">VisualStudioLight</monaco:EditorThemes>
-                </ResourceDictionary>
-                <ResourceDictionary x:Key="HighContrast">
-                    <monaco:EditorThemes x:Key="DefaultEditorThemes">HighContrastDark</monaco:EditorThemes>
-                </ResourceDictionary>
-            </ResourceDictionary.ThemeDictionaries>
-        </ResourceDictionary>
-    </Page.Resources>
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition x:Name="TopPaddingRow" Height="32" />
@@ -66,12 +51,11 @@
             Pane1Length="*"
             Pane2Length="*">
             <TwoPaneView.Pane1>
-                <monaco:MonacoEditor
+                <editor:CodeEditorControl
                     x:Name="Input"
                     Margin="0,4"
-                    EditorContentChanged="Input_EditorContentChanged"
-                    EditorLanguage="csharp"
-                    EditorTheme="{StaticResource DefaultEditorThemes}" />
+                    CharacterReceived="Input_CharacterReceived"
+                    HighlightingLanguage="csharp"/>
             </TwoPaneView.Pane1>
             <TwoPaneView.Pane2>
                 <ItemsView

@@ -3,15 +3,17 @@ using Microsoft.CodeAnalysis.CSharp.Scripting;
 using Microsoft.CodeAnalysis.Scripting;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Navigation;
-using Monaco;
 using SharpScript.Common;
+using SharpScript.Helpers;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using System.Threading.Tasks;
 using Windows.ApplicationModel.Core;
+using WinUIEditor;
 
 // To learn more about WinUI, the WinUI project structure,
 // and more about our project templates, see: http://aka.ms/winui-project-info.
@@ -46,7 +48,11 @@ namespace SharpScript.Pages
                     "Microsoft.CSharp.dll",
                     "System.Net.WebClient.dll");
 
-        public MainPage() => InitializeComponent();
+        public MainPage()
+        {
+            InitializeComponent();
+            Input.Editor.SetText(SettingsHelper.Get<string>(SettingsHelper.CachedCode));
+        }
 
         protected override void OnNavigatedTo(NavigationEventArgs e)
         {
@@ -66,9 +72,9 @@ namespace SharpScript.Pages
 
         private uint count = 0;
 
-        private async void Input_EditorContentChanged(object sender, EventArgs e)
+        private async void Input_CharacterReceived(UIElement sender, CharacterReceivedRoutedEventArgs args)
         {
-            if (sender is not MonacoEditor editor) { return; }
+            if (sender is not CodeEditorControl editor) { return; }
             try
             {
                 count++;
@@ -77,7 +83,7 @@ namespace SharpScript.Pages
                 List<string> results = [];
                 try
                 {
-                    string code = editor.EditorContent;
+                    string code = editor.Editor.GetTargetText();
                     await ThreadSwitcher.ResumeBackgroundAsync();
                     Script<object> script = CSharpScript.Create(code, options);
                     Compilation compilation = script.GetCompilation();
@@ -94,6 +100,7 @@ namespace SharpScript.Pages
                         ScriptState<object> scriptState = await script.RunAsync().ConfigureAwait(false);
                         results.Add($"{scriptState.ReturnValue ?? "null"}");
                     }
+                    SettingsHelper.Set<string>(SettingsHelper.CachedCode, code);
                 }
                 catch (CompilationErrorException cex)
                 {
