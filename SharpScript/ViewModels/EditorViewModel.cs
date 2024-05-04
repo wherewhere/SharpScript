@@ -1,4 +1,5 @@
 ﻿using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Scripting;
 using Microsoft.CodeAnalysis.Scripting;
 using Microsoft.UI.Dispatching;
@@ -18,6 +19,7 @@ namespace SharpScript.ViewModels
     {
         private static readonly ScriptOptions options =
             ScriptOptions.Default
+                .WithLanguageVersion(LanguageVersion.Preview)
                 .WithAllowUnsafe(true)
                 .WithReferences(
                     "System.Private.CoreLib.dll",
