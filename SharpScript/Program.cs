@@ -1,7 +1,6 @@
 ﻿using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.Win32;
-using SharpScript.WinRT;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -61,12 +60,12 @@ namespace SharpScript
             ComWrappersSupport.InitializeComWrappers();
             if (IsPackagedApp)
             {
-                HookRegistry hookRegistry = null;
+                WinRT.HookRegistry hookRegistry = null;
                 try
                 {
                     if (!IsSupportCoreWindow)
                     {
-                        hookRegistry = new HookRegistry();
+                        hookRegistry = new WinRT.HookRegistry();
                         hookRegistry.StartHook();
                     }
                     XamlCheckProcessRequirements();
