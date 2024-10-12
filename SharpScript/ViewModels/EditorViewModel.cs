@@ -2,7 +2,6 @@
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Scripting;
 using Microsoft.CodeAnalysis.Scripting;
-using Microsoft.UI.Dispatching;
 using SharpScript.Common;
 using SharpScript.Helpers;
 using System;
@@ -12,10 +11,11 @@ using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
+using Windows.UI.Core;
 
 namespace SharpScript.ViewModels
 {
-    public class EditorViewModel(DispatcherQueue dispatcher) : INotifyPropertyChanged
+    public class EditorViewModel(CoreDispatcher dispatcher) : INotifyPropertyChanged
     {
         private static readonly ScriptOptions options =
             ScriptOptions.Default
@@ -41,7 +41,7 @@ namespace SharpScript.ViewModels
                     "Microsoft.CSharp.dll",
                     "System.Net.WebClient.dll");
 
-        public DispatcherQueue Dispatcher { get; } = dispatcher ?? DispatcherQueue.GetForCurrentThread();
+        public CoreDispatcher Dispatcher { get; } = dispatcher;
 
         private List<string> diagnostics;
         public List<string> Diagnostics

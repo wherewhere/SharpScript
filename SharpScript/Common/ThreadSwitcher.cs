@@ -1,15 +1,16 @@
-﻿using Microsoft.UI.Dispatching;
-using System;
+﻿using System;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Runtime.Versioning;
 using System.Threading;
+using Windows.Foundation.Metadata;
+using Windows.System;
 using Windows.System.Threading;
 using Windows.UI.Core;
 using ThreadPool = Windows.System.Threading.ThreadPool;
 
 namespace SharpScript.Common
 {
-
     /// <summary>
     /// The interface of helper type for switch thread.
     /// </summary>
@@ -78,7 +79,8 @@ namespace SharpScript.Common
     public readonly record struct DispatcherQueueThreadSwitcher(DispatcherQueue Dispatcher, DispatcherQueuePriority Priority = DispatcherQueuePriority.Normal) : IThreadSwitcher<DispatcherQueueThreadSwitcher>
     {
         /// <inheritdoc/>
-        public bool IsCompleted => Dispatcher?.HasThreadAccess != false;
+        public bool IsCompleted => Dispatcher is not DispatcherQueue dispatcher
+            || (ThreadSwitcher.IsHasThreadAccessPropertyAvailable && dispatcher.HasThreadAccess);
 
         /// <inheritdoc/>
         public void GetResult() { }
@@ -145,6 +147,14 @@ namespace SharpScript.Common
     /// </summary>
     public static class ThreadSwitcher
     {
+#pragma warning disable CA1416
+        /// <summary>
+        /// Gets is <see cref="DispatcherQueue.HasThreadAccess"/> supported.
+        /// </summary>
+        [SupportedOSPlatformGuard("Windows10.0.18362.0")]
+        public static bool IsHasThreadAccessPropertyAvailable { get; } = ApiInformation.IsMethodPresent("Windows.System.DispatcherQueue", "HasThreadAccess");
+#pragma warning restore CA1416
+
         /// <summary>
         /// A helper function—for use within a coroutine—that you can <see langword="await"/> to switch execution to a specific foreground thread. 
         /// </summary>

@@ -1,14 +1,12 @@
-﻿using CommunityToolkit.WinUI;
-using Microsoft.UI.Dispatching;
-using Microsoft.UI.Xaml;
-using SharpScript.Common;
+﻿using SharpScript.Common;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Windows.ApplicationModel.Core;
 using Windows.UI;
+using Windows.UI.Core;
 using Windows.UI.ViewManagement;
-using Colors = Microsoft.UI.Colors;
+using Windows.UI.Xaml;
 
 namespace SharpScript.Helpers
 {
@@ -51,13 +49,13 @@ namespace SharpScript.Helpers
         public static ElementTheme GetActualTheme(Window window) =>
             window == null
                 ? SettingsHelper.Get<ElementTheme>(SettingsHelper.SelectedAppTheme)
-                : window.DispatcherQueue?.HasThreadAccess == false
-                    ? window.DispatcherQueue.EnqueueAsync(() =>
+                : window.Dispatcher?.HasThreadAccess == false
+                    ? window.Dispatcher.AwaitableRunAsync(() =>
                         window.Content is FrameworkElement _rootElement
                             && _rootElement.RequestedTheme != ElementTheme.Default
                                 ? _rootElement.RequestedTheme
                                 : SettingsHelper.Get<ElementTheme>(SettingsHelper.SelectedAppTheme),
-                        DispatcherQueuePriority.High)?.AwaitByTaskCompleteSource()
+                        CoreDispatcherPriority.High)?.AwaitByTaskCompleteSource()
                         ?? SettingsHelper.Get<ElementTheme>(SettingsHelper.SelectedAppTheme)
                     : window.Content is FrameworkElement rootElement
                         && rootElement.RequestedTheme != ElementTheme.Default
@@ -70,13 +68,13 @@ namespace SharpScript.Helpers
         public static async ValueTask<ElementTheme> GetActualThemeAsync(Window window) =>
             window == null
                 ? SettingsHelper.Get<ElementTheme>(SettingsHelper.SelectedAppTheme)
-                : window.DispatcherQueue?.HasThreadAccess == false
-                    ? await window.DispatcherQueue.EnqueueAsync(() =>
+                : window.Dispatcher?.HasThreadAccess == false
+                    ? await window.Dispatcher.AwaitableRunAsync(() =>
                         window.Content is FrameworkElement _rootElement
                             && _rootElement.RequestedTheme != ElementTheme.Default
                                 ? _rootElement.RequestedTheme
                                 : SettingsHelper.Get<ElementTheme>(SettingsHelper.SelectedAppTheme),
-                            DispatcherQueuePriority.High)
+                            CoreDispatcherPriority.High)
                     : window.Content is FrameworkElement rootElement
                         && rootElement.RequestedTheme != ElementTheme.Default
                             ? rootElement.RequestedTheme
@@ -101,12 +99,12 @@ namespace SharpScript.Helpers
         public static ElementTheme GetRootTheme(Window window) =>
             window == null
                 ? ElementTheme.Default
-                : window.DispatcherQueue?.HasThreadAccess == false
-                    ? window.DispatcherQueue.EnqueueAsync(() =>
+                : window.Dispatcher?.HasThreadAccess == false
+                    ? window.Dispatcher.AwaitableRunAsync(() =>
                         window.Content is FrameworkElement _rootElement
                             ? _rootElement.RequestedTheme
                             : ElementTheme.Default,
-                        DispatcherQueuePriority.High).AwaitByTaskCompleteSource()
+                        CoreDispatcherPriority.High).AwaitByTaskCompleteSource()
                     : window.Content is FrameworkElement rootElement
                         ? rootElement.RequestedTheme
                         : ElementTheme.Default;
@@ -117,12 +115,12 @@ namespace SharpScript.Helpers
         public static async ValueTask<ElementTheme> GetRootThemeAsync(Window window) =>
             window == null
                 ? ElementTheme.Default
-                : window.DispatcherQueue?.HasThreadAccess == false
-                    ? await window.DispatcherQueue.EnqueueAsync(() =>
+                : window.Dispatcher?.HasThreadAccess == false
+                    ? await window.Dispatcher.AwaitableRunAsync(() =>
                         window.Content is FrameworkElement _rootElement
                             ? _rootElement.RequestedTheme
                             : ElementTheme.Default,
-                        DispatcherQueuePriority.High)
+                        CoreDispatcherPriority.High)
                     : window.Content is FrameworkElement rootElement
                         ? rootElement.RequestedTheme
                         : ElementTheme.Default;
@@ -131,7 +129,7 @@ namespace SharpScript.Helpers
         {
             WindowHelper.ActiveWindows.Values.ForEach(async window =>
             {
-                await window.DispatcherQueue.ResumeForegroundAsync();
+                await window.Dispatcher.ResumeForegroundAsync();
                 if (window.Content is FrameworkElement rootElement)
                 {
                     rootElement.RequestedTheme = value;
@@ -147,7 +145,7 @@ namespace SharpScript.Helpers
         {
             await Task.WhenAll(WindowHelper.ActiveWindows.Values.Select(async window =>
             {
-                await window.DispatcherQueue.ResumeForegroundAsync();
+                await window.Dispatcher.ResumeForegroundAsync();
                 if (window.Content is FrameworkElement rootElement)
                 {
                     rootElement.RequestedTheme = value;
@@ -205,13 +203,13 @@ namespace SharpScript.Helpers
                     : actualTheme == ElementTheme.Dark;
         }
 
-        public static bool IsColorLight(this Color color) => 5 * color.G + 2 * color.R + color.B > 8 * 128;
+        public static bool IsColorLight(this Color color) => (5 * color.G) + (2 * color.R) + color.B > 8 * 128;
 
         public static void UpdateExtendViewIntoTitleBar(bool isExtendsTitleBar)
         {
             WindowHelper.ActiveWindows.Values.ForEach(async window =>
             {
-                await window.DispatcherQueue.ResumeForegroundAsync();
+                await window.Dispatcher.ResumeForegroundAsync();
                 CoreApplication.GetCurrentView().TitleBar.ExtendViewIntoTitleBar = isExtendsTitleBar;
             });
         }
@@ -226,7 +224,7 @@ namespace SharpScript.Helpers
 
             WindowHelper.ActiveWindows.Values.ForEach(async window =>
             {
-                await window.DispatcherQueue.ResumeForegroundAsync();
+                await window.Dispatcher.ResumeForegroundAsync();
                 bool extendViewIntoTitleBar = CoreApplication.GetCurrentView().TitleBar.ExtendViewIntoTitleBar;
                 ApplicationViewTitleBar titleBar = ApplicationView.GetForCurrentView().TitleBar;
                 titleBar.ForegroundColor = titleBar.ButtonForegroundColor = foregroundColor;
@@ -237,7 +235,7 @@ namespace SharpScript.Helpers
 
         public static async void UpdateSystemCaptionButtonColors(Window window)
         {
-            await window.DispatcherQueue.ResumeForegroundAsync();
+            await window.Dispatcher.ResumeForegroundAsync();
 
             bool isDark = window?.Content is FrameworkElement rootElement ? IsDarkTheme(rootElement.RequestedTheme) : await IsDarkThemeAsync();
             bool isHighContrast = AccessibilitySettings.HighContrast;

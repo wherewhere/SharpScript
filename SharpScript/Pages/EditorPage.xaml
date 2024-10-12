@@ -5,37 +5,36 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:editor="using:WinUIEditor"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:muxc="using:Microsoft.UI.Xaml.Controls"
     xmlns:viewmodels="using:SharpScript.ViewModels"
     d:DataContext="{d:DesignInstance Type=viewmodels:EditorViewModel}"
     DataContext="{x:Bind Provider}"
     NavigationCacheMode="Enabled"
     mc:Ignorable="d">
-    <TwoPaneView Pane1Length="*" Pane2Length="*">
-        <TwoPaneView.Pane1>
+    <muxc:TwoPaneView Pane1Length="*" Pane2Length="*">
+        <muxc:TwoPaneView.Pane1>
             <editor:CodeEditorControl
                 x:Name="Input"
                 Margin="0,4"
                 FontFamily="{StaticResource CodeThemeFontFamily}"
                 HighlightingLanguage="csharp" />
-        </TwoPaneView.Pane1>
-        <TwoPaneView.Pane2>
-            <ItemsView
+        </muxc:TwoPaneView.Pane1>
+        <muxc:TwoPaneView.Pane2>
+            <ListView
                 x:Name="Output"
                 Padding="16,4"
                 ItemsSource="{x:Bind Provider.Diagnostics, Mode=OneWay}"
                 SelectionMode="None">
-                <ItemsView.ItemTemplate>
+                <ListView.ItemTemplate>
                     <DataTemplate x:DataType="x:String">
-                        <ItemContainer>
-                            <TextBlock
-                                FontFamily="{StaticResource CodeThemeFontFamily}"
-                                IsTextSelectionEnabled="True"
-                                Text="{x:Bind}"
-                                TextWrapping="Wrap" />
-                        </ItemContainer>
+                        <TextBlock
+                            FontFamily="{StaticResource CodeThemeFontFamily}"
+                            IsTextSelectionEnabled="True"
+                            Text="{x:Bind}"
+                            TextWrapping="Wrap" />
                     </DataTemplate>
-                </ItemsView.ItemTemplate>
-            </ItemsView>
-        </TwoPaneView.Pane2>
-    </TwoPaneView>
+                </ListView.ItemTemplate>
+            </ListView>
+        </muxc:TwoPaneView.Pane2>
+    </muxc:TwoPaneView>
 </Page>

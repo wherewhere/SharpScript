@@ -1,13 +1,15 @@
-﻿using Microsoft.UI.Xaml;
-using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Media.Animation;
-using Microsoft.UI.Xaml.Navigation;
-using SharpScript.Common;
+﻿using SharpScript.Common;
 using SharpScript.Helpers;
 using SharpScript.Pages;
 using System;
+using Windows.ApplicationModel;
+using Windows.ApplicationModel.Activation;
 using Windows.ApplicationModel.Core;
 using Windows.System.Profile;
+using Windows.UI.Xaml;
+using Windows.UI.Xaml.Controls;
+using Windows.UI.Xaml.Media.Animation;
+using Windows.UI.Xaml.Navigation;
 
 // To learn more about WinUI, the WinUI project structure,
 // and more about our project templates, see: http://aka.ms/winui-project-info.
@@ -26,6 +28,7 @@ namespace SharpScript
         public App()
         {
             InitializeComponent();
+            Suspending += OnSuspending;
             UnhandledException += Application_UnhandledException;
             AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
             if (AnalyticsInfo.VersionInfo.DeviceFamily == "Windows.Xbox") { FocusVisualKind = FocusVisualKind.Reveal; }
@@ -63,7 +66,7 @@ namespace SharpScript
 
                 rootFrame.NavigationFailed += OnNavigationFailed;
 
-                if (e.UWPLaunchActivatedEventArgs.PreviousExecutionState == Windows.ApplicationModel.Activation.ApplicationExecutionState.Terminated)
+                if (e.PreviousExecutionState == ApplicationExecutionState.Terminated)
                 {
                     //TODO: 从之前挂起的应用程序加载状态
                 }
@@ -76,7 +79,7 @@ namespace SharpScript
 
             if (e is LaunchActivatedEventArgs args)
             {
-                if (!args.UWPLaunchActivatedEventArgs.PrelaunchActivated)
+                if (!args.PrelaunchActivated)
                 {
                     CoreApplication.EnablePrelaunch(true);
                 }
@@ -105,7 +108,21 @@ namespace SharpScript
             throw new Exception("Failed to load Page " + e.SourcePageType.FullName);
         }
 
-        private static void Application_UnhandledException(object sender, Microsoft.UI.Xaml.UnhandledExceptionEventArgs e)
+        /// <summary>
+        /// 在将要挂起应用程序执行时调用。  在不知道应用程序
+        /// 无需知道应用程序会被终止还是会恢复，
+        /// 并让内存内容保持不变。
+        /// </summary>
+        /// <param name="sender">挂起的请求的源。</param>
+        /// <param name="e">有关挂起请求的详细信息。</param>
+        private static void OnSuspending(object sender, SuspendingEventArgs e)
+        {
+            SuspendingDeferral deferral = e.SuspendingOperation.GetDeferral();
+            //TODO: 保存应用程序状态并停止任何后台活动
+            deferral.Complete();
+        }
+
+        private static void Application_UnhandledException(object sender, Windows.UI.Xaml.UnhandledExceptionEventArgs e)
         {
             SettingsHelper.LogManager?.GetLogger("Unhandled Exception - Application").Error(e.Exception.ExceptionToMessage(), e.Exception);
             e.Handled = true;

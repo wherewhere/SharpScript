@@ -1,10 +1,7 @@
-using Microsoft.UI.Xaml;
-using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Input;
 using SharpScript.Helpers;
 using SharpScript.ViewModels;
-using System;
 using System.Threading.Tasks;
+using Windows.UI.Xaml.Controls;
 using WinUIEditor;
 
 // To learn more about WinUI, the WinUI project structure,
@@ -22,7 +19,7 @@ namespace SharpScript.Pages
         public EditorPage()
         {
             InitializeComponent();
-            Provider = new EditorViewModel(DispatcherQueue);
+            Provider = new EditorViewModel(Dispatcher);
             string code = SettingsHelper.Get<string>(SettingsHelper.CachedCode);
             Input.Editor.SetText(code);
             _ = Provider.CompilateAsync(code);

@@ -1,14 +1,13 @@
 ﻿using MetroLog;
 using MetroLog.Targets;
-using Microsoft.UI.Xaml;
 using System;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
-using System.Threading.Tasks;
 using Windows.Storage;
+using Windows.UI.Xaml;
 
 namespace SharpScript.Helpers
 {
