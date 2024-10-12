@@ -1,16 +1,14 @@
-﻿using CommunityToolkit.WinUI.Helpers;
-using MetroLog;
+﻿using MetroLog;
 using MetroLog.Targets;
 using Microsoft.UI.Xaml;
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
 using System.Threading.Tasks;
 using Windows.Storage;
-using Windows.UI.ViewManagement;
-using IObjectSerializer = CommunityToolkit.Common.Helpers.IObjectSerializer;
 
 namespace SharpScript.Helpers
 {
@@ -21,34 +19,30 @@ namespace SharpScript.Helpers
         public const string SelectedBackdrop = nameof(SelectedBackdrop);
         public const string IsExtendsTitleBar = nameof(IsExtendsTitleBar);
 
-        public static Type Get<Type>(string key) => LocalObject.Read<Type>(key);
-        public static void Set<Type>(string key, Type value) => LocalObject.Save(key, value);
-        public static Task<Type> GetFile<Type>(string key) => LocalObject.ReadFileAsync<Type>($"Settings/{key}");
-        public static Task SetFile<Type>(string key, Type value) => LocalObject.CreateFileAsync($"Settings/{key}", value);
+        public static Type Get<Type>(string key) => SystemTextJsonObjectSerializer.Deserialize<Type>(LocalObject.Values[key]?.ToString());
+        public static void Set<Type>(string key, Type value) => LocalObject.Values[key] = SystemTextJsonObjectSerializer.Serialize(value);
 
         public static void SetDefaultSettings()
         {
-            if (!LocalObject.KeyExists(CachedCode))
+            if (!LocalObject.Values.ContainsKey(CachedCode))
             {
-                LocalObject.Save(CachedCode, "1 + 1");
+                LocalObject.Values[CachedCode] = SystemTextJsonObjectSerializer.Serialize("1 + 1");
             }
-            if (!LocalObject.KeyExists(SelectedAppTheme))
+            if (!LocalObject.Values.ContainsKey(SelectedAppTheme))
             {
-                LocalObject.Save(SelectedAppTheme, ElementTheme.Default);
+                LocalObject.Values[SelectedAppTheme] = SystemTextJsonObjectSerializer.Serialize(ElementTheme.Default);
             }
-            if (!LocalObject.KeyExists(IsExtendsTitleBar))
+            if (!LocalObject.Values.ContainsKey(IsExtendsTitleBar))
             {
-                LocalObject.Save(IsExtendsTitleBar, true);
+                LocalObject.Values[IsExtendsTitleBar] = SystemTextJsonObjectSerializer.Serialize(true);
             }
         }
     }
 
     public static partial class SettingsHelper
     {
-        public static UISettings UISettings { get; } = new();
         public static ILogManager LogManager { get; private set; }
-        public static OSVersion OperatingSystemVersion => SystemInformation.Instance.OperatingSystemVersion;
-        public static ApplicationDataStorageHelper LocalObject { get; } = ApplicationDataStorageHelper.GetCurrent(new SystemTextJsonObjectSerializer());
+        public static ApplicationDataContainer LocalObject { get; } = ApplicationData.Current.LocalSettings;
 
         static SettingsHelper() => SetDefaultSettings();
 
@@ -65,39 +59,26 @@ namespace SharpScript.Helpers
         }
     }
 
-    public class SystemTextJsonObjectSerializer : IObjectSerializer
+    public static class SystemTextJsonObjectSerializer
     {
-        public string Serialize<T>(T value) => value switch
+        public static string Serialize<T>(T value) => value switch
         {
             bool => JsonSerializer.Serialize(value, SourceGenerationContext.Default.Boolean),
             string => JsonSerializer.Serialize(value, SourceGenerationContext.Default.String),
             ElementTheme => JsonSerializer.Serialize(value, SourceGenerationContext.Default.ElementTheme),
-#if DEBUG
-            _ => JsonSerializer.Serialize(value)
-#else
             _ => value?.ToString(),
-#endif
         };
 
-        public T Deserialize<T>(string value)
+        public static T Deserialize<T>([StringSyntax(StringSyntaxAttribute.Json)] string value)
         {
             if (string.IsNullOrEmpty(value)) { return default; }
             Type type = typeof(T);
-            return type == typeof(bool)
-                ? Deserialize<T>(value, SourceGenerationContext.Default.Boolean)
-                : type == typeof(string)
-                    ? Deserialize<T>(value, SourceGenerationContext.Default.String)
-                    : type == typeof(ElementTheme)
-                        ? Deserialize<T>(value, SourceGenerationContext.Default.ElementTheme)
-#if DEBUG
-                        : JsonSerializer.Deserialize<T>(value);
-#else
-                        : default;
-#endif
+            return type == typeof(bool) ? Deserialize(value, SourceGenerationContext.Default.Boolean)
+                : type == typeof(string) ? Deserialize(value, SourceGenerationContext.Default.String)
+                : type == typeof(ElementTheme) ? Deserialize(value, SourceGenerationContext.Default.ElementTheme)
+                : default;
+            static T Deserialize<TValue>([StringSyntax(StringSyntaxAttribute.Json)] string json, JsonTypeInfo<TValue> jsonTypeInfo) => JsonSerializer.Deserialize(json, jsonTypeInfo) is T value ? value : default;
         }
-
-        private T Deserialize<T>(string value, JsonTypeInfo context) =>
-            JsonSerializer.Deserialize(value, context) is T result ? result : default;
     }
 
     [JsonSerializable(typeof(bool))]

@@ -6,7 +6,7 @@ using System.Reflection;
 
 namespace SharpScript.Common
 {
-    public class WeakEvent<TEventArgs> : IList<Action<TEventArgs>>
+    public partial class WeakEvent<TEventArgs> : IList<Action<TEventArgs>>
     {
         private class Method(Action<TEventArgs> callback) : IEquatable<Method>, IEquatable<Action<TEventArgs>>
         {
@@ -34,15 +34,12 @@ namespace SharpScript.Common
                     && _reference.Target == callback.Target
                     && _method == callback.GetMethodInfo();
 
-            public override bool Equals(object obj)
+            public override bool Equals(object obj) => obj switch
             {
-                return obj switch
-                {
-                    Method other => Equals(other),
-                    Action<TEventArgs> callback => Equals(callback),
-                    _ => false,
-                };
-            }
+                Method other => Equals(other),
+                Action<TEventArgs> callback => Equals(callback),
+                _ => false,
+            };
 
             public override int GetHashCode() => (_reference, _method).GetHashCode();
 
@@ -59,10 +56,7 @@ namespace SharpScript.Common
 
         public WeakEvent(int capacity) => _list = new List<Method>(capacity);
 
-        public WeakEvent(ReadOnlySpan<Action<TEventArgs>> callbacks)
-        {
-            _list = [.. callbacks];
-        }
+        public WeakEvent(ReadOnlySpan<Action<TEventArgs>> callbacks) => _list = [.. callbacks];
 
         public int Count => _list.Count;
 

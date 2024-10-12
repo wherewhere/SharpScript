@@ -1,6 +1,7 @@
 ﻿using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.Win32;
+using SharpScript.Common;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -29,13 +30,10 @@ namespace SharpScript
                 PWSTR str = new();
                 _ = PInvoke.GetCurrentPackageFullName(ref length, str);
 
-                char[] array = new char[length];
-                fixed (char* ptr = array)
-                {
-                    str = new(ptr);
-                    WIN32_ERROR result = PInvoke.GetCurrentPackageFullName(ref length, str);
-                    return result != WIN32_ERROR.APPMODEL_ERROR_NO_PACKAGE;
-                }
+                char* ptr = stackalloc char[(int)length];
+                str = new(ptr);
+                WIN32_ERROR result = PInvoke.GetCurrentPackageFullName(ref length, str);
+                return result != WIN32_ERROR.APPMODEL_ERROR_NO_PACKAGE;
             }
         }
 
@@ -46,7 +44,7 @@ namespace SharpScript
                 try
                 {
                     RegistryKey registryKey = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\WinUI\Xaml");
-                    return registryKey?.GetValue("EnableUWPWindow") is int value && value > 0;
+                    return registryKey?.GetValue("EnableUWPWindow") is > 0;
                 }
                 catch
                 {
@@ -60,16 +58,15 @@ namespace SharpScript
             ComWrappersSupport.InitializeComWrappers();
             if (IsPackagedApp)
             {
-                WinRT.HookRegistry hookRegistry = null;
+                HookRegistry hookRegistry = null;
                 try
                 {
                     if (!IsSupportCoreWindow)
                     {
-                        hookRegistry = new WinRT.HookRegistry();
-                        hookRegistry.StartHook();
+                        hookRegistry = new HookRegistry();
                     }
                     XamlCheckProcessRequirements();
-                    Application.Start(p =>
+                    Application.Start(static p =>
                     {
                         DispatcherQueueSynchronizationContext context = new(DispatcherQueue.GetForCurrentThread());
                         SynchronizationContext.SetSynchronizationContext(context);

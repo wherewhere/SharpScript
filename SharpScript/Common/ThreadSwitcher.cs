@@ -9,6 +9,7 @@ using ThreadPool = Windows.System.Threading.ThreadPool;
 
 namespace SharpScript.Common
 {
+
     /// <summary>
     /// The interface of helper type for switch thread.
     /// </summary>
@@ -38,9 +39,9 @@ namespace SharpScript.Common
     public interface IThreadSwitcher<out T> : IThreadSwitcher
     {
         /// <summary>
-        /// Gets an awaiter used to await <see cref="T"/>.
+        /// Gets an awaiter used to await <typeparamref name="T"/>.
         /// </summary>
-        /// <returns>An awaiter instance.</returns>
+        /// <returns>A <typeparamref name="T"/> awaiter instance.</returns>
         new T GetAwaiter();
     }
 
@@ -65,7 +66,7 @@ namespace SharpScript.Common
         IThreadSwitcher IThreadSwitcher.GetAwaiter() => this;
 
         /// <inheritdoc/>
-        public void OnCompleted(Action continuation) => _ = Dispatcher.RunAsync(Priority, () => continuation());
+        public void OnCompleted(Action continuation) => _ = Dispatcher.RunAsync(Priority, continuation.Invoke);
     }
 
     /// <summary>
@@ -89,7 +90,7 @@ namespace SharpScript.Common
         IThreadSwitcher IThreadSwitcher.GetAwaiter() => this;
 
         /// <inheritdoc/>
-        public void OnCompleted(Action continuation) => _ = Dispatcher.TryEnqueue(Priority, () => continuation());
+        public void OnCompleted(Action continuation) => _ = Dispatcher.TryEnqueue(Priority, continuation.Invoke);
     }
 
     /// <summary>
