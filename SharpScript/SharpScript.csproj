@@ -5,7 +5,6 @@
     <BuiltInComInteropSupport>True</BuiltInComInteropSupport>
     <CSWinRTIncludes>WinUIEditor</CSWinRTIncludes>
     <EnableMsixTooling>True</EnableMsixTooling>
-    <IsAotCompatible>True</IsAotCompatible>
     <OutputType>WinExe</OutputType>
     <Platforms>x86;x64;ARM64</Platforms>
     <PublishProfile>win10-$(Platform).pubxml</PublishProfile>

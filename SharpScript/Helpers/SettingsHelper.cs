@@ -65,7 +65,7 @@ namespace SharpScript.Helpers
             bool => JsonSerializer.Serialize(value, SourceGenerationContext.Default.Boolean),
             string => JsonSerializer.Serialize(value, SourceGenerationContext.Default.String),
             ElementTheme => JsonSerializer.Serialize(value, SourceGenerationContext.Default.ElementTheme),
-            _ => value?.ToString(),
+            _ => JsonSerializer.Serialize(value),
         };
 
         public static T Deserialize<T>([StringSyntax(StringSyntaxAttribute.Json)] string value)
@@ -75,7 +75,7 @@ namespace SharpScript.Helpers
             return type == typeof(bool) ? Deserialize(value, SourceGenerationContext.Default.Boolean)
                 : type == typeof(string) ? Deserialize(value, SourceGenerationContext.Default.String)
                 : type == typeof(ElementTheme) ? Deserialize(value, SourceGenerationContext.Default.ElementTheme)
-                : default;
+                : JsonSerializer.Deserialize<T>(value);
             static T Deserialize<TValue>([StringSyntax(StringSyntaxAttribute.Json)] string json, JsonTypeInfo<TValue> jsonTypeInfo) => JsonSerializer.Deserialize(json, jsonTypeInfo) is T value ? value : default;
         }
     }

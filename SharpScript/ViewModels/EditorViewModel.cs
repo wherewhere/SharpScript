@@ -1,27 +1,26 @@
 ﻿using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Scripting;
+using Microsoft.CodeAnalysis.Emit;
 using Microsoft.CodeAnalysis.Scripting;
 using SharpScript.Common;
 using SharpScript.Helpers;
 using System;
 using System.Collections.Generic;
-using System.Collections.Immutable;
 using System.ComponentModel;
+using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Runtime.Loader;
 using System.Threading.Tasks;
 using Windows.UI.Core;
 
 namespace SharpScript.ViewModels
 {
-    public class EditorViewModel(CoreDispatcher dispatcher) : INotifyPropertyChanged
+    public partial class EditorViewModel(CoreDispatcher dispatcher) : INotifyPropertyChanged
     {
-        private static readonly ScriptOptions options =
-            ScriptOptions.Default
-                .WithLanguageVersion(LanguageVersion.Preview)
-                .WithAllowUnsafe(true)
-                .WithReferences(
+        private static readonly MetadataReference[] references =
+            GetMetadataReferences(
                     "System.Private.CoreLib.dll",
                     "System.Runtime.dll",
                     "System.Console.dll",
@@ -39,7 +38,8 @@ namespace SharpScript.ViewModels
                     "System.Collections.Concurrent.dll",
                     "System.Collections.NonGeneric.dll",
                     "Microsoft.CSharp.dll",
-                    "System.Net.WebClient.dll");
+                    "System.Net.WebClient.dll")
+                .ToArray();
 
         public CoreDispatcher Dispatcher { get; } = dispatcher;
 
@@ -77,20 +77,50 @@ namespace SharpScript.ViewModels
             {
                 Diagnostics = ["Compilating..."];
                 await ThreadSwitcher.ResumeBackgroundAsync();
-                Script<object> script = CSharpScript.Create(code, options);
-                Compilation compilation = script.GetCompilation();
-                ImmutableArray<Diagnostic> diagnostics = compilation.GetDiagnostics();
-                bool isSuccessful = true;
-                results.AddRange(diagnostics.Select(x =>
+                SyntaxTree syntaxTree =
+                    SyntaxFactory.ParseSyntaxTree(
+                        code,
+                        new CSharpParseOptions(
+                            LanguageVersion.Preview,
+                            DocumentationMode.Parse,
+                            SourceCodeKind.Regular),
+                        null);
+                Compilation compilation =
+                    CSharpCompilation.Create(
+                        "SharpScript",
+                        [syntaxTree],
+                        references,
+                        new CSharpCompilationOptions(
+                            OutputKind.ConsoleApplication,
+                            allowUnsafe: true));
+                using MemoryStream assemblyStream = new();
+                EmitResult emitResult = compilation.Emit(assemblyStream);
+                if (emitResult.Success)
                 {
-                    if (x.Severity == DiagnosticSeverity.Error) { isSuccessful = false; }
-                    FileLinePositionSpan line = x.Location.GetLineSpan();
-                    return $"{(string.IsNullOrEmpty(line.Path) ? "Current" : string.Empty)}{x.Location.GetLineSpan()}: {x.Severity} {x.Id}: {x.GetMessage()}";
-                }));
-                if (isSuccessful)
+                    AssemblyLoadContext context = new("ExecutorContext", isCollectible: true);
+                    try
+                    {
+                        assemblyStream.Position = 0;
+                        Assembly assembly = context.LoadFromStream(assemblyStream);
+                        if (assembly.EntryPoint is MethodInfo main)
+                        {
+                            string[][] args = main.GetParameters().Length > 0 ? [Array.Empty<string>()] : null;
+                            object @return = main.Invoke(null, args);
+                            results.Add($"Exits with code {@return ?? 0}.");
+                        }
+                    }
+                    finally
+                    {
+                        context.Unload();
+                    }
+                }
+                else
                 {
-                    ScriptState<object> scriptState = await script.RunAsync().ConfigureAwait(false);
-                    results.Add($"{scriptState.ReturnValue ?? "null"}");
+                    results.AddRange(emitResult.Diagnostics.Select(x =>
+                    {
+                        FileLinePositionSpan line = x.Location.GetLineSpan();
+                        return $"{(string.IsNullOrEmpty(line.Path) ? "Current" : string.Empty)}{x.Location.GetLineSpan()}: {x.Severity} {x.Id}: {x.GetMessage()}";
+                    }));
                 }
                 SettingsHelper.Set(SettingsHelper.CachedCode, code);
             }
@@ -114,6 +144,18 @@ namespace SharpScript.ViewModels
             {
                 Diagnostics = results;
                 GC.Collect();
+            }
+        }
+
+        private static IEnumerable<MetadataReference> GetMetadataReferences(params string[] references)
+        {
+            ScriptMetadataResolver resolver = ScriptMetadataResolver.Default;
+            foreach (string reference in references)
+            {
+                foreach(PortableExecutableReference resolved in resolver.ResolveReference(reference, null, MetadataReferenceProperties.Assembly))
+                {
+                    yield return resolved;
+                }
             }
         }
     }
