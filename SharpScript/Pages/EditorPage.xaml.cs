@@ -22,7 +22,7 @@ namespace SharpScript.Pages
             Provider = new EditorViewModel(Dispatcher);
             string code = SettingsHelper.Get<string>(SettingsHelper.CachedCode);
             Input.Editor.SetText(code);
-            _ = Provider.CompilateAsync(code);
+            _ = Provider.ProcessAsync(code);
             Input.Editor.Modified += Editor_Modified;
         }
 
@@ -35,7 +35,7 @@ namespace SharpScript.Pages
                 await Task.Delay(500);
                 if (count > 1) { return; }
                 string code = sender.GetTargetText().TrimStart('\0');
-                await Provider.CompilateAsync(code).ConfigureAwait(false);
+                await Provider.ProcessAsync(code).ConfigureAwait(false);
             }
             finally
             {

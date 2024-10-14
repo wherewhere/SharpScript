@@ -13,35 +13,68 @@
     mc:Ignorable="d">
     <muxc:TwoPaneView Pane1Length="*" Pane2Length="*">
         <muxc:TwoPaneView.Pane1>
-            <editor:CodeEditorControl
-                x:Name="Input"
-                Margin="0,4"
-                FontFamily="{StaticResource CodeThemeFontFamily}"
-                HighlightingLanguage="csharp" />
+            <Grid Padding="4" RowSpacing="4">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <ComboBox
+                        Grid.Column="1"
+                        ItemsSource="{x:Bind viewmodels:EditorViewModel.LanguageTypes}"
+                        SelectedItem="{x:Bind Provider.Options.LanguageType, Mode=TwoWay}" />
+                </Grid>
+                <editor:CodeEditorControl
+                    x:Name="Input"
+                    Grid.Row="1"
+                    FontFamily="{StaticResource CodeThemeFontFamily}"
+                    HighlightingLanguage="{x:Bind Provider.Options.LanguageName, Mode=OneWay}" />
+            </Grid>
         </muxc:TwoPaneView.Pane1>
         <muxc:TwoPaneView.Pane2>
-            <ListView
-                x:Name="Output"
-                Padding="16,4"
-                ItemsSource="{x:Bind Provider.Diagnostics, Mode=OneWay}"
-                SelectionMode="None">
-                <ListView.ItemContainerStyle>
-                    <Style TargetType="ListViewItem">
-                        <Setter Property="Padding" Value="0" />
-                        <Setter Property="MinHeight" Value="0" />
-                        <Setter Property="MinWidth" Value="0" />
-                    </Style>
-                </ListView.ItemContainerStyle>
-                <ListView.ItemTemplate>
-                    <DataTemplate x:DataType="x:String">
-                        <TextBlock
-                            FontFamily="{StaticResource CodeThemeFontFamily}"
-                            IsTextSelectionEnabled="True"
-                            Text="{x:Bind}"
-                            TextWrapping="Wrap" />
-                    </DataTemplate>
-                </ListView.ItemTemplate>
-            </ListView>
+            <Grid Padding="4" RowSpacing="4">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <ComboBox
+                        Grid.Column="1"
+                        ItemsSource="{x:Bind viewmodels:EditorViewModel.OutputTypes}"
+                        SelectedItem="{x:Bind viewmodels:OutputType.Run}" />
+                </Grid>
+                <ListView
+                    x:Name="Output"
+                    Grid.Row="1"
+                    Padding="12,0"
+                    ItemsSource="{x:Bind Provider.Diagnostics, Mode=OneWay}"
+                    SelectionMode="None">
+                    <ListView.ItemContainerStyle>
+                        <Style TargetType="ListViewItem">
+                            <Setter Property="Padding" Value="0" />
+                            <Setter Property="MinHeight" Value="0" />
+                            <Setter Property="MinWidth" Value="0" />
+                        </Style>
+                    </ListView.ItemContainerStyle>
+                    <ListView.ItemTemplate>
+                        <DataTemplate x:DataType="x:String">
+                            <TextBlock
+                                FontFamily="{StaticResource CodeThemeFontFamily}"
+                                IsTextSelectionEnabled="True"
+                                Text="{x:Bind}"
+                                TextWrapping="Wrap" />
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
+            </Grid>
         </muxc:TwoPaneView.Pane2>
     </muxc:TwoPaneView>
 </Page>

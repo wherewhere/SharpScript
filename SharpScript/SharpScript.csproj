@@ -21,7 +21,9 @@
   <ItemGroup>
     <PackageReference Include="DisposableMemory.ModernNetUAP.WinUI" Version="2.8.6.3-preview" />
     <PackageReference Include="MetroLog.Net6" Version="2.1.0" />
-    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Scripting" Version="4.11.0" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.12.0-2.final" />
+    <PackageReference Include="Microsoft.CodeAnalysis.Scripting.Common" Version="4.12.0-2.final" />
+    <PackageReference Include="Microsoft.CodeAnalysis.VisualBasic" Version="4.12.0-2.final" />
     <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="all">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
