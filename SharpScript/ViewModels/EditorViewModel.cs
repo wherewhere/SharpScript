@@ -1,8 +1,9 @@
 ﻿using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.VisualBasic;
 using Microsoft.CodeAnalysis.Emit;
 using Microsoft.CodeAnalysis.Scripting;
+using Microsoft.CodeAnalysis.VisualBasic;
+using Mobius.ILasm.Core;
 using SharpScript.Common;
 using SharpScript.Helpers;
 using System;
@@ -94,27 +95,12 @@ namespace SharpScript.ViewModels
             {
                 Diagnostics = ["Compilating..."];
                 await ThreadSwitcher.ResumeBackgroundAsync();
-                MemoryStream assemblyStream = new();
-                Compilation compilation = Options.InputOptions switch
+                return Options.LanguageType switch
                 {
-                    CSharpInputOptions csharp => GetCSharpCompilate(code, csharp),
-                    VisualBasicInputOptions vb => GetCSharpCompilate(code, vb),
+                    LanguageType.CSharp or LanguageType.VisualBasic => RoslynCompilate(code, Options, results),
+                    LanguageType.IL => ILCompilate(code, results),
                     _ => throw new Exception("Invalid language type.")
                 };
-                EmitResult emitResult = compilation.Emit(assemblyStream);
-                if (emitResult.Success)
-                {
-                    return assemblyStream;
-                }
-                else
-                {
-                    results.AddRange(emitResult.Diagnostics.Select(x =>
-                    {
-                        FileLinePositionSpan line = x.Location.GetLineSpan();
-                        return $"{(string.IsNullOrEmpty(line.Path) ? "Current" : string.Empty)}{x.Location.GetLineSpan()}: {x.Severity} {x.Id}: {x.GetMessage()}";
-                    }));
-                    return null;
-                }
             }
             catch (CompilationErrorException cex)
             {
@@ -141,7 +127,32 @@ namespace SharpScript.ViewModels
             return null;
         }
 
-        private static Compilation GetCSharpCompilate(string code, CSharpInputOptions options)
+        private static MemoryStream RoslynCompilate(string code, CompilateOptions options, ICollection<string> results)
+        {
+            MemoryStream assemblyStream = new();
+            Compilation compilation = options.InputOptions switch
+            {
+                CSharpInputOptions csharp => GetRoslynCompilate(code, csharp),
+                VisualBasicInputOptions vb => GetRoslynCompilate(code, vb),
+                _ => throw new Exception("Invalid language type.")
+            };
+            EmitResult emitResult = compilation.Emit(assemblyStream);
+            if (emitResult.Success)
+            {
+                return assemblyStream;
+            }
+            else
+            {
+                results.AddRange(emitResult.Diagnostics.Select(x =>
+                {
+                    FileLinePositionSpan line = x.Location.GetLineSpan();
+                    return $"{(string.IsNullOrEmpty(line.Path) ? "Current" : string.Empty)}{x.Location.GetLineSpan()}: {x.Severity} {x.Id}: {x.GetMessage()}";
+                }));
+                return null;
+            }
+        }
+
+        private static Compilation GetRoslynCompilate(string code, CSharpInputOptions options)
         {
             SyntaxTree syntaxTree =
                 CSharpSyntaxFactory.ParseSyntaxTree(
@@ -162,7 +173,7 @@ namespace SharpScript.ViewModels
             return compilation;
         }
 
-        private static Compilation GetCSharpCompilate(string code, VisualBasicInputOptions options)
+        private static Compilation GetRoslynCompilate(string code, VisualBasicInputOptions options)
         {
             SyntaxTree syntaxTree =
                 VisualBasicSyntaxFactory.ParseSyntaxTree(
@@ -181,6 +192,27 @@ namespace SharpScript.ViewModels
             return compilation;
         }
 
+        private static MemoryStream ILCompilate(string code, ICollection<string> results)
+        {
+            Logger logger = new(results);
+            Driver driver = new(logger, Driver.Target.Exe, false, false, false);
+
+            try
+            {
+                MemoryStream assemblyStream = new();
+                if (driver.Assemble([code], assemblyStream))
+                {
+                    return assemblyStream;
+                }
+            }
+            catch (Exception ex) when (ex.GetType().Name.StartsWith("yy"))
+            {
+                return null;
+            }
+
+            return null;
+        }
+
         public async Task ExecuteAsync(MemoryStream assemblyStream)
         {
             bool finished = false;
@@ -193,7 +225,7 @@ namespace SharpScript.ViewModels
                 AssemblyLoadContext context = new("ExecutorContext", isCollectible: true);
                 try
                 {
-                    assemblyStream.Position = 0;
+                    assemblyStream.Seek(0, SeekOrigin.Begin);
                     Assembly assembly = context.LoadFromStream(assemblyStream);
                     if (assembly.EntryPoint is MethodInfo main)
                     {
@@ -248,20 +280,34 @@ namespace SharpScript.ViewModels
                 }
             }
         }
+
+        private class Logger(ICollection<string> results) : Mobius.ILasm.interfaces.ILogger
+        {
+            public void Info(string message) => results.Add($"{nameof(Info)}: {message}");
+
+            public void Warning(string message) => results.Add($"{nameof(Warning)}: {message}");
+
+            public void Error(string message) => results.Add($"{nameof(Error)}: {message}");
+
+            public void Warning(Mono.ILASM.Location location, string message) => results.Add($"Current {location}: {nameof(Warning)}: {message}");
+
+            public void Error(Mono.ILASM.Location location, string message) => results.Add($"Current {location}: {nameof(Error)}: {message}");
+        }
     }
 
     public enum LanguageType
     {
-        CSharp,
-        VisualBasic
+        CSharp = 0b011,
+        VisualBasic = 0b111,
+        IL = 0b001
     }
 
     public enum OutputType
     {
-        Run,
         CSharp,
         IL,
-        JIT
+        JIT,
+        Run
     }
 
     public partial class CompilateOptions(CoreDispatcher dispatcher) : INotifyPropertyChanged
@@ -276,15 +322,13 @@ namespace SharpScript.ViewModels
             {
                 if (languageType != value)
                 {
-                    switch (value)
+                    InputOptions = value switch
                     {
-                        case LanguageType.CSharp:
-                            InputOptions = new CSharpInputOptions(Dispatcher);
-                            break;
-                        case LanguageType.VisualBasic:
-                            InputOptions = new VisualBasicInputOptions(Dispatcher);
-                            break;
-                    }
+                        LanguageType.CSharp => new CSharpInputOptions(Dispatcher),
+                        LanguageType.VisualBasic => new VisualBasicInputOptions(Dispatcher),
+                        LanguageType.IL => new ILInputOptions(Dispatcher),
+                        _ => throw new Exception("Invalid language type."),
+                    };
                     languageType = value;
                     RaisePropertyChangedEvent();
                     RaisePropertyChangedEvent(nameof(LanguageName));
@@ -296,6 +340,7 @@ namespace SharpScript.ViewModels
         {
             LanguageType.CSharp => "csharp",
             LanguageType.VisualBasic => "vb",
+            LanguageType.IL => "il",
             _ => throw new Exception("Invalid language type.")
         };
 
@@ -371,4 +416,6 @@ namespace SharpScript.ViewModels
             set => SetProperty(ref languageVersion, value);
         }
     }
+
+    public partial class ILInputOptions(CoreDispatcher dispatcher) : InputOptions(dispatcher);
 }

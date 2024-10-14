@@ -28,6 +28,8 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="Microsoft.Windows.CsWinRT" Version="2.1.5" />
+    <PackageReference Include="Mobius.ILasm" Version="0.1.0" />
+    <PackageReference Include="System.Security.Permissions" Version="8.0.0" />
 		<PackageReference Include="WinUIEdit.Uwp" Version="0.0.3-prerelease" GeneratePathProperty="True">
 			<ExcludeAssets>build; buildtransitive; compile; runtime</ExcludeAssets>
 		</PackageReference>
