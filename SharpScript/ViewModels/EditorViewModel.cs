@@ -1,4 +1,10 @@
-﻿using Microsoft.CodeAnalysis;
+﻿using ICSharpCode.Decompiler;
+using ICSharpCode.Decompiler.CSharp;
+using ICSharpCode.Decompiler.CSharp.OutputVisitor;
+using ICSharpCode.Decompiler.CSharp.Syntax;
+using ICSharpCode.Decompiler.Disassembler;
+using ICSharpCode.Decompiler.Metadata;
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Emit;
 using Microsoft.CodeAnalysis.Scripting;
@@ -7,18 +13,23 @@ using Mobius.ILasm.Core;
 using SharpScript.Common;
 using SharpScript.Helpers;
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Reflection.Metadata;
 using System.Runtime.CompilerServices;
 using System.Runtime.Loader;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Windows.UI.Core;
 using CSharpLanguageVersion = Microsoft.CodeAnalysis.CSharp.LanguageVersion;
 using CSharpSyntaxFactory = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
+using LanguageVersion = ICSharpCode.Decompiler.CSharp.LanguageVersion;
+using SyntaxTree = Microsoft.CodeAnalysis.SyntaxTree;
 using VisualBasicLanguageVersion = Microsoft.CodeAnalysis.VisualBasic.LanguageVersion;
 using VisualBasicSyntaxFactory = Microsoft.CodeAnalysis.VisualBasic.SyntaxFactory;
 
@@ -68,6 +79,20 @@ namespace SharpScript.ViewModels
             set => SetProperty(ref diagnostics, value);
         }
 
+        private bool isDecompile = false;
+        public bool IsDecompile
+        {
+            get => isDecompile;
+            set => SetProperty(ref isDecompile, value);
+        }
+
+        private string decompiled;
+        public string Decompiled
+        {
+            get => decompiled;
+            set => SetProperty(ref decompiled, value);
+        }
+
         public event PropertyChangedEventHandler PropertyChanged;
 
         protected async void RaisePropertyChangedEvent([CallerMemberName] string name = null)
@@ -88,17 +113,18 @@ namespace SharpScript.ViewModels
             }
         }
 
-        public async Task<MemoryStream> CompilateAsync(string code)
+        private async Task<Streams> CompilateAsync(string code)
         {
             List<string> results = [];
             try
             {
                 Diagnostics = ["Compilating..."];
                 await ThreadSwitcher.ResumeBackgroundAsync();
+                bool isExe = Options.OutputType == OutputType.Run;
                 return Options.LanguageType switch
                 {
-                    LanguageType.CSharp or LanguageType.VisualBasic => RoslynCompilate(code, Options, results),
-                    LanguageType.IL => ILCompilate(code, results),
+                    LanguageType.CSharp or LanguageType.VisualBasic => RoslynCompilate(code, Options, results, isExe),
+                    LanguageType.IL => ILCompilate(code, results, isExe),
                     _ => throw new Exception("Invalid language type.")
                 };
             }
@@ -127,22 +153,32 @@ namespace SharpScript.ViewModels
             return null;
         }
 
-        private static MemoryStream RoslynCompilate(string code, CompilateOptions options, ICollection<string> results)
+        private static Streams RoslynCompilate(string code, CompilateOptions options, ICollection<string> results, bool isExe)
         {
             MemoryStream assemblyStream = new();
+            MemoryStream symbolStream = new();
+        start:
             Compilation compilation = options.InputOptions switch
             {
-                CSharpInputOptions csharp => GetRoslynCompilate(code, csharp),
-                VisualBasicInputOptions vb => GetRoslynCompilate(code, vb),
+                CSharpInputOptions csharp => GetRoslynCompilate(code, csharp, isExe),
+                VisualBasicInputOptions vb => GetRoslynCompilate(code, vb, isExe),
                 _ => throw new Exception("Invalid language type.")
             };
-            EmitResult emitResult = compilation.Emit(assemblyStream);
+            EmitResult emitResult = compilation.Emit(assemblyStream, symbolStream);
             if (emitResult.Success)
             {
-                return assemblyStream;
+                assemblyStream.Seek(0, SeekOrigin.Begin);
+                symbolStream.Seek(0, SeekOrigin.Begin);
+                return new Streams(assemblyStream, symbolStream);
             }
             else
             {
+                if (!isExe && options.LanguageType == LanguageType.CSharp
+                    && emitResult.Diagnostics.Any(x => x.Id == "CS8805" && x.Severity == DiagnosticSeverity.Error))
+                {
+                    isExe = true;
+                    goto start;
+                }
                 results.AddRange(emitResult.Diagnostics.Select(x =>
                 {
                     FileLinePositionSpan line = x.Location.GetLineSpan();
@@ -152,7 +188,7 @@ namespace SharpScript.ViewModels
             }
         }
 
-        private static Compilation GetRoslynCompilate(string code, CSharpInputOptions options)
+        private static Compilation GetRoslynCompilate(string code, CSharpInputOptions options, bool isExe)
         {
             SyntaxTree syntaxTree =
                 CSharpSyntaxFactory.ParseSyntaxTree(
@@ -168,12 +204,12 @@ namespace SharpScript.ViewModels
                     [syntaxTree],
                     references,
                     new CSharpCompilationOptions(
-                        OutputKind.ConsoleApplication,
+                        isExe ? OutputKind.ConsoleApplication : OutputKind.DynamicallyLinkedLibrary,
                         allowUnsafe: true));
             return compilation;
         }
 
-        private static Compilation GetRoslynCompilate(string code, VisualBasicInputOptions options)
+        private static Compilation GetRoslynCompilate(string code, VisualBasicInputOptions options, bool isExe)
         {
             SyntaxTree syntaxTree =
                 VisualBasicSyntaxFactory.ParseSyntaxTree(
@@ -188,21 +224,23 @@ namespace SharpScript.ViewModels
                     "SharpScript",
                     [syntaxTree],
                     references,
-                    new VisualBasicCompilationOptions(OutputKind.ConsoleApplication));
+                    new VisualBasicCompilationOptions(
+                        isExe ? OutputKind.ConsoleApplication : OutputKind.DynamicallyLinkedLibrary));
             return compilation;
         }
 
-        private static MemoryStream ILCompilate(string code, ICollection<string> results)
+        private static Streams ILCompilate(string code, ICollection<string> results, bool isExe)
         {
             Logger logger = new(results);
-            Driver driver = new(logger, Driver.Target.Exe, false, false, false);
+            Driver driver = new(logger, isExe ? Driver.Target.Exe : Driver.Target.Dll, false, false, false);
 
             try
             {
                 MemoryStream assemblyStream = new();
                 if (driver.Assemble([code], assemblyStream))
                 {
-                    return assemblyStream;
+                    assemblyStream.Seek(0, SeekOrigin.Begin);
+                    return new Streams(assemblyStream, null);
                 }
             }
             catch (Exception ex) when (ex.GetType().Name.StartsWith("yy"))
@@ -213,7 +251,161 @@ namespace SharpScript.ViewModels
             return null;
         }
 
-        public async Task ExecuteAsync(MemoryStream assemblyStream)
+        private async Task DecompileAsync(Streams streams)
+        {
+            Diagnostics = ["Decompiling..."];
+            Decompiled = Options.OutputOptions switch
+            {
+                CSharpOutputOptions csharp => await CSharpDecompileAsync(streams, csharp).ConfigureAwait(false),
+                ILOutputOptions => await ILDecompileAsync(streams).ConfigureAwait(false),
+                _ => throw new Exception("Invalid output type.")
+            };
+            IsDecompile = !string.IsNullOrEmpty(Decompiled);
+        }
+
+        private static async Task<string> CSharpDecompileAsync(Streams streams, CSharpOutputOptions options)
+        {
+            using PEFile assemblyFile = new("", streams.AssemblyStream);
+            PortablePdbDebugInfoProvider debugInfo = null;
+            try
+            {
+                //try { debugInfo = streams.SymbolStream != null ? new PortablePdbDebugInfoProvider(streams.SymbolStream) : null; }
+                //catch { }
+
+                CSharpDecompiler decompiler =
+                    new(assemblyFile,
+                        new PreCachedAssemblyResolver(references),
+                        new DecompilerSettings(options.LanguageVersion))
+                    {
+                        DebugInfoProvider = debugInfo
+                    };
+                ICSharpCode.Decompiler.CSharp.Syntax.SyntaxTree syntaxTree = decompiler.DecompileWholeModuleAsSingleFile();
+
+                SortTree(syntaxTree);
+
+                StringBuilder code = new();
+                await using StringWriter codeWriter = new(code);
+                new ExtendedCSharpOutputVisitor(codeWriter, CreateFormattingOptions())
+                    .VisitSyntaxTree(syntaxTree);
+                return code.ToString();
+            }
+            finally
+            {
+                debugInfo?.Dispose();
+            }
+        }
+
+        private static void SortTree(ICSharpCode.Decompiler.CSharp.Syntax.SyntaxTree root)
+        {
+            // Note: the sorting logic cannot be reused, but should match IL and Jit ASM ordering
+            AstNode firstMovedNode = null;
+            foreach (AstNode node in root.Children)
+            {
+                if (node == firstMovedNode) { break; }
+                if (node is NamespaceDeclaration @namespace && IsNonUserCode(@namespace))
+                {
+                    node.Remove();
+                    root.AddChildWithExistingRole(node);
+                    firstMovedNode ??= node;
+                }
+            }
+        }
+
+        private static bool IsNonUserCode(NamespaceDeclaration @namespace) =>
+            // Note: the logic cannot be reused, but should match IL and Jit ASM
+            @namespace.Members.Any(member => member is not TypeDeclaration type || !IsCompilerGenerated(type));
+
+        private static bool IsCompilerGenerated(TypeDeclaration type) =>
+            type.Attributes.Any(section => section.Attributes.Any(attribute => attribute.Type is SimpleType { Identifier: nameof(CompilerGeneratedAttribute) or "CompilerGenerated" }));
+
+        private static CSharpFormattingOptions CreateFormattingOptions()
+        {
+            CSharpFormattingOptions options = FormattingOptionsFactory.CreateAllman();
+            options.IndentationString = "    ";
+            options.MinimumBlankLinesBetweenTypes = 1;
+            return options;
+        }
+
+        private static async Task<string> ILDecompileAsync(Streams streams)
+        {
+            using PEFile assemblyFile = new("", streams.AssemblyStream);
+            PortablePdbDebugInfoProvider debugInfo = null;
+            try
+            {
+                //try { debugInfo = streams.SymbolStream != null ? new PortablePdbDebugInfoProvider(streams.SymbolStream) : null; }
+                //catch { }
+
+                StringBuilder code = new();
+                await using StringWriter codeWriter = new(code);
+
+                PlainTextOutput output = new(codeWriter) { IndentationString = "    " };
+                ReflectionDisassembler disassembler = new(output, default)
+                {
+                    DebugInfo = debugInfo,
+                    ShowSequencePoints = true
+                };
+
+                disassembler.WriteAssemblyHeader(assemblyFile);
+                output.WriteLine(); // empty line
+
+                MetadataReader metadata = assemblyFile.Metadata;
+                DecompileTypes(assemblyFile, output, disassembler, metadata);
+                return code.ToString();
+            }
+            finally
+            {
+                debugInfo?.Dispose();
+            }
+        }
+
+        private static void DecompileTypes(PEFile assemblyFile, PlainTextOutput output, ReflectionDisassembler disassembler, MetadataReader metadata)
+        {
+            const int MaxNonUserTypeHandles = 10;
+            TypeDefinitionHandle[] nonUserTypeHandlesLease = default;
+            int nonUserTypeHandlesCount = -1;
+
+            // user code (first)                
+            foreach (TypeDefinitionHandle typeHandle in metadata.TypeDefinitions)
+            {
+                TypeDefinition type = metadata.GetTypeDefinition(typeHandle);
+                if (!type.GetDeclaringType().IsNil)
+                {
+                    continue; // not a top-level type
+                }
+
+                if (IsNonUserCode(metadata, type) && nonUserTypeHandlesCount < MaxNonUserTypeHandles)
+                {
+                    if (nonUserTypeHandlesCount == -1)
+                    {
+                        nonUserTypeHandlesLease = new TypeDefinitionHandle[MaxNonUserTypeHandles];
+                        nonUserTypeHandlesCount = 0;
+                    }
+
+                    nonUserTypeHandlesLease[nonUserTypeHandlesCount] = typeHandle;
+                    nonUserTypeHandlesCount += 1;
+                    continue;
+                }
+
+                disassembler.DisassembleType(assemblyFile, typeHandle);
+                output.WriteLine();
+            }
+
+            // non-user code (second)
+            if (nonUserTypeHandlesCount > 0)
+            {
+                foreach (TypeDefinitionHandle typeHandle in nonUserTypeHandlesLease[..nonUserTypeHandlesCount])
+                {
+                    disassembler.DisassembleType(assemblyFile, typeHandle);
+                    output.WriteLine();
+                }
+            }
+        }
+
+        private static bool IsNonUserCode(MetadataReader metadata, TypeDefinition type) =>
+            // Note: the logic cannot be reused, but should match C# and Jit ASM
+            !type.NamespaceDefinition.IsNil && type.IsCompilerGenerated(metadata);
+
+        private async Task ExecuteAsync(Streams streams)
         {
             bool finished = false;
             List<string> results = [];
@@ -225,7 +417,7 @@ namespace SharpScript.ViewModels
                 AssemblyLoadContext context = new("ExecutorContext", isCollectible: true);
                 try
                 {
-                    assemblyStream.Seek(0, SeekOrigin.Begin);
+                    MemoryStream assemblyStream = streams.AssemblyStream;
                     Assembly assembly = context.LoadFromStream(assemblyStream);
                     if (assembly.EntryPoint is MethodInfo main)
                     {
@@ -243,7 +435,7 @@ namespace SharpScript.ViewModels
                 finally
                 {
                     context.Unload();
-                    assemblyStream.Dispose();
+                    streams.Dispose();
                 }
             }
             catch (Exception ex)
@@ -263,9 +455,26 @@ namespace SharpScript.ViewModels
 
         public async Task ProcessAsync(string code)
         {
-            if (await CompilateAsync(code).ConfigureAwait(false) is MemoryStream assemblyStream)
+            try
             {
-                await ExecuteAsync(assemblyStream).ConfigureAwait(false);
+                IsDecompile = false;
+                if (await CompilateAsync(code).ConfigureAwait(false) is Streams assemblyStream)
+                {
+                    switch (Options.OutputType)
+                    {
+                        case OutputType.CSharp
+                            or OutputType.IL:
+                            await DecompileAsync(assemblyStream).ConfigureAwait(false);
+                            break;
+                        case OutputType.Run:
+                            await ExecuteAsync(assemblyStream).ConfigureAwait(false);
+                            break;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                SettingsHelper.LogManager.GetLogger(nameof(EditorViewModel)).Error(ex.ExceptionToMessage(), ex);
             }
         }
 
@@ -274,12 +483,14 @@ namespace SharpScript.ViewModels
             ScriptMetadataResolver resolver = ScriptMetadataResolver.Default;
             foreach (string reference in references)
             {
-                foreach(PortableExecutableReference resolved in resolver.ResolveReference(reference, null, MetadataReferenceProperties.Assembly))
+                foreach (PortableExecutableReference resolved in resolver.ResolveReference(reference, null, MetadataReferenceProperties.Assembly))
                 {
                     yield return resolved;
                 }
             }
         }
+
+        public static bool BoolNegationConverter(bool value) => !value;
 
         private class Logger(ICollection<string> results) : Mobius.ILasm.interfaces.ILogger
         {
@@ -293,8 +504,54 @@ namespace SharpScript.ViewModels
 
             public void Error(Mono.ILASM.Location location, string message) => results.Add($"Current {location}: {nameof(Error)}: {message}");
         }
-    }
 
+        private partial record Streams(MemoryStream AssemblyStream, MemoryStream SymbolStream) : IDisposable
+        {
+            public void Dispose()
+            {
+                AssemblyStream?.Dispose();
+                SymbolStream?.Dispose();
+                GC.SuppressFinalize(this);
+            }
+        }
+
+        private class ExtendedCSharpOutputVisitor(TextWriter textWriter, CSharpFormattingOptions formattingPolicy) : CSharpOutputVisitor(textWriter, formattingPolicy)
+        {
+            public override void VisitTypeDeclaration(TypeDeclaration typeDeclaration)
+            {
+                base.VisitTypeDeclaration(typeDeclaration);
+                if (typeDeclaration.NextSibling is NamespaceDeclaration or TypeDeclaration)
+                { NewLine(); }
+            }
+
+            public override void VisitNamespaceDeclaration(NamespaceDeclaration namespaceDeclaration)
+            {
+                base.VisitNamespaceDeclaration(namespaceDeclaration);
+                if (namespaceDeclaration.NextSibling is NamespaceDeclaration or TypeDeclaration)
+                { NewLine(); }
+            }
+
+            public override void VisitAttributeSection(AttributeSection attributeSection)
+            {
+                base.VisitAttributeSection(attributeSection);
+                if (attributeSection is { AttributeTarget: "assembly" or "module", NextSibling: not AttributeSection { AttributeTarget: "assembly" or "module" } })
+                { NewLine(); }
+            }
+        }
+
+        private readonly partial struct MemoryLease<T>(ArrayPool<T> arrayPool, T[] array, int length) : IDisposable
+        {
+            public Memory<T> AsMemory() => array.AsMemory(0, length);
+            public Span<T> AsSpan() => array.AsSpan(0, length);
+
+            public void Dispose()
+            {
+                // can be null if created through default constructor
+                if (array != null)
+                { arrayPool.Return(array); }
+            }
+        }
+    }
     public enum LanguageType
     {
         CSharp = 0b011,
@@ -330,8 +587,9 @@ namespace SharpScript.ViewModels
                         _ => throw new Exception("Invalid language type."),
                     };
                     languageType = value;
-                    RaisePropertyChangedEvent();
-                    RaisePropertyChangedEvent(nameof(LanguageName));
+                    RaisePropertyChangedEvent(
+                        nameof(LanguageType),
+                        nameof(LanguageName));
                 }
             }
         }
@@ -340,7 +598,7 @@ namespace SharpScript.ViewModels
         {
             LanguageType.CSharp => "csharp",
             LanguageType.VisualBasic => "vb",
-            LanguageType.IL => "il",
+            LanguageType.IL => "csharp",
             _ => throw new Exception("Invalid language type.")
         };
 
@@ -351,6 +609,35 @@ namespace SharpScript.ViewModels
             set => SetProperty(ref inputOptions, value);
         }
 
+        private OutputType outputType = OutputType.Run;
+        public OutputType OutputType
+        {
+            get => outputType;
+            set
+            {
+                if (outputType != value)
+                {
+                    OutputOptions = value switch
+                    {
+                        OutputType.CSharp => new CSharpOutputOptions(Dispatcher),
+                        OutputType.IL => new ILOutputOptions(Dispatcher),
+                        OutputType.JIT => new RunOutputOptions(Dispatcher),
+                        OutputType.Run => new RunOutputOptions(Dispatcher),
+                        _ => throw new Exception("Invalid output type."),
+                    };
+                    outputType = value;
+                    RaisePropertyChangedEvent();
+                }
+            }
+        }
+
+        private OutputOptions outputOptions = new RunOutputOptions(dispatcher);
+        public OutputOptions OutputOptions
+        {
+            get => outputOptions;
+            set => SetProperty(ref outputOptions, value);
+        }
+
         public event PropertyChangedEventHandler PropertyChanged;
 
         protected async void RaisePropertyChangedEvent([CallerMemberName] string name = null)
@@ -359,6 +646,18 @@ namespace SharpScript.ViewModels
             {
                 await Dispatcher.ResumeForegroundAsync();
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+            }
+        }
+
+        protected async void RaisePropertyChangedEvent(params string[] names)
+        {
+            if (names?.Length > 0 && PropertyChanged != null)
+            {
+                await Dispatcher.ResumeForegroundAsync();
+                foreach (string name in names)
+                {
+                    PropertyChanged.Invoke(this, new PropertyChangedEventArgs(name));
+                }
             }
         }
 
@@ -397,7 +696,7 @@ namespace SharpScript.ViewModels
         }
     }
 
-    public partial class CSharpInputOptions(CoreDispatcher dispatcher) : InputOptions(dispatcher)
+    public sealed partial class CSharpInputOptions(CoreDispatcher dispatcher) : InputOptions(dispatcher)
     {
         private CSharpLanguageVersion languageVersion = CSharpLanguageVersion.Preview;
         public CSharpLanguageVersion LanguageVersion
@@ -407,7 +706,7 @@ namespace SharpScript.ViewModels
         }
     }
 
-    public partial class VisualBasicInputOptions(CoreDispatcher dispatcher) : InputOptions(dispatcher)
+    public sealed partial class VisualBasicInputOptions(CoreDispatcher dispatcher) : InputOptions(dispatcher)
     {
         private VisualBasicLanguageVersion languageVersion = VisualBasicLanguageVersion.Latest;
         public VisualBasicLanguageVersion LanguageVersion
@@ -417,5 +716,45 @@ namespace SharpScript.ViewModels
         }
     }
 
-    public partial class ILInputOptions(CoreDispatcher dispatcher) : InputOptions(dispatcher);
+    public sealed partial class ILInputOptions(CoreDispatcher dispatcher) : InputOptions(dispatcher);
+
+    public abstract partial class OutputOptions(CoreDispatcher dispatcher) : INotifyPropertyChanged
+    {
+        public CoreDispatcher Dispatcher { get; } = dispatcher;
+
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        protected async void RaisePropertyChangedEvent([CallerMemberName] string name = null)
+        {
+            if (name != null)
+            {
+                await Dispatcher.ResumeForegroundAsync();
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+            }
+        }
+
+        protected void SetProperty<TProperty>(ref TProperty property, TProperty value, [CallerMemberName] string name = null)
+        {
+            if (property == null ? value != null : !property.Equals(value))
+            {
+                property = value;
+                RaisePropertyChangedEvent(name);
+            }
+        }
+    }
+
+    public sealed partial class CSharpOutputOptions(CoreDispatcher dispatcher) : OutputOptions(dispatcher)
+    {
+        private LanguageVersion languageVersion = LanguageVersion.CSharp1;
+        public LanguageVersion LanguageVersion
+        {
+            get => languageVersion;
+            set => SetProperty(ref languageVersion, value);
+        }
+    }
+
+
+    public sealed partial class ILOutputOptions(CoreDispatcher dispatcher) : OutputOptions(dispatcher);
+
+    public sealed partial class RunOutputOptions(CoreDispatcher dispatcher) : OutputOptions(dispatcher);
 }

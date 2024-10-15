@@ -2,6 +2,7 @@ using SharpScript.Helpers;
 using SharpScript.ViewModels;
 using System.Threading.Tasks;
 using Windows.UI.Xaml.Controls;
+using Windows.UI.Xaml.Navigation;
 using WinUIEditor;
 
 // To learn more about WinUI, the WinUI project structure,
@@ -20,14 +21,30 @@ namespace SharpScript.Pages
         {
             InitializeComponent();
             Provider = new EditorViewModel(Dispatcher);
-            string code = SettingsHelper.Get<string>(SettingsHelper.CachedCode);
-            Input.Editor.SetText(code);
-            _ = Provider.ProcessAsync(code);
-            Input.Editor.Modified += Editor_Modified;
         }
 
+        protected override void OnNavigatedTo(NavigationEventArgs e)
+        {
+            base.OnNavigatedTo(e);
+            string code = SettingsHelper.Get<string>(SettingsHelper.CachedCode);
+            Input.Editor.SetText(code);
+            Provider.ProcessAsync(code).ContinueWith(_ =>
+            {
+                Input.Editor.Modified += Editor_Modified;
+            });
+        }
+
+        protected override void OnNavigatedFrom(NavigationEventArgs e)
+        {
+            base.OnNavigatedFrom(e);
+            Input.Editor.Modified -= Editor_Modified;
+            SettingsHelper.Set(SettingsHelper.CachedCode, Input.Editor.GetTargetText());
+        }
+
+        private void Editor_Modified(Editor sender, ModifiedEventArgs args) => _ = ProcessAsync(sender);
+
         private uint count = 0;
-        private async void Editor_Modified(Editor sender, ModifiedEventArgs args)
+        private async Task ProcessAsync(Editor sender)
         {
             try
             {

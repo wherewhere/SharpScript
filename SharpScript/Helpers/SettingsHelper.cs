@@ -40,21 +40,18 @@ namespace SharpScript.Helpers
 
     public static partial class SettingsHelper
     {
-        public static ILogManager LogManager { get; private set; }
+        public static ILogManager LogManager { get; } = LogManagerFactory.CreateLogManager(GetDefaultReleaseConfiguration());
         public static ApplicationDataContainer LocalObject { get; } = ApplicationData.Current.LocalSettings;
 
         static SettingsHelper() => SetDefaultSettings();
 
-        public static void CreateLogManager()
+        private static LoggingConfiguration GetDefaultReleaseConfiguration()
         {
-            if (LogManager == null)
-            {
-                string path = Path.Combine(ApplicationData.Current.LocalFolder.Path, "MetroLogs");
-                if (!Directory.Exists(path)) { Directory.CreateDirectory(path); }
-                LoggingConfiguration loggingConfiguration = new();
-                loggingConfiguration.AddTarget(LogLevel.Info, LogLevel.Fatal, new StreamingFileTarget(path, 7));
-                LogManager = LogManagerFactory.CreateLogManager(loggingConfiguration);
-            }
+            string path = Path.Combine(ApplicationData.Current.LocalFolder.Path, "MetroLogs");
+            if (!Directory.Exists(path)) { Directory.CreateDirectory(path); }
+            LoggingConfiguration loggingConfiguration = new();
+            loggingConfiguration.AddTarget(LogLevel.Info, LogLevel.Fatal, new StreamingFileTarget(path, 7));
+            return loggingConfiguration;
         }
     }
 
