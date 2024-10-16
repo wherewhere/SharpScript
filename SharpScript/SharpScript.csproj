@@ -28,36 +28,36 @@
     <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="all">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="Microsoft.Windows.CsWinRT" Version="2.1.5" />
+    <PackageReference Include="Microsoft.Windows.CsWinRT" Version="2.1.6" />
     <PackageReference Include="Mobius.ILasm" Version="0.1.0" />
     <PackageReference Include="System.Security.Permissions" Version="8.0.0" />
-		<PackageReference Include="WinUIEdit.Uwp" Version="0.0.3-prerelease" GeneratePathProperty="True">
-			<ExcludeAssets>build; buildtransitive; compile; runtime</ExcludeAssets>
-		</PackageReference>
+    <PackageReference Include="WinUIEdit.Uwp" Version="0.0.3-prerelease" GeneratePathProperty="True">
+      <ExcludeAssets>build; buildtransitive; compile; runtime</ExcludeAssets>
+    </PackageReference>
     <Manifest Include="$(ApplicationManifest)" />
   </ItemGroup>
-  
+
   <ItemGroup>
-		<CsWinRTInputs Include="$(PkgWinUIEdit_Uwp)\lib\uap10.0\*.winmd" />
-	</ItemGroup>
+    <CsWinRTInputs Include="$(PkgWinUIEdit_Uwp)\lib\uap10.0\*.winmd" />
+  </ItemGroup>
 
   <ItemGroup>
     <Compile Remove="Generated Files\**" />
     <None Remove="AppPackages\**" />
     <None Remove="Generated Files\**" />
   </ItemGroup>
-  
-	<ItemGroup>
-		<Page Include="$(PkgWinUIEdit_Uwp)\lib\uap10.0\**\*.xaml" Visible="False">
+
+  <ItemGroup>
+    <Page Include="$(PkgWinUIEdit_Uwp)\lib\uap10.0\**\*.xaml" Visible="False">
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <None Include="$(PkgWinUIEdit_Uwp)\lib\uap10.0\*.winmd" Visible="False">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-		<None Include="$(PkgWinUIEdit_Uwp)\runtimes\win10-$(Platform)\native\*.dll" Visible="False">
+    <None Include="$(PkgWinUIEdit_Uwp)\runtimes\win10-$(Platform)\native\*.dll" Visible="False">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-		<None Include="$(PkgWinUIEdit_Uwp)\runtimes\win10-$(Platform)\native\*.pdb" Visible="False">
+    <None Include="$(PkgWinUIEdit_Uwp)\runtimes\win10-$(Platform)\native\*.pdb" Visible="False">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>

@@ -14,6 +14,7 @@ using SharpScript.Common;
 using SharpScript.Helpers;
 using System;
 using System.Buffers;
+using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
@@ -23,7 +24,6 @@ using System.Reflection.Metadata;
 using System.Runtime.CompilerServices;
 using System.Runtime.Loader;
 using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
 using Windows.UI.Core;
 using CSharpLanguageVersion = Microsoft.CodeAnalysis.CSharp.LanguageVersion;
@@ -492,6 +492,8 @@ namespace SharpScript.ViewModels
 
         public static bool BoolNegationConverter(bool value) => !value;
 
+        public static bool CollectionToBoolConverter(ICollection value) => value?.Count > 0;
+
         private class Logger(ICollection<string> results) : Mobius.ILasm.interfaces.ILogger
         {
             public void Info(string message) => results.Add($"{nameof(Info)}: {message}");
@@ -563,7 +565,6 @@ namespace SharpScript.ViewModels
     {
         CSharp,
         IL,
-        JIT,
         Run
     }
 
@@ -609,7 +610,7 @@ namespace SharpScript.ViewModels
             set => SetProperty(ref inputOptions, value);
         }
 
-        private OutputType outputType = OutputType.Run;
+        private OutputType outputType = OutputType.CSharp;
         public OutputType OutputType
         {
             get => outputType;
@@ -621,7 +622,6 @@ namespace SharpScript.ViewModels
                     {
                         OutputType.CSharp => new CSharpOutputOptions(Dispatcher),
                         OutputType.IL => new ILOutputOptions(Dispatcher),
-                        OutputType.JIT => new RunOutputOptions(Dispatcher),
                         OutputType.Run => new RunOutputOptions(Dispatcher),
                         _ => throw new Exception("Invalid output type."),
                     };
@@ -631,7 +631,7 @@ namespace SharpScript.ViewModels
             }
         }
 
-        private OutputOptions outputOptions = new RunOutputOptions(dispatcher);
+        private OutputOptions outputOptions = new CSharpOutputOptions(dispatcher);
         public OutputOptions OutputOptions
         {
             get => outputOptions;
@@ -671,7 +671,13 @@ namespace SharpScript.ViewModels
         }
     }
 
-    public abstract partial class InputOptions(CoreDispatcher dispatcher) : INotifyPropertyChanged
+    public interface IInputOptions : INotifyPropertyChanged
+    {
+        Array LanguageVersions => null;
+        Enum LanguageVersion { get => null; set { } }
+    }
+
+    public abstract partial class InputOptions(CoreDispatcher dispatcher) : IInputOptions
     {
         public CoreDispatcher Dispatcher { get; } = dispatcher;
 
@@ -696,8 +702,15 @@ namespace SharpScript.ViewModels
         }
     }
 
-    public sealed partial class CSharpInputOptions(CoreDispatcher dispatcher) : InputOptions(dispatcher)
+    public sealed partial class CSharpInputOptions(CoreDispatcher dispatcher) : InputOptions(dispatcher), IInputOptions
     {
+        Array IInputOptions.LanguageVersions => Enum.GetValues<CSharpLanguageVersion>();
+        Enum IInputOptions.LanguageVersion
+        {
+            get => languageVersion;
+            set => SetProperty(ref languageVersion, (CSharpLanguageVersion)(value ?? CSharpLanguageVersion.Preview));
+        }
+
         private CSharpLanguageVersion languageVersion = CSharpLanguageVersion.Preview;
         public CSharpLanguageVersion LanguageVersion
         {
@@ -706,8 +719,15 @@ namespace SharpScript.ViewModels
         }
     }
 
-    public sealed partial class VisualBasicInputOptions(CoreDispatcher dispatcher) : InputOptions(dispatcher)
+    public sealed partial class VisualBasicInputOptions(CoreDispatcher dispatcher) : InputOptions(dispatcher), IInputOptions
     {
+        Array IInputOptions.LanguageVersions => Enum.GetValues<VisualBasicLanguageVersion>();
+        Enum IInputOptions.LanguageVersion
+        {
+            get => languageVersion;
+            set => SetProperty(ref languageVersion, (VisualBasicLanguageVersion)(value ?? VisualBasicLanguageVersion.Latest));
+        }
+
         private VisualBasicLanguageVersion languageVersion = VisualBasicLanguageVersion.Latest;
         public VisualBasicLanguageVersion LanguageVersion
         {
@@ -718,7 +738,13 @@ namespace SharpScript.ViewModels
 
     public sealed partial class ILInputOptions(CoreDispatcher dispatcher) : InputOptions(dispatcher);
 
-    public abstract partial class OutputOptions(CoreDispatcher dispatcher) : INotifyPropertyChanged
+    public interface IOutputOptions : INotifyPropertyChanged
+    {
+        bool IsCSharp => false;
+        Enum LanguageVersion { get => default; set { } }
+    }
+
+    public abstract partial class OutputOptions(CoreDispatcher dispatcher) : IOutputOptions
     {
         public CoreDispatcher Dispatcher { get; } = dispatcher;
 
@@ -743,8 +769,25 @@ namespace SharpScript.ViewModels
         }
     }
 
-    public sealed partial class CSharpOutputOptions(CoreDispatcher dispatcher) : OutputOptions(dispatcher)
+    public sealed partial class CSharpOutputOptions(CoreDispatcher dispatcher) : OutputOptions(dispatcher), IOutputOptions
     {
+        public static List<LanguageVersion> LanguageVersions
+        {
+            get
+            {
+                List<LanguageVersion> list = [.. Enum.GetValues<LanguageVersion>()];
+                list.Remove(LanguageVersion.Preview);
+                return list;
+            }
+        }
+
+        bool IOutputOptions.IsCSharp => true;
+        Enum IOutputOptions.LanguageVersion
+        {
+            get => languageVersion;
+            set => SetProperty(ref languageVersion, (LanguageVersion)(value ?? LanguageVersion.CSharp1));
+        }
+
         private LanguageVersion languageVersion = LanguageVersion.CSharp1;
         public LanguageVersion LanguageVersion
         {

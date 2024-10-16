@@ -1,7 +1,9 @@
 using SharpScript.Helpers;
 using SharpScript.ViewModels;
+using System;
 using System.Threading.Tasks;
 using Windows.UI.Xaml.Controls;
+using Windows.UI.Xaml.Data;
 using Windows.UI.Xaml.Navigation;
 using WinUIEditor;
 
@@ -59,5 +61,27 @@ namespace SharpScript.Pages
                 count--;
             }
         }
+    }
+
+    public partial class LanguageVersionFormatConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, string language)
+        {
+            string result = value?.ToString() ?? string.Empty;
+            switch (value)
+            {
+                case Microsoft.CodeAnalysis.CSharp.LanguageVersion
+                    or ICSharpCode.Decompiler.CSharp.LanguageVersion:
+                    result = value.ToString().Replace("CSharp", "C# ");
+                    break;
+                case Microsoft.CodeAnalysis.VisualBasic.LanguageVersion:
+                    result = value.ToString().Replace("VisualBasic", "Visual Basic ");
+                    break;
+            }
+            return result.Replace('_', '.');
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, string language) =>
+            Enum.Parse(targetType, value?.ToString().Replace("C# ", "CSharp").Replace("Visual Basic ", "VisualBasic").Replace('.', '_') ?? string.Empty);
     }
 }

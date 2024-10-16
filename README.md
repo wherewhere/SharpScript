@@ -17,4 +17,7 @@
 ## References
 - [Roslyn](https://github.com/dotnet/roslyn "Roslyn")
 - [MetroLog](https://github.com/roubachof/MetroLog "MetroLog")
+- [WinUIEdit](https://github.com/BreeceW/WinUIEdit "WinUIEdit")
 - [Windows UI](https://github.com/microsoft/microsoft-ui-xaml "Windows UI")
+- [ICSharpCode](https://github.com/icsharpcode/ILSpy "ILSpy")
+- [Mobius.ILasm](https://github.com/kkokosa/Mobius.ILasm "Mobius.ILasm")
