@@ -25,7 +25,13 @@ namespace SharpScript.Helpers
         {
             if (!LocalObject.Values.ContainsKey(CachedCode))
             {
-                LocalObject.Values[CachedCode] = SystemTextJsonObjectSerializer.Serialize("1 + 1");
+                LocalObject.Values[CachedCode] = SystemTextJsonObjectSerializer.Serialize(
+                    """
+                    public class C {
+                        public void M() {
+                        }
+                    }
+                    """);
             }
             if (!LocalObject.Values.ContainsKey(SelectedAppTheme))
             {

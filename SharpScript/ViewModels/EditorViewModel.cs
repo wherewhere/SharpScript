@@ -65,32 +65,28 @@ namespace SharpScript.ViewModels
 
         public CoreDispatcher Dispatcher { get; } = dispatcher;
 
-        private CompilateOptions options = new(dispatcher);
         public CompilateOptions Options
         {
-            get => options;
-            set => SetProperty(ref options, value);
-        }
+            get => field;
+            set => SetProperty(ref field, value);
+        } = new(dispatcher);
 
-        private List<string> diagnostics;
         public List<string> Diagnostics
         {
-            get => diagnostics;
-            set => SetProperty(ref diagnostics, value);
+            get => field;
+            set => SetProperty(ref field, value);
         }
 
-        private bool isDecompile = false;
         public bool IsDecompile
         {
-            get => isDecompile;
-            set => SetProperty(ref isDecompile, value);
-        }
+            get => field;
+            set => SetProperty(ref field, value);
+        } = false;
 
-        private string decompiled;
         public string Decompiled
         {
-            get => decompiled;
-            set => SetProperty(ref decompiled, value);
+            get => field;
+            set => SetProperty(ref field, value);
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
@@ -572,13 +568,12 @@ namespace SharpScript.ViewModels
     {
         public CoreDispatcher Dispatcher { get; } = dispatcher;
 
-        private LanguageType languageType = LanguageType.CSharp;
         public LanguageType LanguageType
         {
-            get => languageType;
+            get => field;
             set
             {
-                if (languageType != value)
+                if (field != value)
                 {
                     InputOptions = value switch
                     {
@@ -587,13 +582,13 @@ namespace SharpScript.ViewModels
                         LanguageType.IL => new ILInputOptions(Dispatcher),
                         _ => throw new Exception("Invalid language type."),
                     };
-                    languageType = value;
+                    field = value;
                     RaisePropertyChangedEvent(
                         nameof(LanguageType),
                         nameof(LanguageName));
                 }
             }
-        }
+        } = LanguageType.CSharp;
 
         public string LanguageName => LanguageType switch
         {
@@ -603,20 +598,18 @@ namespace SharpScript.ViewModels
             _ => throw new Exception("Invalid language type.")
         };
 
-        private InputOptions inputOptions = new CSharpInputOptions(dispatcher);
         public InputOptions InputOptions
         {
-            get => inputOptions;
-            set => SetProperty(ref inputOptions, value);
-        }
+            get => field;
+            set => SetProperty(ref field, value);
+        } = new CSharpInputOptions(dispatcher);
 
-        private OutputType outputType = OutputType.CSharp;
         public OutputType OutputType
         {
-            get => outputType;
+            get => field;
             set
             {
-                if (outputType != value)
+                if (field != value)
                 {
                     OutputOptions = value switch
                     {
@@ -625,18 +618,17 @@ namespace SharpScript.ViewModels
                         OutputType.Run => new RunOutputOptions(Dispatcher),
                         _ => throw new Exception("Invalid output type."),
                     };
-                    outputType = value;
+                    field = value;
                     RaisePropertyChangedEvent();
                 }
             }
-        }
+        } = OutputType.CSharp;
 
-        private OutputOptions outputOptions = new CSharpOutputOptions(dispatcher);
         public OutputOptions OutputOptions
         {
-            get => outputOptions;
-            set => SetProperty(ref outputOptions, value);
-        }
+            get => field;
+            set => SetProperty(ref field, value);
+        } = new CSharpOutputOptions(dispatcher);
 
         public event PropertyChangedEventHandler PropertyChanged;
 
