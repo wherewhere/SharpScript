@@ -536,19 +536,6 @@ namespace SharpScript.ViewModels
                 { NewLine(); }
             }
         }
-
-        private readonly partial struct MemoryLease<T>(ArrayPool<T> arrayPool, T[] array, int length) : IDisposable
-        {
-            public Memory<T> AsMemory() => array.AsMemory(0, length);
-            public Span<T> AsSpan() => array.AsSpan(0, length);
-
-            public void Dispose()
-            {
-                // can be null if created through default constructor
-                if (array != null)
-                { arrayPool.Return(array); }
-            }
-        }
     }
     public enum LanguageType
     {
@@ -787,7 +774,6 @@ namespace SharpScript.ViewModels
             set => SetProperty(ref languageVersion, value);
         }
     }
-
 
     public sealed partial class ILOutputOptions(CoreDispatcher dispatcher) : OutputOptions(dispatcher);
 

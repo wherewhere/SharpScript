@@ -31,6 +31,7 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <ComboBox
+                        x:Name="LanguageType"
                         ItemsSource="{x:Bind viewmodels:EditorViewModel.LanguageTypes}"
                         SelectedItem="{x:Bind Provider.Options.LanguageType, Mode=TwoWay}"
                         ToolTipService.ToolTip="Language" />
@@ -67,6 +68,7 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <ComboBox
+                        x:Name="OutputType"
                         ItemsSource="{x:Bind viewmodels:EditorViewModel.OutputTypes}"
                         SelectedItem="{x:Bind Provider.Options.OutputType, Mode=TwoWay}"
                         ToolTipService.ToolTip="Output Type" />

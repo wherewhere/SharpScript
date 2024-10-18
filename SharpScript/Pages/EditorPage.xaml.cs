@@ -33,6 +33,10 @@ namespace SharpScript.Pages
             Provider.ProcessAsync(code).ContinueWith(_ =>
             {
                 Input.Editor.Modified += Editor_Modified;
+                LanguageType.SelectionChanged += ComboBox_SelectionChanged;
+                LanguageVersions.SelectionChanged += ComboBox_SelectionChanged;
+                OutputType.SelectionChanged += ComboBox_SelectionChanged;
+                CSharpVersions.SelectionChanged += ComboBox_SelectionChanged;
             });
         }
 
@@ -40,10 +44,16 @@ namespace SharpScript.Pages
         {
             base.OnNavigatedFrom(e);
             Input.Editor.Modified -= Editor_Modified;
+            LanguageType.SelectionChanged -= ComboBox_SelectionChanged;
+            LanguageVersions.SelectionChanged -= ComboBox_SelectionChanged;
+            OutputType.SelectionChanged -= ComboBox_SelectionChanged;
+            CSharpVersions.SelectionChanged -= ComboBox_SelectionChanged;
             SettingsHelper.Set(SettingsHelper.CachedCode, Input.Editor.GetTargetText());
         }
 
         private void Editor_Modified(Editor sender, ModifiedEventArgs args) => _ = ProcessAsync(sender);
+
+        private void ComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e) => _ = ProcessAsync(Input.Editor);
 
         private uint count = 0;
         private async Task ProcessAsync(Editor sender)
@@ -55,6 +65,10 @@ namespace SharpScript.Pages
                 if (count > 1) { return; }
                 string code = sender.GetTargetText().TrimStart('\0');
                 await Provider.ProcessAsync(code).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                SettingsHelper.LogManager.GetLogger(nameof(EditorPage)).Error(ex.ExceptionToMessage(), ex);
             }
             finally
             {
