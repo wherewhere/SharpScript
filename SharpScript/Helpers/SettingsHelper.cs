@@ -1,5 +1,6 @@
 ﻿using MetroLog;
 using MetroLog.Targets;
+using SharpScript.ViewModels;
 using System;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
@@ -14,6 +15,8 @@ namespace SharpScript.Helpers
     public static partial class SettingsHelper
     {
         public const string CachedCode = nameof(CachedCode);
+        public const string OutputType = nameof(OutputType);
+        public const string LanguageType = nameof(LanguageType);
         public const string SelectedAppTheme = nameof(SelectedAppTheme);
         public const string SelectedBackdrop = nameof(SelectedBackdrop);
         public const string IsExtendsTitleBar = nameof(IsExtendsTitleBar);
@@ -32,6 +35,18 @@ namespace SharpScript.Helpers
                         }
                     }
                     """);
+            }
+            if (!LocalObject.Values.ContainsKey(OutputType))
+            {
+                LocalObject.Values[OutputType] = SystemTextJsonObjectSerializer.Serialize(ViewModels.OutputType.CSharp);
+            }
+            if (!LocalObject.Values.ContainsKey(LanguageType))
+            {
+                LocalObject.Values[LanguageType] = SystemTextJsonObjectSerializer.Serialize(ViewModels.LanguageType.CSharp);
+            }
+            if (!LocalObject.Values.ContainsKey(LanguageType))
+            {
+                LocalObject.Values[LanguageType] = SystemTextJsonObjectSerializer.Serialize(ViewModels.LanguageType.CSharp);
             }
             if (!LocalObject.Values.ContainsKey(SelectedAppTheme))
             {
@@ -67,7 +82,9 @@ namespace SharpScript.Helpers
         {
             bool => JsonSerializer.Serialize(value, SourceGenerationContext.Default.Boolean),
             string => JsonSerializer.Serialize(value, SourceGenerationContext.Default.String),
+            OutputType => JsonSerializer.Serialize(value, SourceGenerationContext.Default.OutputType),
             ElementTheme => JsonSerializer.Serialize(value, SourceGenerationContext.Default.ElementTheme),
+            LanguageType => JsonSerializer.Serialize(value, SourceGenerationContext.Default.LanguageType),
             _ => JsonSerializer.Serialize(value),
         };
 
@@ -77,7 +94,9 @@ namespace SharpScript.Helpers
             Type type = typeof(T);
             return type == typeof(bool) ? Deserialize(value, SourceGenerationContext.Default.Boolean)
                 : type == typeof(string) ? Deserialize(value, SourceGenerationContext.Default.String)
+                : type == typeof(OutputType) ? Deserialize(value, SourceGenerationContext.Default.OutputType)
                 : type == typeof(ElementTheme) ? Deserialize(value, SourceGenerationContext.Default.ElementTheme)
+                : type == typeof(LanguageType) ? Deserialize(value, SourceGenerationContext.Default.LanguageType)
                 : JsonSerializer.Deserialize<T>(value);
             static T Deserialize<TValue>([StringSyntax(StringSyntaxAttribute.Json)] string json, JsonTypeInfo<TValue> jsonTypeInfo) => JsonSerializer.Deserialize(json, jsonTypeInfo) is T value ? value : default;
         }
@@ -85,6 +104,8 @@ namespace SharpScript.Helpers
 
     [JsonSerializable(typeof(bool))]
     [JsonSerializable(typeof(string))]
+    [JsonSerializable(typeof(OutputType))]
     [JsonSerializable(typeof(ElementTheme))]
+    [JsonSerializable(typeof(LanguageType))]
     public partial class SourceGenerationContext : JsonSerializerContext;
 }

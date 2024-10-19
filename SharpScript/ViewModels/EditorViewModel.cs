@@ -7,27 +7,33 @@ using ICSharpCode.Decompiler.Metadata;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Emit;
-using Microsoft.CodeAnalysis.Scripting;
 using Microsoft.CodeAnalysis.VisualBasic;
+using Microsoft.VisualBasic;
 using Mobius.ILasm.Core;
 using SharpScript.Common;
 using SharpScript.Helpers;
 using System;
 using System.Buffers;
 using System.Collections;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
+using System.Net;
+using System.Net.Http;
 using System.Reflection;
 using System.Reflection.Metadata;
 using System.Runtime.CompilerServices;
 using System.Runtime.Loader;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Windows.UI.Core;
 using CSharpLanguageVersion = Microsoft.CodeAnalysis.CSharp.LanguageVersion;
 using CSharpSyntaxFactory = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
+using Enumerable = System.Linq.Enumerable;
+using Expression = System.Linq.Expressions.Expression;
 using LanguageVersion = ICSharpCode.Decompiler.CSharp.LanguageVersion;
 using SyntaxTree = Microsoft.CodeAnalysis.SyntaxTree;
 using VisualBasicLanguageVersion = Microsoft.CodeAnalysis.VisualBasic.LanguageVersion;
@@ -39,25 +45,20 @@ namespace SharpScript.ViewModels
     {
         private static readonly MetadataReference[] references =
             GetMetadataReferences(
-                "System.Private.CoreLib.dll",
-                "System.Runtime.dll",
-                "System.Console.dll",
-                "netstandard.dll",
-                "System.Text.RegularExpressions.dll",
-                "System.Linq.dll",
-                "System.Linq.Expressions.dll",
-                "System.IO.dll",
-                "System.Net.Primitives.dll",
-                "System.Net.Http.dll",
-                "System.Private.Uri.dll",
-                "System.Reflection.dll",
-                "System.ComponentModel.Primitives.dll",
-                "System.Globalization.dll",
-                "System.Collections.Concurrent.dll",
-                "System.Collections.NonGeneric.dll",
-                "Microsoft.CSharp.dll",
-                "Microsoft.VisualBasic.Core.dll",
-                "System.Net.WebClient.dll")
+                typeof(object).Assembly,
+                typeof(Console).Assembly,
+                typeof(Regex).Assembly,
+                typeof(Enumerable).Assembly,
+                typeof(Expression).Assembly,
+                typeof(EndPoint).Assembly,
+                typeof(HttpClient).Assembly,
+                typeof(Uri).Assembly,
+                typeof(Component).Assembly,
+                typeof(Partitioner).Assembly,
+                typeof(CollectionBase).Assembly,
+                typeof(Binder).Assembly,
+                typeof(VBMath).Assembly,
+                typeof(WebClient).Assembly)
             .ToArray();
 
         public static LanguageType[] LanguageTypes { get; } = Enum.GetValues<LanguageType>();
@@ -81,7 +82,7 @@ namespace SharpScript.ViewModels
         {
             get => field;
             set => SetProperty(ref field, value);
-        } = false;
+        }
 
         public string Decompiled
         {
@@ -123,10 +124,6 @@ namespace SharpScript.ViewModels
                     LanguageType.IL => ILCompilate(code, results, isExe),
                     _ => throw new Exception("Invalid language type.")
                 };
-            }
-            catch (CompilationErrorException cex)
-            {
-                results.Add(cex.Message);
             }
             catch (AggregateException aex) when (aex.InnerExceptions?.Count > 1)
             {
@@ -186,6 +183,7 @@ namespace SharpScript.ViewModels
 
         private static Compilation GetRoslynCompilate(string code, CSharpInputOptions options, bool isExe)
         {
+            IList<MetadataReference> references = AddReferences(ref code);
             SyntaxTree syntaxTree =
                 CSharpSyntaxFactory.ParseSyntaxTree(
                     code,
@@ -207,6 +205,7 @@ namespace SharpScript.ViewModels
 
         private static Compilation GetRoslynCompilate(string code, VisualBasicInputOptions options, bool isExe)
         {
+            IList<MetadataReference> references = AddReferences(ref code);
             SyntaxTree syntaxTree =
                 VisualBasicSyntaxFactory.ParseSyntaxTree(
                     code,
@@ -223,6 +222,36 @@ namespace SharpScript.ViewModels
                     new VisualBasicCompilationOptions(
                         isExe ? OutputKind.ConsoleApplication : OutputKind.DynamicallyLinkedLibrary));
             return compilation;
+        }
+
+        private static IList<MetadataReference> AddReferences(ref string code)
+        {
+            if (code.StartsWith("#r ", StringComparison.OrdinalIgnoreCase))
+            {
+                using StringReader reader = new(code);
+                List<MetadataReference> references = [.. EditorViewModel.references];
+                while (reader.Peek() > 0)
+                {
+                    string line = reader.ReadLine();
+                    if (line.StartsWith("#r ", StringComparison.OrdinalIgnoreCase))
+                    {
+                        string path = line[3..].Trim(' ', '\'', '"');
+                        Assembly assembly = Assembly.Load(path);
+                        if (TryCreateMetadataReference(assembly, out PortableExecutableReference reference))
+                        {
+                            references.Add(reference);
+                        }
+                    }
+                    else
+                    {
+                        code = line;
+                        break;
+                    }
+                }
+                code += reader.ReadToEnd();
+                return references;
+            }
+            return references;
         }
 
         private static Streams ILCompilate(string code, ICollection<string> results, bool isExe)
@@ -256,7 +285,7 @@ namespace SharpScript.ViewModels
                 ILOutputOptions => await ILDecompileAsync(streams).ConfigureAwait(false),
                 _ => throw new Exception("Invalid output type.")
             };
-            IsDecompile = !string.IsNullOrEmpty(Decompiled);
+            IsDecompile = true;
         }
 
         private static async Task<string> CSharpDecompileAsync(Streams streams, CSharpOutputOptions options)
@@ -474,16 +503,28 @@ namespace SharpScript.ViewModels
             }
         }
 
-        private static IEnumerable<MetadataReference> GetMetadataReferences(params string[] references)
+        private static IEnumerable<MetadataReference> GetMetadataReferences(params Assembly[] assemblies)
         {
-            ScriptMetadataResolver resolver = ScriptMetadataResolver.Default;
-            foreach (string reference in references)
+            foreach (Assembly assembly in assemblies)
             {
-                foreach (PortableExecutableReference resolved in resolver.ResolveReference(reference, null, MetadataReferenceProperties.Assembly))
+                if (TryCreateMetadataReference(assembly, out PortableExecutableReference reference))
                 {
-                    yield return resolved;
+                    yield return reference;
                 }
             }
+        }
+
+        private static unsafe bool TryCreateMetadataReference(Assembly assembly, out PortableExecutableReference reference)
+        {
+            if (assembly.TryGetRawMetadata(out byte* metadata, out int length))
+            {
+                ModuleMetadata moduleMetadata = ModuleMetadata.CreateFromMetadata((nint)metadata, length);
+                AssemblyMetadata assemblyMetadata = AssemblyMetadata.Create(moduleMetadata);
+                reference = assemblyMetadata.GetReference();
+                return true;
+            }
+            reference = null;
+            return false;
         }
 
         public static bool BoolNegationConverter(bool value) => !value;
@@ -560,7 +601,8 @@ namespace SharpScript.ViewModels
             get => field;
             set
             {
-                if (field != value)
+                bool isChanged;
+                if (isChanged = field != value || InputOptions == null)
                 {
                     InputOptions = value switch
                     {
@@ -569,13 +611,16 @@ namespace SharpScript.ViewModels
                         LanguageType.IL => new ILInputOptions(Dispatcher),
                         _ => throw new Exception("Invalid language type."),
                     };
-                    field = value;
-                    RaisePropertyChangedEvent(
-                        nameof(LanguageType),
-                        nameof(LanguageName));
+                    if (isChanged)
+                    {
+                        field = value;
+                        RaisePropertyChangedEvent(
+                            nameof(LanguageType),
+                            nameof(LanguageName));
+                    }
                 }
             }
-        } = LanguageType.CSharp;
+        }
 
         public string LanguageName => LanguageType switch
         {
@@ -588,15 +633,16 @@ namespace SharpScript.ViewModels
         public InputOptions InputOptions
         {
             get => field;
-            set => SetProperty(ref field, value);
-        } = new CSharpInputOptions(dispatcher);
+            private set => SetProperty(ref field, value);
+        }
 
         public OutputType OutputType
         {
             get => field;
             set
             {
-                if (field != value)
+                bool isChanged;
+                if (isChanged = field != value || OutputOptions == null)
                 {
                     OutputOptions = value switch
                     {
@@ -605,17 +651,20 @@ namespace SharpScript.ViewModels
                         OutputType.Run => new RunOutputOptions(Dispatcher),
                         _ => throw new Exception("Invalid output type."),
                     };
-                    field = value;
-                    RaisePropertyChangedEvent();
+                    if (isChanged)
+                    {
+                        field = value;
+                        RaisePropertyChangedEvent();
+                    }
                 }
             }
-        } = OutputType.CSharp;
+        }
 
         public OutputOptions OutputOptions
         {
             get => field;
-            set => SetProperty(ref field, value);
-        } = new CSharpOutputOptions(dispatcher);
+            private set => SetProperty(ref field, value);
+        }
 
         public event PropertyChangedEventHandler PropertyChanged;
 

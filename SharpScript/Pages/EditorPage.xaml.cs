@@ -1,6 +1,7 @@
 using SharpScript.Helpers;
 using SharpScript.ViewModels;
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Data;
@@ -17,12 +18,20 @@ namespace SharpScript.Pages
     /// </summary>
     public sealed partial class EditorPage : Page
     {
+        private bool _isInitialized;
         public EditorViewModel Provider { get; }
 
         public EditorPage()
         {
             InitializeComponent();
-            Provider = new EditorViewModel(Dispatcher);
+            Provider = new EditorViewModel(Dispatcher)
+            {
+                Options =
+                {
+                    LanguageType = SettingsHelper.Get<LanguageType>(SettingsHelper.LanguageType),
+                    OutputType = SettingsHelper.Get<OutputType>(SettingsHelper.OutputType)
+                }
+            };
         }
 
         protected override void OnNavigatedTo(NavigationEventArgs e)
@@ -30,34 +39,40 @@ namespace SharpScript.Pages
             base.OnNavigatedTo(e);
             string code = SettingsHelper.Get<string>(SettingsHelper.CachedCode);
             Input.Editor.SetText(code);
-            Provider.ProcessAsync(code).ContinueWith(_ =>
-            {
-                Input.Editor.Modified += Editor_Modified;
-                LanguageType.SelectionChanged += ComboBox_SelectionChanged;
-                LanguageVersions.SelectionChanged += ComboBox_SelectionChanged;
-                OutputType.SelectionChanged += ComboBox_SelectionChanged;
-                CSharpVersions.SelectionChanged += ComboBox_SelectionChanged;
-            });
+            Provider.ProcessAsync(code).ContinueWith(_ => _isInitialized = true);
+            Input.Editor.Modified += Editor_Modified;
         }
 
         protected override void OnNavigatedFrom(NavigationEventArgs e)
         {
             base.OnNavigatedFrom(e);
             Input.Editor.Modified -= Editor_Modified;
-            LanguageType.SelectionChanged -= ComboBox_SelectionChanged;
-            LanguageVersions.SelectionChanged -= ComboBox_SelectionChanged;
-            OutputType.SelectionChanged -= ComboBox_SelectionChanged;
-            CSharpVersions.SelectionChanged -= ComboBox_SelectionChanged;
             SettingsHelper.Set(SettingsHelper.CachedCode, Input.Editor.GetTargetText());
         }
 
         private void Editor_Modified(Editor sender, ModifiedEventArgs args) => _ = ProcessAsync(sender);
 
-        private void ComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e) => _ = ProcessAsync(Input.Editor);
+        private void ComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            _ = ProcessAsync(Input.Editor);
+            if (sender is ComboBox element)
+            {
+                switch (element.Name)
+                {
+                    case nameof(LanguageType):
+                        SettingsHelper.Set(SettingsHelper.LanguageType, (LanguageType)e.AddedItems.FirstOrDefault());
+                        break;
+                    case nameof(OutputType):
+                        SettingsHelper.Set(SettingsHelper.OutputType, (OutputType)e.AddedItems.FirstOrDefault());
+                        break;
+                }
+            }
+        }
 
         private uint count = 0;
         private async Task ProcessAsync(Editor sender)
         {
+            if (!_isInitialized) { return; }
             try
             {
                 count++;

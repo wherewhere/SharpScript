@@ -24,7 +24,6 @@
     <PackageReference Include="ICSharpCode.Decompiler" Version="9.0.0.7660-preview2" />
     <PackageReference Include="MetroLog.Net6" Version="2.1.0" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.12.0-2.final" />
-    <PackageReference Include="Microsoft.CodeAnalysis.Scripting.Common" Version="4.12.0-2.final" />
     <PackageReference Include="Microsoft.CodeAnalysis.VisualBasic" Version="4.12.0-2.final" />
     <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="all">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>

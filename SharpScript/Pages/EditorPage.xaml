@@ -34,6 +34,7 @@
                         x:Name="LanguageType"
                         ItemsSource="{x:Bind viewmodels:EditorViewModel.LanguageTypes}"
                         SelectedItem="{x:Bind Provider.Options.LanguageType, Mode=TwoWay}"
+                        SelectionChanged="ComboBox_SelectionChanged"
                         ToolTipService.ToolTip="Language" />
                     <ComboBox
                         x:Name="LanguageVersions"
@@ -41,6 +42,7 @@
                         x:Load="{x:Bind viewmodels:EditorViewModel.CollectionToBoolConverter(Provider.Options.InputOptions.(viewmodels:IInputOptions.LanguageVersions)), FallbackValue='false', Mode=OneWay}"
                         ItemsSource="{x:Bind Provider.Options.InputOptions.(viewmodels:IInputOptions.LanguageVersions), Mode=OneWay}"
                         SelectedItem="{x:Bind Provider.Options.InputOptions.(viewmodels:IInputOptions.LanguageVersion), Mode=TwoWay}"
+                        SelectionChanged="ComboBox_SelectionChanged"
                         ToolTipService.ToolTip="Language Version">
                         <ComboBox.ItemTemplate>
                             <DataTemplate x:DataType="sys:Enum">
@@ -71,6 +73,7 @@
                         x:Name="OutputType"
                         ItemsSource="{x:Bind viewmodels:EditorViewModel.OutputTypes}"
                         SelectedItem="{x:Bind Provider.Options.OutputType, Mode=TwoWay}"
+                        SelectionChanged="ComboBox_SelectionChanged"
                         ToolTipService.ToolTip="Output Type" />
                     <ComboBox
                         x:Name="CSharpVersions"
@@ -78,6 +81,7 @@
                         x:Load="{x:Bind Provider.Options.OutputOptions.(viewmodels:IOutputOptions.IsCSharp), Mode=OneWay}"
                         ItemsSource="{x:Bind viewmodels:CSharpOutputOptions.LanguageVersions}"
                         SelectedItem="{x:Bind Provider.Options.OutputOptions.(viewmodels:IOutputOptions.LanguageVersion), Mode=TwoWay}"
+                        SelectionChanged="ComboBox_SelectionChanged"
                         ToolTipService.ToolTip="CSharp Version">
                         <ComboBox.ItemTemplate>
                             <DataTemplate x:DataType="sys:Enum">

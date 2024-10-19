@@ -8,8 +8,12 @@
 ## Dictionary
 - [SharpScript](#sharpscript)
   - [Dictionary](#dictionary)
+  - [Screenshots](#screenshots)
   - [Contributors](#contributors)
   - [References](#references)
+
+## Screenshots
+![MSIL->C#](https://github.com/user-attachments/assets/a01e512b-5742-4dc2-a2ca-8dbd14e633c4)
 
 ## Contributors
 [![Contributors](https://contrib.rocks/image?repo=wherewhere/SharpScript)](https://github.com/wherewhere/SharpScript/graphs/contributors "Contributors")
