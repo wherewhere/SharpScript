@@ -68,25 +68,25 @@ namespace SharpScript.ViewModels
 
         public CompilateOptions Options
         {
-            get => field;
+            get;
             set => SetProperty(ref field, value);
         } = new(dispatcher);
 
         public List<string> Diagnostics
         {
-            get => field;
+            get;
             set => SetProperty(ref field, value);
         }
 
         public bool IsDecompile
         {
-            get => field;
+            get;
             set => SetProperty(ref field, value);
         }
 
         public string Decompiled
         {
-            get => field;
+            get;
             set => SetProperty(ref field, value);
         }
 
@@ -598,7 +598,7 @@ namespace SharpScript.ViewModels
 
         public LanguageType LanguageType
         {
-            get => field;
+            get;
             set
             {
                 bool isChanged;
@@ -632,13 +632,13 @@ namespace SharpScript.ViewModels
 
         public InputOptions InputOptions
         {
-            get => field;
+            get;
             private set => SetProperty(ref field, value);
         }
 
         public OutputType OutputType
         {
-            get => field;
+            get;
             set
             {
                 bool isChanged;
@@ -662,7 +662,7 @@ namespace SharpScript.ViewModels
 
         public OutputOptions OutputOptions
         {
-            get => field;
+            get;
             private set => SetProperty(ref field, value);
         }
 

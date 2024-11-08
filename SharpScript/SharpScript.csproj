@@ -1,11 +1,11 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <ApplicationEntryPoint>SharpScript.App</ApplicationEntryPoint>
     <ApplicationIcon>favicon.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <BuiltInComInteropSupport>True</BuiltInComInteropSupport>
     <CSWinRTIncludes>WinUIEditor</CSWinRTIncludes>
     <EnableMsixTooling>True</EnableMsixTooling>
-    <LangVersion>preview</LangVersion>
     <OutputType>WinExe</OutputType>
     <Platforms>x86;x64;ARM64</Platforms>
     <PublishProfile>win10-$(Platform).pubxml</PublishProfile>
@@ -16,18 +16,14 @@
     <UseUwp>True</UseUwp>
     <UseUwpTools>True</UseUwpTools>
     <VersionPrefix>0.0.1</VersionPrefix>
-    <WindowsSdkPackageVersion>10.0.26100.48</WindowsSdkPackageVersion>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="DisposableMemory.ModernNetUAP.WinUI" Version="2.8.6.3-preview" />
+    <PackageReference Include="DisposableMemory.ModernNetUAP.WinUI" Version="2.8.6.3" />
     <PackageReference Include="ICSharpCode.Decompiler" Version="9.0.0.7660-preview2" />
     <PackageReference Include="MetroLog.Net6" Version="2.1.0" />
-    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.12.0-2.final" />
-    <PackageReference Include="Microsoft.CodeAnalysis.VisualBasic" Version="4.12.0-2.final" />
-    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="all">
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    </PackageReference>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.12.0-3.final" />
+    <PackageReference Include="Microsoft.CodeAnalysis.VisualBasic" Version="4.12.0-3.final" />
     <PackageReference Include="Microsoft.Windows.CsWinRT" Version="2.1.6" />
     <PackageReference Include="Mobius.ILasm" Version="0.1.0" />
     <PackageReference Include="System.Security.Permissions" Version="8.0.0" />

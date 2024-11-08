@@ -39,7 +39,7 @@ namespace SharpScript.Pages
             base.OnNavigatedTo(e);
             string code = SettingsHelper.Get<string>(SettingsHelper.CachedCode);
             Input.Editor.SetText(code);
-            Provider.ProcessAsync(code).ContinueWith(_ => _isInitialized = true);
+            _ = Provider.ProcessAsync(code).ContinueWith(_ => _isInitialized = true);
             Input.Editor.Modified += Editor_Modified;
         }
 
