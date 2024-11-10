@@ -1,0 +1,39 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
+
+  <PropertyGroup>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <TargetFramework>net8.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ICSharpCode.Decompiler" Version="9.0.0.7660-preview2" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="8.0.10" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="8.0.10" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.12.0-3.final" />
+    <PackageReference Include="Microsoft.CodeAnalysis.VisualBasic" Version="4.12.0-3.final" />
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="all">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Update="wwwroot\**">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <Target Name="GetOutputAssemblies" AfterTargets="CopyFilesToOutputDirectory">
+    <ItemGroup>
+      <OutputAssemblies Include="$(OutputPath)\*.dll" />
+    </ItemGroup>
+  </Target>
+
+  <Target Name="CopyAssembliesToOutputDirectory" AfterTargets="CopyFilesToOutputDirectory" DependsOnTargets="GetOutputAssemblies">
+    <Copy SourceFiles="@(OutputAssemblies)" DestinationFolder="$(OutputPath)wwwroot\_content\reference" />
+  </Target>
+
+  <Target Name="CopyAssembliesToPublishDirectory" AfterTargets="CopyFilesToPublishDirectory" DependsOnTargets="GetOutputAssemblies">
+    <Copy SourceFiles="@(OutputAssemblies)" DestinationFolder="$(PublishDir)wwwroot\_content\reference" />
+  </Target>
+
+</Project>

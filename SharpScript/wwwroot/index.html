@@ -1,0 +1,117 @@
+<html lang="zh-cn">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SharpScript</title>
+    <meta name="description" content=".NET language playground on WASM">
+    <meta name="theme-color" content="#ca3e00">
+    <base href="/" />
+    <script src="_framework/blazor.webassembly.js" autostart="false"></script>
+    <script type="module" data-pjax>
+        import {
+            provideFluentDesignSystem,
+            fluentButton,
+            fluentProgressRing,
+            fluentTextArea,
+            baseLayerLuminance,
+            StandardLuminance
+        } from "https://cdn.jsdelivr.net/npm/@fluentui/web-components/+esm";
+        provideFluentDesignSystem()
+            .register(
+                fluentButton(),
+                fluentProgressRing(),
+                fluentTextArea()
+            );
+        if (typeof matchMedia === "function") {
+            const scheme = window.matchMedia("(prefers-color-scheme: dark)");
+            if (typeof scheme !== "undefined") {
+                scheme.addListener(e => baseLayerLuminance.withDefault(e.matches ? StandardLuminance.DarkMode : StandardLuminance.LightMode));
+                if (scheme.matches) {
+                    baseLayerLuminance.withDefault(StandardLuminance.DarkMode);
+                }
+            }
+        }
+    </script>
+</head>
+
+<body>
+    <div id="vue-app" style="padding: 0.5rem var(--content-padding);">
+        <div style="display: flex; flex-direction: column; row-gap: 8px;">
+            <div style="display: flex; column-gap: 8px">
+                <fluent-text-area v-model="code" resize="both"
+                                  style="font-family: var(--font-monospace);"></fluent-text-area>
+                <fluent-button @click="processAsync">Run</fluent-button>
+                <fluent-progress-ring v-init-dotnet :style="{ display: loading ? '' : 'none' }"></fluent-progress-ring>
+            </div>
+            <div style="font-family: var(--font-monospace);">
+                <div v-for="item in diagnostics" :key="item">
+                    {{ item }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { createApp } from "https://cdn.jsdelivr.net/npm/vue/dist/vue.esm-browser.prod.js";
+        createApp({
+            data() {
+                return {
+                    code: `using System;\nConsole.WriteLine("Hello, World!");`,
+                    diagnostics: [],
+                    loading: false
+                }
+            },
+            methods: {
+                async processAsync() {
+                    try {
+                        this.loading = true;
+                        this.diagnostics = await DotNet.invokeMethodAsync("SharpScript", "ProcessAsync", this.code);
+                    }
+                    finally {
+                        this.loading = false;
+                    }
+                }
+            }
+        }).directive("init-dotnet", {
+            async mounted(element) {
+                try {
+                    element.style.display = '';
+                    await Blazor.start();
+                    await DotNet.invokeMethodAsync("SharpScript", "InitAsync", new URL("_content/reference/", document.baseURI));
+                }
+                finally {
+                    element.style.display = "none";
+                }
+            }
+        }).mount("#vue-app");
+    </script>
+
+    <style>
+        @import 'https://cdn.jsdelivr.net/gh/microsoft/fluentui-blazor@dev/src/Core/wwwroot/css/reboot.css';
+
+        :root {
+            --font-monospace: "Cascadia Code NF", "Cascadia Code PL", "Cascadia Code", Consolas, "Courier New", "Liberation Mono", SFMono-Regular, Menlo, Monaco, monospace;
+            --highlight-bg: #fff3cd;
+            --content-padding: 1rem;
+            --loading-display: none;
+            --loaded-display: unset;
+        }
+
+        @media (min-width: 767px) {
+            :root {
+                --content-padding: 1.5rem;
+            }
+        }
+
+        body,
+        .body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: var(--neutral-fill-stealth-rest);
+        }
+    </style>
+</body>
+
+</html>
