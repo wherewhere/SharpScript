@@ -8,7 +8,6 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Emit;
 using Microsoft.CodeAnalysis.VisualBasic;
-using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -417,7 +416,7 @@ namespace SharpScript.Common
                     {
                         case OutputType.CSharp
                             or OutputType.IL:
-                            //await DecompileAsync(assemblyStream).ConfigureAwait(false);
+                            await DecompileAsync(assemblyStream).ConfigureAwait(false);
                             break;
                         case OutputType.Run:
                             await ExecuteAsync(assemblyStream).ConfigureAwait(false);
@@ -523,9 +522,6 @@ namespace SharpScript.Common
                         _ => throw new Exception("Invalid language type."),
                     };
                     languageType = value;
-                    //RaisePropertyChangedEvent(
-                    //    nameof(LanguageType),
-                    //    nameof(LanguageName));
                 }
             }
         }
@@ -576,16 +572,11 @@ namespace SharpScript.Common
         Array IInputOptions.LanguageVersions => Enum.GetValues<CSharpLanguageVersion>();
         Enum IInputOptions.LanguageVersion
         {
-            get => languageVersion;
-            set => languageVersion = (CSharpLanguageVersion)(value ?? CSharpLanguageVersion.Preview);
+            get => LanguageVersion;
+            set => LanguageVersion = (CSharpLanguageVersion)(value ?? CSharpLanguageVersion.Preview);
         }
 
-        private CSharpLanguageVersion languageVersion = CSharpLanguageVersion.Preview;
-        public CSharpLanguageVersion LanguageVersion
-        {
-            get => languageVersion;
-            set => languageVersion = value;
-        }
+        public CSharpLanguageVersion LanguageVersion { get; set; } = CSharpLanguageVersion.Preview;
     }
 
     public sealed partial class VisualBasicInputOptions : InputOptions, IInputOptions
@@ -593,16 +584,11 @@ namespace SharpScript.Common
         Array IInputOptions.LanguageVersions => Enum.GetValues<VisualBasicLanguageVersion>();
         Enum IInputOptions.LanguageVersion
         {
-            get => languageVersion;
-            set => languageVersion = (VisualBasicLanguageVersion)(value ?? VisualBasicLanguageVersion.Latest);
+            get => LanguageVersion;
+            set => LanguageVersion = (VisualBasicLanguageVersion)(value ?? VisualBasicLanguageVersion.Latest);
         }
 
-        private VisualBasicLanguageVersion languageVersion = VisualBasicLanguageVersion.Latest;
-        public VisualBasicLanguageVersion LanguageVersion
-        {
-            get => languageVersion;
-            set => languageVersion = value;
-        }
+        public VisualBasicLanguageVersion LanguageVersion { get; set; } = VisualBasicLanguageVersion.Latest;
     }
 
     public sealed partial class ILInputOptions : InputOptions;
@@ -630,16 +616,11 @@ namespace SharpScript.Common
         bool IOutputOptions.IsCSharp => true;
         Enum IOutputOptions.LanguageVersion
         {
-            get => languageVersion;
-            set => languageVersion = (LanguageVersion)(value ?? LanguageVersion.CSharp1);
+            get => LanguageVersion;
+            set => LanguageVersion = (LanguageVersion)(value ?? LanguageVersion.CSharp1);
         }
 
-        private LanguageVersion languageVersion = LanguageVersion.CSharp1;
-        public LanguageVersion LanguageVersion
-        {
-            get => languageVersion;
-            set => languageVersion = value;
-        }
+        public LanguageVersion LanguageVersion { get; set; } = LanguageVersion.CSharp1;
     }
 
     public sealed partial class ILOutputOptions : OutputOptions;

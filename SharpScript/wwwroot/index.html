@@ -7,26 +7,38 @@
     <meta name="description" content=".NET language playground on WASM">
     <meta name="theme-color" content="#ca3e00">
     <base href="/" />
+    <link rel="icon" type="image/png" sizes="50x50"
+          href="https://cdn.jsdelivr.net/gh/wherewhere/SharpScript@main/SharpScript/Assets/StoreLogo.scale-100.png">
+    <link rel="icon" type="image/png" sizes="63x63"
+          href="https://cdn.jsdelivr.net/gh/wherewhere/SharpScript@main/SharpScript/Assets/StoreLogo.scale-125.png">
+    <link rel="icon" type="image/png" sizes="75x75"
+          href="https://cdn.jsdelivr.net/gh/wherewhere/SharpScript@main/SharpScript/Assets/StoreLogo.scale-150.png">
+    <link rel="icon" type="image/png" sizes="100x100"
+          href="https://cdn.jsdelivr.net/gh/wherewhere/SharpScript@main/SharpScript/Assets/StoreLogo.scale-200.png">
+    <link rel="icon" type="image/png" sizes="200x200"
+          href="https://cdn.jsdelivr.net/gh/wherewhere/SharpScript@main/SharpScript/Assets/StoreLogo.scale-400.png">
     <script src="_framework/blazor.webassembly.js" autostart="false"></script>
     <script type="module" data-pjax>
         import {
             provideFluentDesignSystem,
             fluentButton,
+            fluentOption,
+            fluentSelect,
             fluentProgressRing,
-            fluentTextArea,
             baseLayerLuminance,
             StandardLuminance
         } from "https://cdn.jsdelivr.net/npm/@fluentui/web-components/+esm";
         provideFluentDesignSystem()
             .register(
                 fluentButton(),
-                fluentProgressRing(),
-                fluentTextArea()
+                fluentOption(),
+                fluentSelect(),
+                fluentProgressRing()
             );
         if (typeof matchMedia === "function") {
             const scheme = window.matchMedia("(prefers-color-scheme: dark)");
             if (typeof scheme !== "undefined") {
-                scheme.addListener(e => baseLayerLuminance.withDefault(e.matches ? StandardLuminance.DarkMode : StandardLuminance.LightMode));
+                scheme.addEventListener("change", e => baseLayerLuminance.withDefault(e.matches ? StandardLuminance.DarkMode : StandardLuminance.LightMode));
                 if (scheme.matches) {
                     baseLayerLuminance.withDefault(StandardLuminance.DarkMode);
                 }
@@ -36,59 +48,248 @@
 </head>
 
 <body>
-    <div id="vue-app" style="padding: 0.5rem var(--content-padding);">
-        <div style="display: flex; flex-direction: column; row-gap: 8px;">
-            <div style="display: flex; column-gap: 8px">
-                <fluent-text-area v-model="code" resize="both"
-                                  style="font-family: var(--font-monospace);"></fluent-text-area>
-                <fluent-button @click="processAsync">Run</fluent-button>
-                <fluent-progress-ring v-init-dotnet :style="{ display: loading ? '' : 'none' }"></fluent-progress-ring>
+    <div id="vue-app">
+        <div class="split-view">
+            <div class="split-content" style="display: flex; flex-direction: column; row-gap: 4px; padding: 4px;">
+                <div style="display: flex; justify-content: space-between; column-gap: 4px;">
+                    <fluent-select v-model="language" style="min-width: auto;">
+                        <fluent-option value="CSharp">C#</fluent-option>
+                        <fluent-option value="VisualBasic">VB</fluent-option>
+                        <fluent-option value="IL" disabled>IL</fluent-option>
+                    </fluent-select>
+                    <div style="display: flex; column-gap: 4px;">
+                        <fluent-button @click="processAsync" :disabled="loading">
+                            <fluent-progress-ring v-if="loading" slot="start"
+                                                  style="width: 12px; height: 12px;"></fluent-progress-ring>
+                            <span>{{ loading ? "Processing..." : "Process" }}</span>
+                        </fluent-button>
+                        <fluent-select v-model="inputLanguage" v-if="inputLanguages.length" style="min-width: auto;">
+                            <fluent-option v-for="item in inputLanguages" :value="item">
+                                {{ getLauguageVersion(item) }}
+                            </fluent-option>
+                        </fluent-select>
+                    </div>
+                </div>
+                <div style="flex: 1;">
+                    <monaco-editor v-model:value="code" :language="getLauguage()"
+                                   style="width: 100%; height: 100%;"></monaco-editor>
+                </div>
             </div>
-            <div style="font-family: var(--font-monospace);">
-                <div v-for="item in diagnostics" :key="item">
-                    {{ item }}
+            <div class="split-content" style="display: flex; flex-direction: column; row-gap: 4px; padding: 4px;">
+                <div style="display: flex; justify-content: space-between; column-gap: 4px;">
+                    <fluent-select v-model="output" style="min-width: auto;">
+                        <fluent-option value="CSharp">C#</fluent-option>
+                        <fluent-option value="IL">IL</fluent-option>
+                        <fluent-option value="Run">Run</fluent-option>
+                    </fluent-select>
+                    <fluent-select v-model="outputLanguage" v-if="outputLanguages.length" style="min-width: auto;">
+                        <fluent-option v-for="item in outputLanguages" :value="item">
+                            {{ getLauguageVersion(item) }}
+                        </fluent-option>
+                    </fluent-select>
+                </div>
+                <div style="flex: 1;">
+                    <monaco-editor v-if="results.isDecompile" v-model:value="results.decompiled" language="csharp"
+                                   readonly="true" style="width: 100%; height: 100%;"></monaco-editor>
+                    <div style="font-family: var(--font-monospace); overflow: auto; padding: 0 12px; white-space: pre-line;"
+                         v-else>
+                        <div v-for="item in results.diagnostics">
+                            {{ item }}
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
+    <template id="empty-template">
+        <div></div>
+    </template>
+
     <script type="module">
-        import { createApp } from "https://cdn.jsdelivr.net/npm/vue/dist/vue.esm-browser.prod.js";
+        import { createApp, toRaw } from "https://cdn.jsdelivr.net/npm/vue/dist/vue.esm-browser.prod.js";
+        import * as monaco from "https://cdn.jsdelivr.net/npm/monaco-editor/+esm";
+        if (typeof matchMedia === "function") {
+            const scheme = window.matchMedia("(prefers-color-scheme: dark)");
+            if (typeof scheme !== "undefined") {
+                scheme.addEventListener("change", e => monaco.editor.setTheme(e.matches ? "vs-dark" : "vs"));
+                if (scheme.matches) {
+                    monaco.editor.setTheme("vs-dark");
+                }
+            }
+        }
         createApp({
             data() {
                 return {
                     code: `using System;\nConsole.WriteLine("Hello, World!");`,
-                    diagnostics: [],
-                    loading: false
+                    language: "CSharp",
+                    inputLanguages: [],
+                    inputLanguage: "Default",
+                    output: "Run",
+                    outputLanguages: [],
+                    outputLanguage: "CSharp1",
+                    isInit: false,
+                    loading: false,
+                    results: {
+                        diagnostics: [],
+                        isDecompile: false,
+                        decompiled: null
+                    }
+                }
+            },
+            watch: {
+                async language(newValue, oldValue) {
+                    if (newValue !== oldValue) {
+                        try {
+                            this.loading = true;
+                            await this.initDotNet();
+                            await DotNet.invokeMethodAsync("SharpScript", "SetLanguageType", newValue);
+                            this.inputLanguages = await DotNet.invokeMethodAsync("SharpScript", "GetInputLanguageVersions");
+                        }
+                        finally {
+                            this.loading = false;
+                        }
+                    }
+                },
+                async inputLanguage(newValue, oldValue) {
+                    if (newValue !== oldValue) {
+                        try {
+                            this.loading = true;
+                            await this.initDotNet();
+                            await DotNet.invokeMethodAsync("SharpScript", "SetInputLanguageVersion", newValue);
+                        }
+                        finally {
+                            this.loading = false;
+                        }
+                    }
+                },
+                async output(newValue, oldValue) {
+                    if (newValue !== oldValue) {
+                        try {
+                            this.loading = true;
+                            await this.initDotNet();
+                            await DotNet.invokeMethodAsync("SharpScript", "SetOutputType", newValue);
+                            this.outputLanguages = await DotNet.invokeMethodAsync("SharpScript", "GetOutputLanguageVersions");
+                        }
+                        finally {
+                            this.loading = false;
+                        }
+                    }
+                },
+                async outputLanguage(newValue, oldValue) {
+                    if (newValue !== oldValue) {
+                        try {
+                            this.loading = true;
+                            await this.initDotNet();
+                            await DotNet.invokeMethodAsync("SharpScript", "SetOutputLanguageVersion", newValue);
+                        }
+                        finally {
+                            this.loading = false;
+                        }
+                    }
                 }
             },
             methods: {
                 async processAsync() {
                     try {
                         this.loading = true;
-                        this.diagnostics = await DotNet.invokeMethodAsync("SharpScript", "ProcessAsync", this.code);
+                        await this.initDotNet();
+                        this.results = await DotNet.invokeMethodAsync("SharpScript", "ProcessAsync", this.code);
                     }
                     finally {
                         this.loading = false;
                     }
+                },
+                async initDotNet() {
+                    if (!this.isInit) {
+                        await Blazor.start();
+                        await DotNet.invokeMethodAsync("SharpScript", "InitAsync", new URL("_content/reference/", document.baseURI));
+                        this.isInit = true;
+                    }
+                },
+                getLauguage() {
+                    switch (this.language) {
+                        case "CSharp":
+                        case "IL":
+                            return "csharp";
+                        case "VisualBasic":
+                            return "vb";
+                        default:
+                            return "plaintext";
+                    }
+                },
+                getLauguageVersion(version) {
+                    return version.replace("VisualBasic", "VB ").replace("CSharp", "C# ").replace('_', '.');
                 }
             }
-        }).directive("init-dotnet", {
-            async mounted(element) {
-                try {
-                    element.style.display = '';
-                    await Blazor.start();
-                    await DotNet.invokeMethodAsync("SharpScript", "InitAsync", new URL("_content/reference/", document.baseURI));
+        }).component("monaco-editor", {
+            template: "#empty-template",
+            props: {
+                language: String,
+                value: String,
+                readonly: false
+            },
+            emits: ['update:value'],
+            data() {
+                return {
+                    editor: null
                 }
-                finally {
-                    element.style.display = "none";
+            },
+            watch: {
+                language(newValue, oldValue) {
+                    if (newValue !== oldValue) {
+                        monaco.editor.setModelLanguage(toRaw(this.editor).getModel(), newValue);
+                    }
+                },
+                value(newValue, oldValue) {
+                    if (this.readonly && newValue !== oldValue) {
+                        toRaw(this.editor).setValue(newValue);
+                    }
+                },
+                readonly(newValue, oldValue) {
+                    if (newValue !== oldValue) {
+                        toRaw(this.editor).updateOptions({ readOnly: newValue });
+                    }
                 }
+            },
+            methods: {
+                createEditor(element, language, value, readonly) {
+                    return monaco.editor.create(element, {
+                        value: value,
+                        language: language,
+                        automaticLayout: true,
+                        fontFamily: "'Cascadia Code NF', 'Cascadia Code PL', 'Cascadia Code', Consolas, 'Courier New', monospace",
+                        fontLigatures: "ligatures",
+                        minimap: {
+                            enabled: false
+                        },
+                        padding: {
+                            bottom: 4,
+                            top: 4
+                        },
+                        readOnly: readonly,
+                        smoothScrolling: true,
+                        tabSize: 4
+                    });
+                }
+            },
+            mounted() {
+                const editor = this.createEditor(this.$el, this.language, this.value, this.readonly);
+                editor.onDidChangeModelContent(_ => {
+                    this.$emit('update:value', editor.getValue());
+                });
+                this.editor = editor;
             }
         }).mount("#vue-app");
     </script>
 
     <style>
         @import 'https://cdn.jsdelivr.net/gh/microsoft/fluentui-blazor@dev/src/Core/wwwroot/css/reboot.css';
+
+        @font-face {
+            font-family: codicon;
+            src: local('codicon'), url('https://cdn.jsdelivr.net/npm/monaco-editor/min/vs/base/browser/ui/codicons/codicon/codicon.ttf') format('truetype');
+        }
 
         :root {
             --font-monospace: "Cascadia Code NF", "Cascadia Code PL", "Cascadia Code", Consolas, "Courier New", "Liberation Mono", SFMono-Regular, Menlo, Monaco, monospace;
@@ -110,6 +311,47 @@
             height: 100%;
             overflow: hidden;
             background-color: var(--neutral-fill-stealth-rest);
+        }
+
+        #vue-app fluent-select::part(listbox) {
+            max-height: calc(var(--base-height-multiplier) * 30px);
+        }
+
+        #vue-app fluent-select .listbox {
+            max-height: calc(var(--base-height-multiplier) * 30px);
+        }
+
+        #vue-app div.split-view {
+            width: 100%;
+            height: 100%;
+            display: flex;
+        }
+
+        #vue-app div.split-view .split-content {
+            flex: 1;
+            width: 50%;
+            height: 100%;
+        }
+
+        @media (max-width: 767px) {
+            #vue-app div.split-view {
+                flex-direction: column;
+            }
+
+            #vue-app div.split-view .split-content {
+                width: 100%;
+                height: 50%;
+            }
+        }
+
+        #vue-app .monaco-editor {
+            outline-width: 0;
+        }
+
+        #vue-app .monaco-editor,
+        #vue-app .monaco-editor .margin,
+        #vue-app .monaco-editor-background {
+            background-color: unset;
         }
     </style>
 </body>
