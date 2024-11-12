@@ -5,7 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>SharpScript</title>
     <meta name="description" content=".NET language playground on WASM">
-    <meta name="theme-color" content="#ca3e00">
+    <meta name="theme-color" content="#fbfbfb" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#272727" media="(prefers-color-scheme: dark)">
     <base href="/" />
     <link rel="icon" type="image/png" sizes="50x50"
           href="https://cdn.jsdelivr.net/gh/wherewhere/SharpScript@main/SharpScript/Assets/StoreLogo.scale-100.png">
@@ -36,7 +37,7 @@
                 fluentProgressRing()
             );
         if (typeof matchMedia === "function") {
-            const scheme = window.matchMedia("(prefers-color-scheme: dark)");
+            const scheme = matchMedia("(prefers-color-scheme: dark)");
             if (typeof scheme !== "undefined") {
                 scheme.addEventListener("change", e => baseLayerLuminance.withDefault(e.matches ? StandardLuminance.DarkMode : StandardLuminance.LightMode));
                 if (scheme.matches) {
@@ -55,13 +56,13 @@
                     <fluent-select v-model="language" style="min-width: auto;">
                         <fluent-option value="CSharp">C#</fluent-option>
                         <fluent-option value="VisualBasic">VB</fluent-option>
-                        <fluent-option value="IL" disabled>IL</fluent-option>
+                        <fluent-option value="IL">IL</fluent-option>
                     </fluent-select>
                     <div style="display: flex; column-gap: 4px;">
                         <fluent-button @click="processAsync" :disabled="loading">
                             <fluent-progress-ring v-if="loading" slot="start"
                                                   style="width: 12px; height: 12px;"></fluent-progress-ring>
-                            <span>{{ loading ? "Processing..." : "Process" }}</span>
+                            <span>{{ message }}</span>
                         </fluent-button>
                         <fluent-select v-model="inputLanguage" v-if="inputLanguages.length" style="min-width: auto;">
                             <fluent-option v-for="item in inputLanguages" :value="item">
@@ -109,27 +110,20 @@
     <script type="module">
         import { createApp, toRaw } from "https://cdn.jsdelivr.net/npm/vue/dist/vue.esm-browser.prod.js";
         import * as monaco from "https://cdn.jsdelivr.net/npm/monaco-editor/+esm";
-        if (typeof matchMedia === "function") {
-            const scheme = window.matchMedia("(prefers-color-scheme: dark)");
-            if (typeof scheme !== "undefined") {
-                scheme.addEventListener("change", e => monaco.editor.setTheme(e.matches ? "vs-dark" : "vs"));
-                if (scheme.matches) {
-                    monaco.editor.setTheme("vs-dark");
-                }
-            }
-        }
         createApp({
             data() {
                 return {
                     code: `using System;\nConsole.WriteLine("Hello, World!");`,
                     language: "CSharp",
-                    inputLanguages: [],
-                    inputLanguage: "Default",
+                    inputLanguages: ["Default", "CSharp1", "CSharp2", "CSharp3", "CSharp4", "CSharp5", "CSharp6", "CSharp7", "CSharp7_1", "CSharp7_2", "CSharp7_3", "CSharp8", "CSharp9", "CSharp10", "CSharp11", "CSharp12", "CSharp13", "LatestMajor", "Preview", "Latest"],
+                    inputLanguage: "Preview",
                     output: "Run",
                     outputLanguages: [],
                     outputLanguage: "CSharp1",
-                    isInit: false,
+                    isInitDotnet: false,
+                    isInitCompiler: false,
                     loading: false,
+                    message: "Process",
                     results: {
                         diagnostics: [],
                         isDecompile: false,
@@ -142,9 +136,12 @@
                     if (newValue !== oldValue) {
                         try {
                             this.loading = true;
+                            const message = this.message;
+                            this.message = "Changing language...";
                             await this.initDotNet();
                             await DotNet.invokeMethodAsync("SharpScript", "SetLanguageType", newValue);
                             this.inputLanguages = await DotNet.invokeMethodAsync("SharpScript", "GetInputLanguageVersions");
+                            this.message = message;
                         }
                         finally {
                             this.loading = false;
@@ -155,8 +152,11 @@
                     if (newValue !== oldValue) {
                         try {
                             this.loading = true;
+                            const message = this.message;
+                            this.message = "Changing version...";
                             await this.initDotNet();
                             await DotNet.invokeMethodAsync("SharpScript", "SetInputLanguageVersion", newValue);
+                            this.message = message;
                         }
                         finally {
                             this.loading = false;
@@ -167,9 +167,12 @@
                     if (newValue !== oldValue) {
                         try {
                             this.loading = true;
+                            const message = this.message;
+                            this.message = "Changing output...";
                             await this.initDotNet();
                             await DotNet.invokeMethodAsync("SharpScript", "SetOutputType", newValue);
                             this.outputLanguages = await DotNet.invokeMethodAsync("SharpScript", "GetOutputLanguageVersions");
+                            this.message = message;
                         }
                         finally {
                             this.loading = false;
@@ -180,8 +183,11 @@
                     if (newValue !== oldValue) {
                         try {
                             this.loading = true;
+                            const message = this.message;
+                            this.message = "Changing version...";
                             await this.initDotNet();
                             await DotNet.invokeMethodAsync("SharpScript", "SetOutputLanguageVersion", newValue);
+                            this.message = message;
                         }
                         finally {
                             this.loading = false;
@@ -193,18 +199,33 @@
                 async processAsync() {
                     try {
                         this.loading = true;
-                        await this.initDotNet();
+                        const message = this.message;
+                        this.message = "Compiling...";
+                        await this.initCompiler();
                         this.results = await DotNet.invokeMethodAsync("SharpScript", "ProcessAsync", this.code);
+                        this.message = message;
                     }
                     finally {
                         this.loading = false;
                     }
                 },
                 async initDotNet() {
-                    if (!this.isInit) {
+                    if (!this.isInitDotnet) {
+                        const message = this.message;
+                        this.message = "Loading .NET...";
                         await Blazor.start();
+                        this.message = message;
+                        this.isInitDotnet = true;
+                    }
+                },
+                async initCompiler() {
+                    if (!this.isInitCompiler) {
+                        await this.initDotNet();
+                        const message = this.message;
+                        this.message = "Downloading references...";
                         await DotNet.invokeMethodAsync("SharpScript", "InitAsync", new URL("_content/reference/", document.baseURI));
-                        this.isInit = true;
+                        this.message = message;
+                        this.isInitCompiler = true;
                     }
                 },
                 getLauguage() {
@@ -220,6 +241,17 @@
                 },
                 getLauguageVersion(version) {
                     return version.replace("VisualBasic", "VB ").replace("CSharp", "C# ").replace('_', '.');
+                }
+            },
+            mounted() {
+                if (typeof matchMedia === "function") {
+                    const scheme = matchMedia("(prefers-color-scheme: dark)");
+                    if (typeof scheme !== "undefined") {
+                        scheme.addEventListener("change", e => monaco.editor.setTheme(e.matches ? "vs-dark" : "vs"));
+                        if (scheme.matches) {
+                            monaco.editor.setTheme("vs-dark");
+                        }
+                    }
                 }
             }
         }).component("monaco-editor", {
@@ -327,32 +359,32 @@
             display: flex;
         }
 
-        #vue-app div.split-view .split-content {
-            flex: 1;
-            width: 50%;
-            height: 100%;
-        }
+            #vue-app div.split-view .split-content {
+                flex: 1;
+                width: 50%;
+                height: 100%;
+            }
 
         @media (max-width: 767px) {
             #vue-app div.split-view {
                 flex-direction: column;
             }
 
-            #vue-app div.split-view .split-content {
-                width: 100%;
-                height: 50%;
-            }
+                #vue-app div.split-view .split-content {
+                    width: 100%;
+                    height: 50%;
+                }
         }
 
         #vue-app .monaco-editor {
             outline-width: 0;
         }
 
-        #vue-app .monaco-editor,
-        #vue-app .monaco-editor .margin,
-        #vue-app .monaco-editor-background {
-            background-color: unset;
-        }
+            #vue-app .monaco-editor,
+            #vue-app .monaco-editor .margin,
+            #vue-app .monaco-editor-background {
+                background-color: unset;
+            }
     </style>
 </body>
 

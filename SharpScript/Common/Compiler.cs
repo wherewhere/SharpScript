@@ -8,6 +8,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Emit;
 using Microsoft.CodeAnalysis.VisualBasic;
+using Mobius.ILasm.Core;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -30,6 +31,7 @@ namespace SharpScript.Common
 {
     public class Compiler
     {
+        private static string baseUrl;
         private static List<MetadataReference> references;
 
         public static LanguageType[] LanguageTypes { get; } = Enum.GetValues<LanguageType>();
@@ -45,10 +47,10 @@ namespace SharpScript.Common
 
         public static async ValueTask InitAsync(string baseUrl)
         {
+            Compiler.baseUrl = baseUrl;
             if (references?.Count is not > 0)
             {
                 references = await GetMetadataReferencesAsync(
-                    baseUrl,
                     "System.Runtime",
                     "System.Private.CoreLib",
                     "System.Console",
@@ -67,7 +69,7 @@ namespace SharpScript.Common
             }
         }
 
-        private async Task<Streams> CompilateAsync(string code)
+        private async ValueTask<Streams> CompilateAsync(string code)
         {
             List<string> results = [];
             try
@@ -77,7 +79,7 @@ namespace SharpScript.Common
                 bool isExe = Options.OutputType == OutputType.Run;
                 return Options.LanguageType switch
                 {
-                    LanguageType.CSharp or LanguageType.VisualBasic => RoslynCompilate(code, Options, results, isExe),
+                    LanguageType.CSharp or LanguageType.VisualBasic => await RoslynCompilateAsync(code, Options, results, isExe).ConfigureAwait(false),
                     LanguageType.IL => ILCompilate(code, results, isExe),
                     _ => throw new Exception("Invalid language type.")
                 };
@@ -103,17 +105,17 @@ namespace SharpScript.Common
             return null;
         }
 
-        private static Streams RoslynCompilate(string code, CompilateOptions options, ICollection<string> results, bool isExe)
+        private static async ValueTask<Streams> RoslynCompilateAsync(string code, CompilateOptions options, ICollection<string> results, bool isExe)
         {
             MemoryStream assemblyStream = new();
             MemoryStream symbolStream = new();
         start:
-            Compilation compilation = options.InputOptions switch
+            Compilation compilation = await (options.InputOptions switch
             {
-                CSharpInputOptions csharp => GetRoslynCompilate(code, csharp, isExe),
-                VisualBasicInputOptions vb => GetRoslynCompilate(code, vb, isExe),
+                CSharpInputOptions csharp => GetRoslynCompilateAsync(code, csharp, isExe),
+                VisualBasicInputOptions vb => GetRoslynCompilateAsync(code, vb, isExe),
                 _ => throw new Exception("Invalid language type.")
-            };
+            }).ConfigureAwait(false);
             EmitResult emitResult = compilation.Emit(assemblyStream, symbolStream);
             if (emitResult.Success)
             {
@@ -138,11 +140,13 @@ namespace SharpScript.Common
             }
         }
 
-        private static Compilation GetRoslynCompilate(string code, CSharpInputOptions options, bool isExe)
+        private static async Task<Compilation> GetRoslynCompilateAsync(string code, CSharpInputOptions options, bool isExe)
         {
+            Ref<string> @ref = new(code);
+            IList<MetadataReference> references = await AddReferencesAsync(@ref).ConfigureAwait(false);
             SyntaxTree syntaxTree =
                 CSharpSyntaxFactory.ParseSyntaxTree(
-                    code,
+                    @ref.Value,
                     new CSharpParseOptions(
                         options.LanguageVersion,
                         DocumentationMode.Parse,
@@ -160,11 +164,13 @@ namespace SharpScript.Common
             return compilation;
         }
 
-        private static Compilation GetRoslynCompilate(string code, VisualBasicInputOptions options, bool isExe)
+        private static async Task<Compilation> GetRoslynCompilateAsync(string code, VisualBasicInputOptions options, bool isExe)
         {
+            Ref<string> @ref = new(code);
+            IList<MetadataReference> references = await AddReferencesAsync(@ref).ConfigureAwait(false);
             SyntaxTree syntaxTree =
                 VisualBasicSyntaxFactory.ParseSyntaxTree(
-                    code,
+                    @ref.Value,
                     new VisualBasicParseOptions(
                         options.LanguageVersion,
                         DocumentationMode.Parse,
@@ -181,29 +187,65 @@ namespace SharpScript.Common
             return compilation;
         }
 
+        private static async ValueTask<IList<MetadataReference>> AddReferencesAsync(Ref<string> code)
+        {
+            if (code.Value.StartsWith("#r ", StringComparison.OrdinalIgnoreCase))
+            {
+                using StringReader reader = new(code.Value);
+                List<MetadataReference> references = [.. Compiler.references];
+                HttpClient client = null;
+                try
+                {
+                    while (reader.Peek() > 0)
+                    {
+                        string line = reader.ReadLine();
+                        if (line.StartsWith("#r ", StringComparison.OrdinalIgnoreCase))
+                        {
+                            string path = line[3..].Trim(' ', '\'', '"');
+                            client ??= new() { BaseAddress = new(baseUrl) };
+                            using Stream stream = await client.GetStreamAsync($"{path}.dll").ConfigureAwait(false);
+                            references.Add(MetadataReference.CreateFromStream(stream));
+                        }
+                        else
+                        {
+                            code.Value = line;
+                            break;
+                        }
+                    }
+                }
+                finally
+                {
+                    client?.Dispose();
+                }
+                code.Value += reader.ReadToEnd();
+                return references;
+            }
+            return references;
+        }
+
         private static Streams ILCompilate(string code, ICollection<string> results, bool isExe)
         {
-            //Logger logger = new(results);
-            //Driver driver = new(logger, isExe ? Driver.Target.Exe : Driver.Target.Dll, false, false, false);
+            Logger logger = new(results);
+            Driver driver = new(logger, isExe ? Driver.Target.Exe : Driver.Target.Dll, false, false, false);
 
-            //try
-            //{
-            //    MemoryStream assemblyStream = new();
-            //    if (driver.Assemble([code], assemblyStream))
-            //    {
-            //        assemblyStream.Seek(0, SeekOrigin.Begin);
-            //        return new Streams(assemblyStream, null);
-            //    }
-            //}
-            //catch (Exception ex) when (ex.GetType().Name.StartsWith("yy"))
-            //{
-            //    return null;
-            //}
+            try
+            {
+                MemoryStream assemblyStream = new();
+                if (driver.Assemble([code], assemblyStream))
+                {
+                    assemblyStream.Seek(0, SeekOrigin.Begin);
+                    return new Streams(assemblyStream, null);
+                }
+            }
+            catch (Exception ex) when (ex.GetType().Name.StartsWith("yy"))
+            {
+                return null;
+            }
 
             return null;
         }
 
-        private async Task DecompileAsync(Streams streams)
+        private async ValueTask DecompileAsync(Streams streams)
         {
             Diagnostics = ["Decompiling..."];
             Decompiled = Options.OutputOptions switch
@@ -215,7 +257,7 @@ namespace SharpScript.Common
             IsDecompile = true;
         }
 
-        private static async Task<string> CSharpDecompileAsync(Streams streams, CSharpOutputOptions options)
+        private static async ValueTask<string> CSharpDecompileAsync(Streams streams, CSharpOutputOptions options)
         {
             using PEFile assemblyFile = new("", streams.AssemblyStream);
             PortablePdbDebugInfoProvider debugInfo = null;
@@ -278,7 +320,7 @@ namespace SharpScript.Common
             return options;
         }
 
-        private static async Task<string> ILDecompileAsync(Streams streams)
+        private static async ValueTask<string> ILDecompileAsync(Streams streams)
         {
             using PEFile assemblyFile = new("", streams.AssemblyStream);
             PortablePdbDebugInfoProvider debugInfo = null;
@@ -357,7 +399,7 @@ namespace SharpScript.Common
             // Note: the logic cannot be reused, but should match C# and Jit ASM
             !type.NamespaceDefinition.IsNil && type.IsCompilerGenerated(metadata);
 
-        private async Task ExecuteAsync(Streams streams)
+        private async ValueTask ExecuteAsync(Streams streams)
         {
             bool finished = false;
             List<string> results = [];
@@ -405,7 +447,7 @@ namespace SharpScript.Common
             }
         }
 
-        public async Task ProcessAsync(string code)
+        public async ValueTask ProcessAsync(string code)
         {
             try
             {
@@ -430,7 +472,7 @@ namespace SharpScript.Common
             }
         }
 
-        private static async ValueTask<List<MetadataReference>> GetMetadataReferencesAsync(string baseUrl, params string[] assemblies)
+        private static async ValueTask<List<MetadataReference>> GetMetadataReferencesAsync(params string[] assemblies)
         {
             List<MetadataReference> references = [];
             using HttpClient client = new() { BaseAddress = new Uri(baseUrl) };
@@ -442,18 +484,23 @@ namespace SharpScript.Common
             return references;
         }
 
-        //private class Logger(ICollection<string> results) : Mobius.ILasm.interfaces.ILogger
-        //{
-        //    public void Info(string message) => results.Add($"{nameof(Info)}: {message}");
+        private record class Ref<T>(T Value)
+        {
+            public T Value { get; set; } = Value;
+        }
 
-        //    public void Warning(string message) => results.Add($"{nameof(Warning)}: {message}");
+        private class Logger(ICollection<string> results) : Mobius.ILasm.interfaces.ILogger
+        {
+            public void Info(string message) => results.Add($"{nameof(Info)}: {message}");
 
-        //    public void Error(string message) => results.Add($"{nameof(Error)}: {message}");
+            public void Warning(string message) => results.Add($"{nameof(Warning)}: {message}");
 
-        //    public void Warning(Mono.ILASM.Location location, string message) => results.Add($"Current {location}: {nameof(Warning)}: {message}");
+            public void Error(string message) => results.Add($"{nameof(Error)}: {message}");
 
-        //    public void Error(Mono.ILASM.Location location, string message) => results.Add($"Current {location}: {nameof(Error)}: {message}");
-        //}
+            public void Warning(Mono.ILASM.Location location, string message) => results.Add($"Current {location}: {nameof(Warning)}: {message}");
+
+            public void Error(Mono.ILASM.Location location, string message) => results.Add($"Current {location}: {nameof(Error)}: {message}");
+        }
 
         private partial record Streams(MemoryStream AssemblyStream, MemoryStream SymbolStream) : IDisposable
         {
