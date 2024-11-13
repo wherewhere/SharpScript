@@ -138,6 +138,9 @@
                             this.loading = true;
                             const message = this.message;
                             this.message = "Changing language...";
+                            if (this.code === this.getDefaultCode(oldValue)) {
+                                this.code = this.getDefaultCode(newValue);
+                            }
                             await this.initDotNet();
                             await DotNet.invokeMethodAsync("SharpScript", "SetLanguageType", newValue);
                             this.inputLanguages = await DotNet.invokeMethodAsync("SharpScript", "GetInputLanguageVersions");
@@ -201,7 +204,8 @@
                         this.loading = true;
                         const message = this.message;
                         this.message = "Compiling...";
-                        await this.initCompiler();
+                        this.setSettings();
+                        await (this.language === "IL" ? this.initDotNet() : this.initCompiler());
                         this.results = await DotNet.invokeMethodAsync("SharpScript", "ProcessAsync", this.code);
                         this.message = message;
                     }
@@ -241,6 +245,48 @@
                 },
                 getLauguageVersion(version) {
                     return version.replace("VisualBasic", "VB ").replace("CSharp", "C# ").replace('_', '.');
+                },
+                getDefaultCode(language) {
+                    switch (language) {
+                        case "CSharp":
+                            return `using System;\nConsole.WriteLine("Hello, World!");`;
+                        case "VisualBasic":
+                            return `Imports System\nPublic Module Program\n    Public Sub Main()\n        Console.WriteLine("Hello, World!")\n    End Sub\nEnd Module`;
+                        case "IL":
+                            return `.assembly ' ' {\n}\n.method static void Main() {\n    .entrypoint\n    ldstr "Hello, World!"\n    call void [System.Console]System.Console::WriteLine(string)\n    ret\n}`;
+                        default:
+                            return '';
+                    }
+                },
+                loadSettings() {
+                    const hash = location.hash.substring(1);
+                    if (hash) {
+                        const params = new URLSearchParams(hash);
+                        if (params.has("language")) {
+                            this.language = params.get("language");
+                        }
+                        if (params.has("version")) {
+                            this.inputLanguage = params.get("version");
+                        }
+                        if (params.has("output")) {
+                            this.output = params.get("output");
+                        }
+                        if (params.has("csversion")) {
+                            this.outputLanguage = params.get("csversion");
+                        }
+                        if (params.has("code")) {
+                            this.code = decodeURIComponent(atob(params.get("code")));
+                        }
+                    }
+                },
+                setSettings() {
+                    location.hash = new URLSearchParams({
+                        language: this.language,
+                        version: this.inputLanguage,
+                        output: this.output,
+                        csversion: this.outputLanguage,
+                        code: btoa(encodeURIComponent(this.code))
+                    });
                 }
             },
             mounted() {
@@ -253,6 +299,7 @@
                         }
                     }
                 }
+                this.loadSettings();
             }
         }).component("monaco-editor", {
             template: "#empty-template",
@@ -264,7 +311,8 @@
             emits: ['update:value'],
             data() {
                 return {
-                    editor: null
+                    editor: null,
+                    changed: false
                 }
             },
             watch: {
@@ -274,9 +322,10 @@
                     }
                 },
                 value(newValue, oldValue) {
-                    if (this.readonly && newValue !== oldValue) {
+                    if (!this.changed && newValue !== oldValue) {
                         toRaw(this.editor).setValue(newValue);
                     }
+                    this.changed = false;
                 },
                 readonly(newValue, oldValue) {
                     if (newValue !== oldValue) {
@@ -308,6 +357,7 @@
             mounted() {
                 const editor = this.createEditor(this.$el, this.language, this.value, this.readonly);
                 editor.onDidChangeModelContent(_ => {
+                    this.changed = true;
                     this.$emit('update:value', editor.getValue());
                 });
                 this.editor = editor;
