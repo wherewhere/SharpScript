@@ -92,11 +92,8 @@
                 <div style="flex: 1;">
                     <monaco-editor v-if="results.isDecompile" v-model:value="results.decompiled" language="csharp"
                                    readonly="true" style="width: 100%; height: 100%;"></monaco-editor>
-                    <div style="font-family: var(--font-monospace); overflow: auto; padding: 0 12px; white-space: pre-line;"
-                         v-else>
-                        <div v-for="item in results.diagnostics">
-                            {{ item }}
-                        </div>
+                    <div style="font-family: var(--font-monospace); overflow: auto; padding: 0 12px;" v-else>
+                        <pre class="unset" v-for="item in results.diagnostics">{{ item }}</pre>
                     </div>
                 </div>
             </div>
@@ -146,6 +143,11 @@
                             this.inputLanguages = await DotNet.invokeMethodAsync("SharpScript", "GetInputLanguageVersions");
                             this.message = message;
                         }
+                        catch (e) {
+                            this.message = "Error";
+                            this.results.diagnostics.push(e.message);
+                            throw e;
+                        }
                         finally {
                             this.loading = false;
                         }
@@ -160,6 +162,11 @@
                             await this.initDotNet();
                             await DotNet.invokeMethodAsync("SharpScript", "SetInputLanguageVersion", newValue);
                             this.message = message;
+                        }
+                        catch (e) {
+                            this.message = "Error";
+                            this.results.diagnostics.push(e.message);
+                            throw e;
                         }
                         finally {
                             this.loading = false;
@@ -177,6 +184,11 @@
                             this.outputLanguages = await DotNet.invokeMethodAsync("SharpScript", "GetOutputLanguageVersions");
                             this.message = message;
                         }
+                        catch (e) {
+                            this.message = "Error";
+                            this.results.diagnostics.push(e.message);
+                            throw e;
+                        }
                         finally {
                             this.loading = false;
                         }
@@ -191,6 +203,11 @@
                             await this.initDotNet();
                             await DotNet.invokeMethodAsync("SharpScript", "SetOutputLanguageVersion", newValue);
                             this.message = message;
+                        }
+                        catch (e) {
+                            this.message = "Error";
+                            this.results.diagnostics.push(e.message);
+                            throw e;
                         }
                         finally {
                             this.loading = false;
@@ -208,6 +225,11 @@
                         await (this.language === "IL" ? this.initDotNet() : this.initCompiler());
                         this.results = await DotNet.invokeMethodAsync("SharpScript", "ProcessAsync", this.code);
                         this.message = message;
+                    }
+                    catch (e) {
+                        this.message = "Error";
+                        this.results.diagnostics.push(e.message);
+                        throw e;
                     }
                     finally {
                         this.loading = false;
@@ -227,7 +249,7 @@
                         await this.initDotNet();
                         const message = this.message;
                         this.message = "Downloading references...";
-                        await DotNet.invokeMethodAsync("SharpScript", "InitAsync", new URL("_content/reference/", document.baseURI));
+                        await DotNet.invokeMethodAsync("SharpScript", "InitAsync", new URL("_framework/", document.baseURI));
                         this.message = message;
                         this.isInitCompiler = true;
                     }
@@ -393,6 +415,14 @@
             height: 100%;
             overflow: hidden;
             background-color: var(--neutral-fill-stealth-rest);
+        }
+
+        pre.unset {
+            margin-top: unset;
+            margin-bottom: unset;
+            font-size: inherit;
+            font-family: inherit;
+            white-space: pre-wrap;
         }
 
         #vue-app fluent-select::part(listbox) {

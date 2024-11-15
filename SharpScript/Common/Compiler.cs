@@ -203,8 +203,8 @@ namespace SharpScript.Common
                         {
                             string path = line[3..].Trim(' ', '\'', '"');
                             client ??= new() { BaseAddress = new(baseUrl) };
-                            using Stream stream = await client.GetStreamAsync($"{path}.dll").ConfigureAwait(false);
-                            references.Add(MetadataReference.CreateFromStream(stream));
+                            using Stream stream = await client.GetStreamAsync($"{path}.wasm").ConfigureAwait(false);
+                            references.Add(MetadataReference.CreateFromImage(WebcilConverterUtil.ConvertFromWebcil(stream)));
                         }
                         else
                         {
@@ -478,8 +478,8 @@ namespace SharpScript.Common
             using HttpClient client = new() { BaseAddress = new Uri(baseUrl) };
             foreach (string assembly in assemblies)
             {
-                using Stream stream = await client.GetStreamAsync($"{assembly}.dll").ConfigureAwait(false);
-                references.Add(MetadataReference.CreateFromStream(stream));
+                using Stream stream = await client.GetStreamAsync($"{assembly}.wasm").ConfigureAwait(false);
+                references.Add(MetadataReference.CreateFromImage(WebcilConverterUtil.ConvertFromWebcil(stream)));
             }
             return references;
         }

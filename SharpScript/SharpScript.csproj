@@ -15,7 +15,7 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="Mobius.ILasm" Version="0.1.0" />
-    <PackageReference Include="System.Security.Permissions" Version="8.0.0" />
+    <PackageReference Include="System.Security.Permissions" Version="9.0.0" />
   </ItemGroup>
 
   <ItemGroup>
@@ -23,19 +23,5 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
-
-  <Target Name="GetOutputAssemblies" AfterTargets="CopyFilesToOutputDirectory">
-    <ItemGroup>
-      <OutputAssemblies Include="$(OutputPath)\*.dll" />
-    </ItemGroup>
-  </Target>
-
-  <Target Name="CopyAssembliesToOutputDirectory" AfterTargets="CopyFilesToOutputDirectory" DependsOnTargets="GetOutputAssemblies">
-    <Copy SourceFiles="@(OutputAssemblies)" DestinationFolder="$(OutputPath)wwwroot\_content\reference" />
-  </Target>
-
-  <Target Name="CopyAssembliesToPublishDirectory" AfterTargets="CopyFilesToPublishDirectory" DependsOnTargets="GetOutputAssemblies">
-    <Copy SourceFiles="@(OutputAssemblies)" DestinationFolder="$(PublishDir)wwwroot\_content\reference" />
-  </Target>
 
 </Project>
