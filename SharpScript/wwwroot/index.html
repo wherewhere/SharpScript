@@ -46,6 +46,17 @@
             }
         }
     </script>
+    <script src="https://cdn.jsdelivr.net/npm/monaco-editor/min/vs/loader.js"></script>
+    <script>
+        function importMonaco() {
+            return typeof monaco === "undefined"
+                ? new Promise(resolve => {
+                    require.config({ paths: { vs: "https://cdn.jsdelivr.net/npm/monaco-editor/min/vs" } });
+                    require(["vs/editor/editor.main"], () => resolve(monaco));
+                })
+                : new Promise(resolve => resolve(monaco));
+        }
+    </script>
 </head>
 
 <body>
@@ -64,7 +75,7 @@
                                                   style="width: 12px; height: 12px;"></fluent-progress-ring>
                             <span>{{ message }}</span>
                         </fluent-button>
-                        <fluent-select v-model="inputLanguage" v-if="inputLanguages.length" style="min-width: auto;">
+                        <fluent-select v-if="inputLanguages.length" v-model="inputLanguage" style="min-width: auto;">
                             <fluent-option v-for="item in inputLanguages" :value="item">
                                 {{ getLauguageVersion(item) }}
                             </fluent-option>
@@ -83,7 +94,7 @@
                         <fluent-option value="IL">IL</fluent-option>
                         <fluent-option value="Run">Run</fluent-option>
                     </fluent-select>
-                    <fluent-select v-model="outputLanguage" v-if="outputLanguages.length" style="min-width: auto;">
+                    <fluent-select v-if="outputLanguages.length" v-model="outputLanguage" style="min-width: auto;">
                         <fluent-option v-for="item in outputLanguages" :value="item">
                             {{ getLauguageVersion(item) }}
                         </fluent-option>
@@ -98,6 +109,7 @@
                 </div>
             </div>
         </div>
+        <div class="loading-progress" v-if="!isInitDotnet"></div>
     </div>
 
     <template id="empty-template">
@@ -106,7 +118,7 @@
 
     <script type="module">
         import { createApp, toRaw } from "https://cdn.jsdelivr.net/npm/vue/dist/vue.esm-browser.prod.js";
-        import * as monaco from "https://cdn.jsdelivr.net/npm/monaco-editor/+esm";
+        const monaco = await importMonaco();
         createApp({
             data() {
                 return {
@@ -125,6 +137,25 @@
                         diagnostics: [],
                         isDecompile: false,
                         decompiled: null
+                    },
+                    locker: {
+                        resolves: [],
+                        reference: 0,
+                        async await() {
+                            return new Promise(resolve => {
+                                if (this.reference++ <= 0) {
+                                    resolve();
+                                }
+                                else {
+                                    this.resolves.push(resolve);
+                                }
+                            });
+                        },
+                        release() {
+                            if (--this.reference > 0) {
+                                this.resolves.pop()();
+                            }
+                        }
                     }
                 }
             },
@@ -149,6 +180,7 @@
                             throw e;
                         }
                         finally {
+                            this.message = "Process";
                             this.loading = false;
                         }
                     }
@@ -169,6 +201,7 @@
                             throw e;
                         }
                         finally {
+                            this.message = "Process";
                             this.loading = false;
                         }
                     }
@@ -190,6 +223,7 @@
                             throw e;
                         }
                         finally {
+                            this.message = "Process";
                             this.loading = false;
                         }
                     }
@@ -210,6 +244,7 @@
                             throw e;
                         }
                         finally {
+                            this.message = "Process";
                             this.loading = false;
                         }
                     }
@@ -232,6 +267,7 @@
                         throw e;
                     }
                     finally {
+                        this.message = "Process";
                         this.loading = false;
                     }
                 },
@@ -239,7 +275,11 @@
                     if (!this.isInitDotnet) {
                         const message = this.message;
                         this.message = "Loading .NET...";
-                        await Blazor.start();
+                        await this.locker.await();
+                        if (!this.isInitDotnet) {
+                            await Blazor.start();
+                        }
+                        this.locker.release();
                         this.message = message;
                         this.isInitDotnet = true;
                     }
@@ -287,14 +327,18 @@
                         if (params.has("language")) {
                             this.language = params.get("language");
                         }
-                        if (params.has("version")) {
-                            this.inputLanguage = params.get("version");
+                        if (this.language !== "IL") {
+                            if (params.has("version")) {
+                                this.inputLanguage = params.get("version");
+                            }
                         }
                         if (params.has("output")) {
                             this.output = params.get("output");
                         }
-                        if (params.has("csversion")) {
-                            this.outputLanguage = params.get("csversion");
+                        if (this.outputLanguage === "CSharp") {
+                            if (params.has("csversion")) {
+                                this.outputLanguage = params.get("csversion");
+                            }
                         }
                         if (params.has("code")) {
                             this.code = decodeURIComponent(atob(params.get("code")));
@@ -302,13 +346,21 @@
                     }
                 },
                 setSettings() {
-                    location.hash = new URLSearchParams({
+                    const settings = {
                         language: this.language,
-                        version: this.inputLanguage,
-                        output: this.output,
-                        csversion: this.outputLanguage,
-                        code: btoa(encodeURIComponent(this.code))
-                    });
+                        output: this.output
+                    };
+                    if (this.language !== "IL") {
+                        settings.version = this.inputLanguage;
+                    }
+                    if (this.outputLanguage === "CSharp") {
+                        settings.csversion = this.outputLanguage;
+                    }
+                    const code = this.code;
+                    if (code) {
+                        settings.code = btoa(encodeURIComponent(code));
+                    }
+                    location.hash = new URLSearchParams(settings);
                 }
             },
             mounted() {
@@ -390,11 +442,6 @@
     <style>
         @import 'https://cdn.jsdelivr.net/gh/microsoft/fluentui-blazor@dev/src/Core/wwwroot/css/reboot.css';
 
-        @font-face {
-            font-family: codicon;
-            src: local('codicon'), url('https://cdn.jsdelivr.net/npm/monaco-editor/min/vs/base/browser/ui/codicons/codicon/codicon.ttf') format('truetype');
-        }
-
         :root {
             --font-monospace: "Cascadia Code NF", "Cascadia Code PL", "Cascadia Code", Consolas, "Courier New", "Liberation Mono", SFMono-Regular, Menlo, Monaco, monospace;
             --highlight-bg: #fff3cd;
@@ -423,6 +470,16 @@
             font-size: inherit;
             font-family: inherit;
             white-space: pre-wrap;
+        }
+
+        .loading-progress {
+            bottom: 0;
+            width: var(--blazor-load-percentage, 0%);
+            background-color: var(--accent-fill-rest);
+            height: calc((var(--stroke-width) * 3) * 1px);
+            transition: all 0.2s ease-in-out;
+            overflow: hidden;
+            position: absolute;
         }
 
         #vue-app fluent-select::part(listbox) {
