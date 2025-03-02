@@ -1,0 +1,11 @@
+<Project>
+  <PropertyGroup>
+    <Authors>wherewhere</Authors>
+    <Copyright>Copyright © 2017 - 2025 wherewhere. All Rights Reserved.</Copyright>
+    <Description>.NET language playground on WASM</Description>
+    <LangVersion>latest</LangVersion>
+    <RepositoryType>git</RepositoryType>
+    <PublishRepositoryUrl>True</PublishRepositoryUrl>
+    <RepositoryUrl>https://github.com/wherewhere/SharpScript</RepositoryUrl>
+  </PropertyGroup>
+</Project>

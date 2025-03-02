@@ -448,6 +448,13 @@
             --content-padding: 1rem;
             --loading-display: none;
             --loaded-display: unset;
+            color-scheme: light;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                color-scheme: dark;
+            }
         }
 
         @media (min-width: 767px) {
