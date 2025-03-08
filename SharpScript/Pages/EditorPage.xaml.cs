@@ -19,7 +19,7 @@ namespace SharpScript.Pages
     public sealed partial class EditorPage : Page
     {
         private bool _isInitialized;
-        public EditorViewModel Provider { get; }
+        private readonly EditorViewModel Provider;
 
         public EditorPage()
         {
