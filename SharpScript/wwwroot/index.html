@@ -19,6 +19,36 @@
     <link rel="icon" type="image/png" sizes="200x200"
           href="https://cdn.jsdelivr.net/gh/wherewhere/SharpScript@main/SharpScript/Assets/StoreLogo.scale-400.png">
     <script src="_framework/blazor.webassembly.js" autostart="false"></script>
+    <script type="importmap" data-pjax>
+        {
+            "imports": {
+                "@babel/runtime/helpers/extends": "https://cdn.jsdelivr.net/npm/@babel/runtime/helpers/esm/extends.js",
+                "@codemirror/autocomplete": "https://cdn.jsdelivr.net/npm/@codemirror/autocomplete/dist/index.js",
+                "@codemirror/commands": "https://cdn.jsdelivr.net/npm/@codemirror/commands/dist/index.js",
+                "@codemirror/language": "https://cdn.jsdelivr.net/npm/@codemirror/language/dist/index.js",
+                "@codemirror/legacy-modes/mode/vb": "https://cdn.jsdelivr.net/npm/@codemirror/legacy-modes/mode/vb.js",
+                "@codemirror/lint": "https://cdn.jsdelivr.net/npm/@codemirror/lint/dist/index.js",
+                "@codemirror/search": "https://cdn.jsdelivr.net/npm/@codemirror/search/dist/index.js",
+                "@codemirror/state": "https://cdn.jsdelivr.net/npm/@codemirror/state/+esm",
+                "@codemirror/view": "https://cdn.jsdelivr.net/npm/@codemirror/view/dist/index.js",
+                "@fluentui/web-components": "https://cdn.jsdelivr.net/npm/@fluentui/web-components/+esm",
+                "@lezer/common": "https://cdn.jsdelivr.net/npm/@lezer/common/+esm",
+                "@lezer/highlight": "https://cdn.jsdelivr.net/npm/@lezer/highlight/dist/index.js",
+                "@lezer/lr": "https://cdn.jsdelivr.net/npm/@lezer/lr/+esm",
+                "@replit/codemirror-lang-csharp": "https://cdn.jsdelivr.net/npm/@replit/codemirror-lang-csharp/dist/index.js",
+                "@uiw/codemirror-themes": "https://cdn.jsdelivr.net/npm/@uiw/codemirror-themes/esm/index.js",
+                "@uiw/codemirror-theme-vscode/dark": "https://cdn.jsdelivr.net/npm/@uiw/codemirror-theme-vscode/esm/dark.js",
+                "@uiw/codemirror-theme-vscode/light": "https://cdn.jsdelivr.net/npm/@uiw/codemirror-theme-vscode/esm/light.js",
+                "codemirror": "https://cdn.jsdelivr.net/npm/codemirror/dist/index.js",
+                "crelt": "https://cdn.jsdelivr.net/npm/crelt/+esm",
+                "mirrorsharp-codemirror-6-preview/codemirror/lang-cil": "https://cdn.jsdelivr.net/npm/mirrorsharp-codemirror-6-preview/codemirror/languages/cil.js",
+                "mirrorsharp-codemirror-6-preview/codemirror/lang-vb": "https://cdn.jsdelivr.net/npm/mirrorsharp-codemirror-6-preview/codemirror/languages/vb.js",
+                "style-mod": "https://cdn.jsdelivr.net/npm/style-mod/+esm",
+                "vue": "https://cdn.jsdelivr.net/npm/vue/dist/vue.esm-browser.prod.js",
+                "w3c-keyname": "https://cdn.jsdelivr.net/npm/w3c-keyname/+esm"
+            }
+          }
+    </script>
     <script type="module" data-pjax>
         import {
             provideFluentDesignSystem,
@@ -28,7 +58,7 @@
             fluentProgressRing,
             baseLayerLuminance,
             StandardLuminance
-        } from "https://cdn.jsdelivr.net/npm/@fluentui/web-components/+esm";
+        } from "@fluentui/web-components";
         provideFluentDesignSystem()
             .register(
                 fluentButton(),
@@ -36,25 +66,12 @@
                 fluentSelect(),
                 fluentProgressRing()
             );
-        if (typeof matchMedia === "function") {
-            const scheme = matchMedia("(prefers-color-scheme: dark)");
-            if (typeof scheme !== "undefined") {
-                scheme.addEventListener("change", e => baseLayerLuminance.withDefault(e.matches ? StandardLuminance.DarkMode : StandardLuminance.LightMode));
-                if (scheme.matches) {
-                    baseLayerLuminance.withDefault(StandardLuminance.DarkMode);
-                }
+        const scheme = matchMedia("(prefers-color-scheme: dark)");
+        if (typeof scheme !== "undefined") {
+            scheme.addEventListener("change", e => baseLayerLuminance.withDefault(e.matches ? StandardLuminance.DarkMode : StandardLuminance.LightMode));
+            if (scheme.matches) {
+                baseLayerLuminance.withDefault(StandardLuminance.DarkMode);
             }
-        }
-    </script>
-    <script src="https://cdn.jsdelivr.net/npm/monaco-editor/min/vs/loader.js"></script>
-    <script>
-        function importMonaco() {
-            return typeof monaco === "undefined"
-                ? new Promise(resolve => {
-                    require.config({ paths: { vs: "https://cdn.jsdelivr.net/npm/monaco-editor/min/vs" } });
-                    require(["vs/editor/editor.main"], () => resolve(monaco));
-                })
-                : new Promise(resolve => resolve(monaco));
         }
     </script>
 </head>
@@ -82,10 +99,7 @@
                         </fluent-select>
                     </div>
                 </div>
-                <div style="flex: 1;">
-                    <monaco-editor v-model:value="code" :language="getLauguage()"
-                                   style="width: 100%; height: 100%;"></monaco-editor>
-                </div>
+                <codemirror class="editor" v-model:value="code" :language="getLauguage()"></codemirror>
             </div>
             <div class="split-content" style="display: flex; flex-direction: column; row-gap: 4px; padding: 4px;">
                 <div style="display: flex; justify-content: space-between; column-gap: 4px;">
@@ -100,10 +114,10 @@
                         </fluent-option>
                     </fluent-select>
                 </div>
-                <div style="flex: 1;">
-                    <monaco-editor v-if="results.isDecompile" v-model:value="results.decompiled" language="csharp"
-                                   readonly="true" style="width: 100%; height: 100%;"></monaco-editor>
-                    <div style="font-family: var(--font-monospace); overflow: auto; padding: 0 12px;" v-else>
+                <div class="editor">
+                    <codemirror v-if="results.isDecompile" v-model:value="results.decompiled"
+                                :language="getOutputLanguage()" readonly="true"></codemirror>
+                    <div style="font-family: var(--font-monospace); padding: 0 12px;" v-else>
                         <pre class="unset" v-for="item in results.diagnostics">{{ item }}</pre>
                     </div>
                 </div>
@@ -117,8 +131,14 @@
     </template>
 
     <script type="module">
-        import { createApp, toRaw } from "https://cdn.jsdelivr.net/npm/vue/dist/vue.esm-browser.prod.js";
-        const monaco = await importMonaco();
+        import { createApp, toRaw } from "vue";
+        import { basicSetup, EditorView } from "codemirror";
+        import { Compartment, EditorState } from "@codemirror/state"
+        import { csharp } from "@replit/codemirror-lang-csharp";
+        import { cil } from "mirrorsharp-codemirror-6-preview/codemirror/lang-cil";
+        import { vb } from "mirrorsharp-codemirror-6-preview/codemirror/lang-vb";
+        import { vscodeDark } from "@uiw/codemirror-theme-vscode/dark";
+        import { vscodeLight } from "@uiw/codemirror-theme-vscode/light";
         createApp({
             data() {
                 return {
@@ -296,11 +316,22 @@
                 },
                 getLauguage() {
                     switch (this.language) {
-                        case "CSharp":
                         case "IL":
+                            return "il";
+                        case "CSharp":
                             return "csharp";
                         case "VisualBasic":
                             return "vb";
+                        default:
+                            return "plaintext";
+                    }
+                },
+                getOutputLanguage() {
+                    switch (this.output) {
+                        case "IL":
+                            return "il";
+                        case "CSharp":
+                            return "csharp";
                         default:
                             return "plaintext";
                     }
@@ -364,18 +395,9 @@
                 }
             },
             mounted() {
-                if (typeof matchMedia === "function") {
-                    const scheme = matchMedia("(prefers-color-scheme: dark)");
-                    if (typeof scheme !== "undefined") {
-                        scheme.addEventListener("change", e => monaco.editor.setTheme(e.matches ? "vs-dark" : "vs"));
-                        if (scheme.matches) {
-                            monaco.editor.setTheme("vs-dark");
-                        }
-                    }
-                }
                 this.loadSettings();
             }
-        }).component("monaco-editor", {
+        }).component("codemirror", {
             template: "#empty-template",
             props: {
                 language: String,
@@ -386,55 +408,81 @@
             data() {
                 return {
                     editor: null,
-                    changed: false
+                    changed: false,
+                    themeSet: new Compartment(),
+                    languageSet: new Compartment(),
+                    readonlySet: new Compartment()
                 }
             },
             watch: {
                 language(newValue, oldValue) {
                     if (newValue !== oldValue) {
-                        monaco.editor.setModelLanguage(toRaw(this.editor).getModel(), newValue);
+                        const lang = this.getLauguage(newValue);
+                        this.editor.dispatch({ effects: this.languageSet.reconfigure(lang) });
                     }
                 },
                 value(newValue, oldValue) {
                     if (!this.changed && newValue !== oldValue) {
-                        toRaw(this.editor).setValue(newValue);
+                        const editor = this.editor;
+                        editor.dispatch({ changes: { from: 0, to: editor.state.doc.length, insert: newValue } });
                     }
                     this.changed = false;
                 },
                 readonly(newValue, oldValue) {
                     if (newValue !== oldValue) {
-                        toRaw(this.editor).updateOptions({ readOnly: newValue });
+                        this.editor.dispatch({ effects: this.readonlySet.reconfigure(EditorState.readOnly.of(!!newValue)) });
                     }
                 }
             },
             methods: {
-                createEditor(element, language, value, readonly) {
-                    return monaco.editor.create(element, {
-                        value: value,
-                        language: language,
-                        automaticLayout: true,
-                        fontFamily: "'Cascadia Code NF', 'Cascadia Code PL', 'Cascadia Code', Consolas, 'Courier New', monospace",
-                        fontLigatures: "ligatures",
-                        minimap: {
-                            enabled: false
-                        },
-                        padding: {
-                            bottom: 4,
-                            top: 4
-                        },
-                        readOnly: readonly,
-                        smoothScrolling: true,
-                        tabSize: 4
-                    });
+                updateTheme(e) {
+                    this.editor.dispatch({ effects: this.themeSet.reconfigure(e.matches ? vscodeDark : vscodeLight) });
+                },
+                getLauguage(lang) {
+                    switch (lang) {
+                        case "il":
+                            return cil;
+                        case "csharp":
+                            return csharp();
+                        case "vb":
+                            return vb;
+                    }
                 }
             },
             mounted() {
-                const editor = this.createEditor(this.$el, this.language, this.value, this.readonly);
-                editor.onDidChangeModelContent(_ => {
-                    this.changed = true;
-                    this.$emit('update:value', editor.getValue());
+                const getTheme = () => {
+                    const scheme = matchMedia("(prefers-color-scheme: dark)");
+                    if (typeof scheme !== "undefined") {
+                        scheme.addEventListener("change", this.updateTheme);
+                        if (scheme.matches) {
+                            return this.themeSet.of(vscodeDark);
+                        }
+                    }
+                    return this.themeSet.of(vscodeLight);
+                };
+                this.editor = new EditorView({
+                    doc: this.value,
+                    parent: this.$el,
+                    extensions: [
+                        basicSetup,
+                        this.languageSet.of(this.getLauguage(this.language || "csharp")),
+                        getTheme(),
+                        this.readonlySet.of(EditorState.readOnly.of(!!this.readonly)),
+                        EditorView.updateListener.of(e => {
+                            if (e.docChanged) {
+                                this.changed = true;
+                                this.$emit("update:value", e.state.doc.toString());
+                            }
+                        })
+                    ]
                 });
-                this.editor = editor;
+            },
+            unmounted() {
+                const scheme = matchMedia("(prefers-color-scheme: dark)");
+                if (typeof scheme !== "undefined") {
+                    scheme.removeEventListener("change", this.updateTheme);
+                }
+                this.editor.destroy();
             }
         }).mount("#vue-app");
     </script>
@@ -509,6 +557,11 @@
                 height: 100%;
             }
 
+                #vue-app div.split-view .split-content .editor {
+                    flex: 1;
+                    overflow: auto;
+                }
+
         @media (max-width: 767px) {
             #vue-app div.split-view {
                 flex-direction: column;
@@ -520,15 +573,9 @@
                 }
         }
 
-        #vue-app .monaco-editor {
-            outline-width: 0;
+        #vue-app .cm-editor {
+            background-color: transparent;
         }
-
-            #vue-app .monaco-editor,
-            #vue-app .monaco-editor .margin,
-            #vue-app .monaco-editor-background {
-                background-color: unset;
-            }
     </style>
 </body>
 

@@ -2,17 +2,18 @@
 
   <PropertyGroup>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <TargetFramework>net8.0</TargetFramework>
+    <CompressionEnabled>false</CompressionEnabled>
+    <TargetFramework>net8.0-browser</TargetFramework>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="ICSharpCode.Decompiler" Version="9.0.0.7889" />
-    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="8.0.13" />
-    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="8.0.13" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="8.0.14" IsImplicitlyDefined="true" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="8.0.14" PrivateAssets="all" IsImplicitlyDefined="true" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.13.0" />
     <PackageReference Include="Microsoft.CodeAnalysis.VisualBasic" Version="4.13.0" />
     <PackageReference Include="Mobius.ILasm" Version="0.1.0" />
-    <PackageReference Include="System.Security.Permissions" Version="9.0.2" />
+    <PackageReference Include="System.Security.Permissions" Version="9.0.3" />
   </ItemGroup>
 
   <ItemGroup>
