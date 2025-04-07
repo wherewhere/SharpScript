@@ -29,6 +29,7 @@ using VisualBasicSyntaxFactory = Microsoft.CodeAnalysis.VisualBasic.SyntaxFactor
 using RoslynDiagnostic = Microsoft.CodeAnalysis.Diagnostic;
 using Microsoft.Extensions.Logging;
 using Microsoft.CodeAnalysis.Text;
+using System.Collections.Immutable;
 
 namespace SharpScript.Common
 {
@@ -41,12 +42,6 @@ namespace SharpScript.Common
         public static OutputType[] OutputTypes { get; } = Enum.GetValues<OutputType>();
 
         public CompilateOptions Options { get; set; } = new();
-
-        public List<Diagnostic> Diagnostics { get; set; }
-
-        public bool IsDecompile { get; set; } = false;
-
-        public string Decompiled { get; set; }
 
         public static async ValueTask InitAsync(string baseUrl)
         {
@@ -72,19 +67,20 @@ namespace SharpScript.Common
             }
         }
 
-        private async ValueTask<Streams> CompilateAsync(string code)
+        private async ValueTask<(Streams streams, List<Diagnostic> diagnostics)> CompilateAsync(string code)
         {
             List<Diagnostic> results = [];
             try
             {
                 await Task.Yield();
                 bool isExe = Options.OutputType == OutputType.Run;
-                return Options.LanguageType switch
+                Streams streams = Options.LanguageType switch
                 {
                     LanguageType.CSharp or LanguageType.VisualBasic => await RoslynCompilateAsync(code, Options, results, isExe).ConfigureAwait(false),
                     LanguageType.IL => ILCompilate(code, results, isExe),
                     _ => throw new Exception("Invalid language type.")
                 };
+                return (streams, results);
             }
             catch (AggregateException aex) when (aex.InnerExceptions?.Count > 1)
             {
@@ -100,11 +96,43 @@ namespace SharpScript.Common
             }
             finally
             {
-                //SettingsHelper.Set(SettingsHelper.CachedCode, code);
-                Diagnostics = results;
                 GC.Collect();
             }
-            return null;
+            return (null, results);
+        }
+
+        public async ValueTask<List<Diagnostic>> GetDiagnosticsAsync(string code)
+        {
+            List<Diagnostic> results = [];
+            try
+            {
+                await Task.Yield();
+                bool isExe = Options.OutputType == OutputType.Run;
+                results = Options.LanguageType switch
+                {
+                    LanguageType.CSharp or LanguageType.VisualBasic => await GetRoslynDiagnosticsAsync(code, Options, results, isExe).ConfigureAwait(false),
+                    LanguageType.IL => GetILDiagnostics(code, results, isExe),
+                    _ => throw new Exception("Invalid language type.")
+                };
+                return results;
+            }
+            catch (AggregateException aex) when (aex.InnerExceptions?.Count > 1)
+            {
+                results.Add(new Diagnostic(aex));
+            }
+            catch (AggregateException aex)
+            {
+                results.Add(new Diagnostic(aex.InnerException));
+            }
+            catch (Exception ex)
+            {
+                results.Add(new Diagnostic(ex));
+            }
+            finally
+            {
+                GC.Collect();
+            }
+            return results;
         }
 
         private static async ValueTask<Streams> RoslynCompilateAsync(string code, CompilateOptions options, ICollection<Diagnostic> results, bool isExe)
@@ -128,7 +156,7 @@ namespace SharpScript.Common
             else
             {
                 if (!isExe && options.LanguageType == LanguageType.CSharp
-                    && emitResult.Diagnostics.Any(x => x.Id == "CS8805" && x.Severity == DiagnosticSeverity.Error))
+                    && emitResult.Diagnostics.Any(x => x is { Id: "CS8805", Severity: DiagnosticSeverity.Error }))
                 {
                     isExe = true;
                     goto start;
@@ -138,13 +166,34 @@ namespace SharpScript.Common
             }
         }
 
+        private static async ValueTask<T> GetRoslynDiagnosticsAsync<T>(string code, CompilateOptions options, T results, bool isExe) where T : ICollection<Diagnostic>
+        {
+            MemoryStream assemblyStream = new();
+            MemoryStream symbolStream = new();
+        start:
+            Compilation compilation = await (options.InputOptions switch
+            {
+                CSharpInputOptions csharp => GetRoslynCompilateAsync(code, csharp, isExe),
+                VisualBasicInputOptions vb => GetRoslynCompilateAsync(code, vb, isExe),
+                _ => throw new Exception("Invalid language type.")
+            }).ConfigureAwait(false);
+            ImmutableArray<RoslynDiagnostic> diagnostics = compilation.GetDiagnostics();
+            if (!isExe && options.LanguageType == LanguageType.CSharp
+                && diagnostics.Any(x => x is { Id: "CS8805", Severity: DiagnosticSeverity.Error }))
+            {
+                isExe = true;
+                goto start;
+            }
+            results.AddRange(diagnostics.Select(x => new Diagnostic(x)));
+            return results;
+        }
+
         private static async Task<Compilation> GetRoslynCompilateAsync(string code, CSharpInputOptions options, bool isExe)
         {
-            Ref<string> @ref = new(code);
-            IList<MetadataReference> references = await AddReferencesAsync(@ref).ConfigureAwait(false);
+            (IList<MetadataReference> references, code) = await AddReferencesAsync(code).ConfigureAwait(false);
             SyntaxTree syntaxTree =
                 CSharpSyntaxFactory.ParseSyntaxTree(
-                    @ref.Value,
+                    code,
                     new CSharpParseOptions(
                         options.LanguageVersion,
                         DocumentationMode.Parse,
@@ -164,11 +213,10 @@ namespace SharpScript.Common
 
         private static async Task<Compilation> GetRoslynCompilateAsync(string code, VisualBasicInputOptions options, bool isExe)
         {
-            Ref<string> @ref = new(code);
-            IList<MetadataReference> references = await AddReferencesAsync(@ref).ConfigureAwait(false);
+            (IList<MetadataReference> references, code) = await AddReferencesAsync(code).ConfigureAwait(false);
             SyntaxTree syntaxTree =
                 VisualBasicSyntaxFactory.ParseSyntaxTree(
-                    @ref.Value,
+                    code,
                     new VisualBasicParseOptions(
                         options.LanguageVersion,
                         DocumentationMode.Parse,
@@ -185,11 +233,11 @@ namespace SharpScript.Common
             return compilation;
         }
 
-        private static async ValueTask<IList<MetadataReference>> AddReferencesAsync(Ref<string> code)
+        private static async ValueTask<(IList<MetadataReference> references, string code)> AddReferencesAsync(string code)
         {
-            if (code.Value.StartsWith("#r ", StringComparison.OrdinalIgnoreCase))
+            if (code.StartsWith("#r ", StringComparison.OrdinalIgnoreCase))
             {
-                using StringReader reader = new(code.Value);
+                using StringReader reader = new(code);
                 List<MetadataReference> references = [.. Compiler.references];
                 HttpClient client = null;
                 try
@@ -206,7 +254,7 @@ namespace SharpScript.Common
                         }
                         else
                         {
-                            code.Value = line;
+                            code = line;
                             break;
                         }
                     }
@@ -215,10 +263,10 @@ namespace SharpScript.Common
                 {
                     client?.Dispose();
                 }
-                code.Value += reader.ReadToEnd();
-                return references;
+                code += reader.ReadToEnd();
+                return (references, code);
             }
-            return references;
+            return (references, code);
         }
 
         private static Streams ILCompilate(string code, ICollection<Diagnostic> results, bool isExe)
@@ -243,16 +291,29 @@ namespace SharpScript.Common
             return null;
         }
 
-        private async ValueTask DecompileAsync(Streams streams)
+        private static T GetILDiagnostics<T>(string code, T results, bool isExe) where T : ICollection<Diagnostic>
         {
-            Decompiled = Options.OutputOptions switch
+            Logger logger = new(results);
+            Driver driver = new(logger, isExe ? Driver.Target.Exe : Driver.Target.Dll, false, false, false);
+
+            try
             {
-                CSharpOutputOptions csharp => await CSharpDecompileAsync(streams, csharp).ConfigureAwait(false),
-                ILOutputOptions => await ILDecompileAsync(streams).ConfigureAwait(false),
-                _ => throw new Exception("Invalid output type.")
-            };
-            IsDecompile = true;
+                using MemoryStream assemblyStream = new();
+                _ = driver.Assemble([code], assemblyStream);
+                return results;
+            }
+            catch (Exception ex) when (ex.GetType().Name.StartsWith("yy"))
+            {
+                return results;
+            }
         }
+
+        private async ValueTask<string> DecompileAsync(Streams streams) => Options.OutputOptions switch
+        {
+            CSharpOutputOptions csharp => await CSharpDecompileAsync(streams, csharp).ConfigureAwait(false),
+            ILOutputOptions => await ILDecompileAsync(streams).ConfigureAwait(false),
+            _ => throw new Exception("Invalid output type.")
+        };
 
         private static async ValueTask<string> CSharpDecompileAsync(Streams streams, CSharpOutputOptions options)
         {
@@ -396,10 +457,10 @@ namespace SharpScript.Common
             // Note: the logic cannot be reused, but should match C# and Jit ASM
             !type.NamespaceDefinition.IsNil && type.IsCompilerGenerated(metadata);
 
-        private async ValueTask ExecuteAsync(Streams streams)
+        private static async ValueTask<List<string>> ExecuteAsync(Streams streams)
         {
             bool finished = false;
-            List<Diagnostic> results = [];
+            List<string> results = [];
             StringBuilder output = new();
             try
             {
@@ -417,9 +478,9 @@ namespace SharpScript.Common
                         Console.SetOut(writer);
                         object @return = main.Invoke(null, args);
                         Console.SetOut(temp);
-                        results.Add(new Diagnostic(Severity.Output, output.ToString()));
+                        results.Add(output.ToString());
                         finished = true;
-                        results.Add(new Diagnostic(Severity.Output, $"Exits with code {@return ?? 0}."));
+                        results.Add($"Exits with code {@return ?? 0}.");
                     }
                 }
                 finally
@@ -432,40 +493,42 @@ namespace SharpScript.Common
             {
                 if (!finished)
                 {
-                    results.Add(new Diagnostic(Severity.Output, output.ToString()));
+                    results.Add(output.ToString());
                 }
-                results.Add(new Diagnostic(ex));
+                results.Add(ex.Message);
             }
             finally
             {
-                Diagnostics = results;
                 GC.Collect();
             }
+            return results;
         }
 
-        public async ValueTask ProcessAsync(string code)
+        public async ValueTask<CompileResult> ProcessAsync(string code)
         {
             try
             {
-                IsDecompile = false;
-                if (await CompilateAsync(code).ConfigureAwait(false) is Streams assemblyStream)
+                (Streams assemblyStream, List<Diagnostic> diagnostics) = await CompilateAsync(code).ConfigureAwait(false);
+                if (assemblyStream != null)
                 {
                     switch (Options.OutputType)
                     {
                         case OutputType.CSharp
                             or OutputType.IL:
-                            await DecompileAsync(assemblyStream).ConfigureAwait(false);
-                            break;
+                            string results = await DecompileAsync(assemblyStream).ConfigureAwait(false);
+                            return new CompileResult(diagnostics, results);
                         case OutputType.Run:
-                            await ExecuteAsync(assemblyStream).ConfigureAwait(false);
-                            break;
+                            List<string> outputs = await ExecuteAsync(assemblyStream).ConfigureAwait(false);
+                            return new CompileResult(diagnostics, null, outputs);
                     }
                 }
+                return new CompileResult(diagnostics, null);
             }
             catch (Exception ex)
             {
                 logger.LogError(ex, "Compilate or {type} assembly failed. {message} (0x{hResult:X})", Options?.OutputType == OutputType.Run ? "execute" : "decompile", ex.GetMessage(), ex.HResult);
             }
+            return new CompileResult([], null);
         }
 
         private static async ValueTask<List<MetadataReference>> GetMetadataReferencesAsync(params string[] assemblies)
@@ -480,22 +543,17 @@ namespace SharpScript.Common
             return references;
         }
 
-        private record class Ref<T>(T Value)
-        {
-            public T Value { get; set; } = Value;
-        }
-
         private class Logger(ICollection<Diagnostic> results) : Mobius.ILasm.interfaces.ILogger
         {
-            public void Info(string message) => results.Add(new Diagnostic(Severity.Info, message));
+            public void Info(string message) => results.Add(new Diagnostic(DiagnosticSeverity.Info, message));
 
-            public void Warning(string message) => results.Add(new Diagnostic(Severity.Warning, message));
+            public void Warning(string message) => results.Add(new Diagnostic(DiagnosticSeverity.Warning, message));
 
-            public void Error(string message) => results.Add(new Diagnostic(Severity.Error, message));
+            public void Error(string message) => results.Add(new Diagnostic(DiagnosticSeverity.Error, message));
 
-            public void Warning(Mono.ILASM.Location location, string message) => results.Add(new Diagnostic(location, Severity.Warning, message));
+            public void Warning(Mono.ILASM.Location location, string message) => results.Add(new Diagnostic(location, DiagnosticSeverity.Warning, message));
 
-            public void Error(Mono.ILASM.Location location, string message) => results.Add(new Diagnostic(location, Severity.Error, message));
+            public void Error(Mono.ILASM.Location location, string message) => results.Add(new Diagnostic(location, DiagnosticSeverity.Error, message));
         }
 
         private partial record Streams(MemoryStream AssemblyStream, MemoryStream SymbolStream) : IDisposable
@@ -533,6 +591,8 @@ namespace SharpScript.Common
         }
     }
 
+    public record struct CompileResult(List<Diagnostic> Diagnostics, string Decompiled, params List<string> Outputs);
+
     public enum LanguageType
     {
         CSharp = 0b011,
@@ -547,31 +607,22 @@ namespace SharpScript.Common
         Run
     }
 
-    public enum Severity
-    {
-        Output = -1,
-        Hidden = 0,
-        Info,
-        Warning,
-        Error
-    }
-
-    public sealed class Diagnostic(Severity severity, string message)
+    public sealed class Diagnostic(DiagnosticSeverity severity, string message)
     {
         public string ID { get; }
         public LinePositionSpan Location { get; }
         public string Message => message;
-        public Severity Severity => severity;
+        public string Severity => severity.ToString();
 
-        public Diagnostic(Exception exception) : this(Severity.Error, exception.Message) { }
+        public Diagnostic(Exception exception) : this(DiagnosticSeverity.Error, exception.Message) { }
 
-        public Diagnostic(RoslynDiagnostic diagnostic) : this((Severity)diagnostic.Severity, diagnostic.GetMessage())
+        public Diagnostic(RoslynDiagnostic diagnostic) : this(diagnostic.Severity, diagnostic.GetMessage())
         {
             ID = diagnostic.Id;
             Location = diagnostic.Location.GetLineSpan().Span;
         }
 
-        public Diagnostic(Mono.ILASM.Location location, Severity severity, string message) : this (severity, message)
+        public Diagnostic(Mono.ILASM.Location location, DiagnosticSeverity severity, string message) : this (severity, message)
         {
             var position = new LinePosition(location.line - 1, location.column);
             Location = new LinePositionSpan(position, position);

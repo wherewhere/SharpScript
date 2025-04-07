@@ -115,10 +115,18 @@
                     </fluent-select>
                 </div>
                 <div class="editor">
-                    <codemirror v-if="results.isDecompile" v-model:value="results.decompiled"
+                    <codemirror v-if="results.decompiled" v-model:value="results.decompiled"
                                 :language="getOutputLanguage()" readonly="true"></codemirror>
-                    <div style="font-family: var(--font-monospace); padding: 0 12px;" v-else>
-                        <pre class="unset" v-for="item in results.diagnostics">{{ item }}</pre>
+                    <div v-if="results.outputs.length" style="font-family: var(--font-monospace); padding: 0 12px;">
+                        <pre class="unset" v-for="item in results.outputs">{{ item }}</pre>
+                    </div>
+                    <div v-if="results.diagnostics.length" style="font-family: var(--font-monospace); padding: 0 12px;">
+                        <div class="unset" v-for="item in results.diagnostics">
+                            <span style="color: var(--accent-fill-rest);">{{ item.severity }}</span>&emsp;
+                            <span>{{ item.id || "\t" }}</span>&emsp;
+                            <span>{{ item.message }}</span>&emsp;
+                            <span>[{{ item.location.start.line + 1 }}, {{ item.location.start.character }}] - [{{ item.location.end.line + 1 }}, {{ item.location.end.character }}]</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -133,8 +141,11 @@
     <script type="module">
         import { createApp, toRaw } from "vue";
         import { basicSetup, EditorView } from "codemirror";
+        import { indentWithTab } from "@codemirror/commands";
         import { Compartment, EditorState } from "@codemirror/state";
+        import { indentUnit } from "@codemirror/language";
         import { linter } from "@codemirror/lint";
+        import { keymap } from "@codemirror/view";
         import { csharp } from "@replit/codemirror-lang-csharp";
         import { cil } from "mirrorsharp-codemirror-6-preview/codemirror/lang-cil";
         import { vb } from "mirrorsharp-codemirror-6-preview/codemirror/lang-vb";
@@ -156,8 +167,8 @@
                     message: "Process",
                     results: {
                         diagnostics: [],
-                        isDecompile: false,
-                        decompiled: null
+                        decompiled: null,
+                        outputs: []
                     },
                     locker: {
                         resolves: [],
@@ -277,8 +288,7 @@
                         this.loading = true;
                         const message = this.message;
                         this.message = "Compiling...";
-                        this.setSettings();
-                        await (this.language === "IL" ? this.initDotNet() : this.initCompiler());
+                        await this.initAsync();
                         this.results = await DotNet.invokeMethodAsync("SharpScript", "ProcessAsync", this.code);
                         this.message = message;
                     }
@@ -292,7 +302,20 @@
                         this.loading = false;
                     }
                 },
-                async initDotNet() {
+                async getDiagnosticsAsync(code) {
+                    try {
+                        return await DotNet.invokeMethodAsync("SharpScript", "GetDiagnosticsAsync", code);
+                    }
+                    catch (e) {
+                        console.warn(e);
+                    }
+                },
+                async initAsync() {
+                    this.setSettings();
+                    await (this.language === "IL" ? this.initDotNetAsync() : this.initCompilerAsync());
+                    this.initEditer();
+                },
+                async initDotNetAsync() {
                     if (!this.isInitDotnet) {
                         const message = this.message;
                         this.message = "Loading .NET...";
@@ -300,15 +323,14 @@
                         if (!this.isInitDotnet) {
                             await Blazor.start();
                         }
-                        this.initEditer();
                         this.locker.release();
                         this.message = message;
                         this.isInitDotnet = true;
                     }
                 },
-                async initCompiler() {
+                async initCompilerAsync() {
                     if (!this.isInitCompiler) {
-                        await this.initDotNet();
+                        await this.initDotNetAsync();
                         const message = this.message;
                         this.message = "Downloading references...";
                         await DotNet.invokeMethodAsync("SharpScript", "InitAsync", new URL("_framework/", document.baseURI));
@@ -330,19 +352,21 @@
                         return index;
                     }
                     editor.dispatch({
-                        effects: editorHost.linterSet.reconfigure(linter(view => {
-                            if (this.results) {
-                                return this.results.diagnostics.map(diagnostic => {
-                                    return diagnostic.severity === -1 ? undefined : {
+                        effects: editorHost.linterSet.reconfigure(linter(async view => {
+                            const diagnostics = await this.getDiagnosticsAsync(view.state.doc.toString());
+                            if (diagnostics) {
+                                return diagnostics.map(diagnostic => {
+                                    return {
                                         from: getIndex(view.state.doc, diagnostic.location.start),
                                         to: getIndex(view.state.doc, diagnostic.location.end),
                                         severity: (() => {
                                             switch (diagnostic.severity) {
-                                                case 3:
+                                                case "Error":
                                                     return "error";
-                                                case 2:
+                                                case "Warning":
                                                     return "warning";
-                                                case 1:
+                                                case "Info":
+                                                case "Hidden":
                                                 default:
                                                     return "info";
                                             }
@@ -507,10 +531,12 @@
                     parent: this.$el,
                     extensions: [
                         basicSetup,
+                        keymap.of([indentWithTab]),
                         this.languageSet.of(this.getLauguage(this.language || "csharp")),
                         getTheme(),
                         this.readonlySet.of(EditorState.readOnly.of(!!this.readonly)),
                         this.linterSet.of(linter()),
+                        indentUnit.of("    "),
                         EditorView.updateListener.of(e => {
                             if (e.docChanged) {
                                 this.changed = true;

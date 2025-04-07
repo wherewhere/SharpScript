@@ -15,23 +15,22 @@ namespace SharpScript
         public static Compiler Compiler { get; private set; }
         public static WebAssemblyHost Current { get; private set; }
 
-        private static async Task Main(string[] args)
+        private static Task Main(string[] args)
         {
             WebAssemblyHostBuilder builder = WebAssemblyHostBuilder.CreateDefault(args);
             Current = builder.Build();
             Compiler = new Compiler(Current.Services.GetRequiredService<ILogger<Compiler>>());
-            await Current.RunAsync();
+            return Current.RunAsync();
         }
 
         [JSInvokable]
-        public static async Task InitAsync(string baseUrl) => await Compiler.InitAsync(baseUrl).ConfigureAwait(false);
+        public static Task InitAsync(string baseUrl) => Compiler.InitAsync(baseUrl).AsTask();
 
         [JSInvokable]
-        public static async Task<CompileResult> ProcessAsync(string code)
-        {
-            await Compiler.ProcessAsync(code).ConfigureAwait(false);
-            return new CompileResult(Compiler.Diagnostics, Compiler.IsDecompile, Compiler.Decompiled);
-        }
+        public static Task<CompileResult> ProcessAsync(string code) => Compiler.ProcessAsync(code).AsTask();
+
+        [JSInvokable]
+        public static Task<List<Diagnostic>> GetDiagnosticsAsync(string code) => Compiler.GetDiagnosticsAsync(code).AsTask();
 
         [JSInvokable]
         public static IEnumerable<string> GetLanguageTypes() => Compiler.LanguageTypes.Select(x => x.ToString());
@@ -86,7 +85,5 @@ namespace SharpScript
                 ((IOutputOptions)Compiler.Options.OutputOptions).LanguageVersion = (Enum)Enum.Parse(@enum, type, true);
             }
         }
-
-        public record CompileResult(List<Diagnostic> Diagnostics, bool IsDecompile, string Decompiled);
     }
 }
