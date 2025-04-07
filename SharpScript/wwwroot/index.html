@@ -19,7 +19,7 @@
     <link rel="icon" type="image/png" sizes="200x200"
           href="https://cdn.jsdelivr.net/gh/wherewhere/SharpScript@main/SharpScript/Assets/StoreLogo.scale-400.png">
     <script src="_framework/blazor.webassembly.js" autostart="false"></script>
-    <script type="importmap" data-pjax>
+    <script type="importmap">
         {
             "imports": {
                 "@babel/runtime/helpers/extends": "https://cdn.jsdelivr.net/npm/@babel/runtime/helpers/esm/extends.js",
@@ -34,7 +34,7 @@
                 "@fluentui/web-components": "https://cdn.jsdelivr.net/npm/@fluentui/web-components/+esm",
                 "@lezer/common": "https://cdn.jsdelivr.net/npm/@lezer/common/+esm",
                 "@lezer/highlight": "https://cdn.jsdelivr.net/npm/@lezer/highlight/dist/index.js",
-                "@lezer/lr": "https://cdn.jsdelivr.net/npm/@lezer/lr/+esm",
+                "@lezer/lr": "https://cdn.jsdelivr.net/npm/@lezer/lr/dist/index.js",
                 "@replit/codemirror-lang-csharp": "https://cdn.jsdelivr.net/npm/@replit/codemirror-lang-csharp/dist/index.js",
                 "@uiw/codemirror-themes": "https://cdn.jsdelivr.net/npm/@uiw/codemirror-themes/esm/index.js",
                 "@uiw/codemirror-theme-vscode/dark": "https://cdn.jsdelivr.net/npm/@uiw/codemirror-theme-vscode/esm/dark.js",
@@ -49,7 +49,7 @@
             }
           }
     </script>
-    <script type="module" data-pjax>
+    <script type="module">
         import {
             provideFluentDesignSystem,
             fluentButton,
@@ -99,7 +99,7 @@
                         </fluent-select>
                     </div>
                 </div>
-                <codemirror class="editor" v-model:value="code" :language="getLauguage()"></codemirror>
+                <codemirror class="editor" v-model:value="code" :language="getLauguage()" ref="editor"></codemirror>
             </div>
             <div class="split-content" style="display: flex; flex-direction: column; row-gap: 4px; padding: 4px;">
                 <div style="display: flex; justify-content: space-between; column-gap: 4px;">
@@ -133,7 +133,8 @@
     <script type="module">
         import { createApp, toRaw } from "vue";
         import { basicSetup, EditorView } from "codemirror";
-        import { Compartment, EditorState } from "@codemirror/state"
+        import { Compartment, EditorState } from "@codemirror/state";
+        import { linter } from "@codemirror/lint";
         import { csharp } from "@replit/codemirror-lang-csharp";
         import { cil } from "mirrorsharp-codemirror-6-preview/codemirror/lang-cil";
         import { vb } from "mirrorsharp-codemirror-6-preview/codemirror/lang-vb";
@@ -299,6 +300,7 @@
                         if (!this.isInitDotnet) {
                             await Blazor.start();
                         }
+                        this.initEditer();
                         this.locker.release();
                         this.message = message;
                         this.isInitDotnet = true;
@@ -313,6 +315,45 @@
                         this.message = message;
                         this.isInitCompiler = true;
                     }
+                },
+                initEditer() {
+                    const editorHost = this.$refs.editor;
+                    const editor = editorHost.editor;
+                    function getIndex(doc, span) {
+                        if (doc.lines <= span.line) {
+                            return doc.length;
+                        }
+                        const index = doc.line(span.line + 1).from + span.character;
+                        if (index > doc.length) {
+                            return doc.length;
+                        }
+                        return index;
+                    }
+                    editor.dispatch({
+                        effects: editorHost.linterSet.reconfigure(linter(view => {
+                            if (this.results) {
+                                return this.results.diagnostics.map(diagnostic => {
+                                    return diagnostic.severity === -1 ? undefined : {
+                                        from: getIndex(view.state.doc, diagnostic.location.start),
+                                        to: getIndex(view.state.doc, diagnostic.location.end),
+                                        severity: (() => {
+                                            switch (diagnostic.severity) {
+                                                case 3:
+                                                    return "error";
+                                                case 2:
+                                                    return "warning";
+                                                case 1:
+                                                default:
+                                                    return "info";
+                                            }
+                                        })(),
+                                        message: diagnostic.message
+                                    }
+                                });
+                            }
+                            return [];
+                        }))
+                    });
                 },
                 getLauguage() {
                     switch (this.language) {
@@ -411,7 +452,8 @@
                     changed: false,
                     themeSet: new Compartment(),
                     languageSet: new Compartment(),
-                    readonlySet: new Compartment()
+                    readonlySet: new Compartment(),
+                    linterSet: new Compartment()
                 }
             },
             watch: {
@@ -468,6 +510,7 @@
                         this.languageSet.of(this.getLauguage(this.language || "csharp")),
                         getTheme(),
                         this.readonlySet.of(EditorState.readOnly.of(!!this.readonly)),
+                        this.linterSet.of(linter()),
                         EditorView.updateListener.of(e => {
                             if (e.docChanged) {
                                 this.changed = true;
@@ -575,7 +618,12 @@
 
         #vue-app .cm-editor {
             background-color: transparent;
+            outline: none;
         }
+
+            #vue-app .cm-editor .cm-scroller {
+                font-family: var(--font-monospace);
+            }
     </style>
 </body>
 

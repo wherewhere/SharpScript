@@ -1,4 +1,6 @@
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
 using SharpScript.Common;
 using System;
@@ -10,13 +12,14 @@ namespace SharpScript
 {
     public static class Program
     {
-        public static Compiler Compiler { get; } = new Compiler();
+        public static Compiler Compiler { get; private set; }
         public static WebAssemblyHost Current { get; private set; }
 
         private static async Task Main(string[] args)
         {
             WebAssemblyHostBuilder builder = WebAssemblyHostBuilder.CreateDefault(args);
             Current = builder.Build();
+            Compiler = new Compiler(Current.Services.GetRequiredService<ILogger<Compiler>>());
             await Current.RunAsync();
         }
 
@@ -84,6 +87,6 @@ namespace SharpScript
             }
         }
 
-        public record CompileResult(List<string> Diagnostics, bool IsDecompile, string Decompiled);
+        public record CompileResult(List<Diagnostic> Diagnostics, bool IsDecompile, string Decompiled);
     }
 }

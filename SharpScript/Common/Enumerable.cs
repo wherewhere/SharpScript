@@ -7,6 +7,8 @@ namespace SharpScript.Common
 {
     public static class Enumerable
     {
+        public static object GetMessage(this Exception ex) => ex.Message is { Length: > 0 } message ? message : ex.GetType();
+
         /// <summary>
         /// Adds the elements of the specified collection to the end of the <see cref="ICollection{TSource}"/>.
         /// </summary>
