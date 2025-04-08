@@ -6,14 +6,14 @@ using ICSharpCode.Decompiler.Disassembler;
 using ICSharpCode.Decompiler.Metadata;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.Emit;
+using Microsoft.CodeAnalysis.Text;
 using Microsoft.CodeAnalysis.VisualBasic;
+using Microsoft.Extensions.Logging;
 using Mobius.ILasm.Core;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Net.Http;
 using System.Reflection;
 using System.Reflection.Metadata;
 using System.Runtime.CompilerServices;
@@ -21,63 +21,32 @@ using System.Runtime.Loader;
 using System.Text;
 using System.Threading.Tasks;
 using CSharpLanguageVersion = Microsoft.CodeAnalysis.CSharp.LanguageVersion;
-using CSharpSyntaxFactory = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 using LanguageVersion = ICSharpCode.Decompiler.CSharp.LanguageVersion;
-using SyntaxTree = Microsoft.CodeAnalysis.SyntaxTree;
-using VisualBasicLanguageVersion = Microsoft.CodeAnalysis.VisualBasic.LanguageVersion;
-using VisualBasicSyntaxFactory = Microsoft.CodeAnalysis.VisualBasic.SyntaxFactory;
 using RoslynDiagnostic = Microsoft.CodeAnalysis.Diagnostic;
-using Microsoft.Extensions.Logging;
-using Microsoft.CodeAnalysis.Text;
-using System.Collections.Immutable;
+using VisualBasicLanguageVersion = Microsoft.CodeAnalysis.VisualBasic.LanguageVersion;
 
 namespace SharpScript.Common
 {
-    public class Compiler(ILogger<Compiler> logger)
+    public class Compiler(ILoggerFactory factory)
     {
-        private static string baseUrl;
-        private static List<MetadataReference> references;
-
         public static LanguageType[] LanguageTypes { get; } = Enum.GetValues<LanguageType>();
         public static OutputType[] OutputTypes { get; } = Enum.GetValues<OutputType>();
 
+        private readonly ILogger<Compiler> logger = factory.CreateLogger<Compiler>();
+
         public CompilateOptions Options { get; set; } = new();
 
-        public static async ValueTask InitAsync(string baseUrl)
-        {
-            Compiler.baseUrl = baseUrl;
-            if (references?.Count is not > 0)
-            {
-                references = await GetMetadataReferencesAsync(
-                    "System.Runtime",
-                    "System.Private.CoreLib",
-                    "System.Console",
-                    "System.Text.RegularExpressions",
-                    "System.Linq",
-                    "System.Linq.Expressions",
-                    "System.Net.Primitives",
-                    "System.Net.Http",
-                    "System.Private.Uri",
-                    "System.ComponentModel.Primitives",
-                    "System.Collections.Concurrent",
-                    "System.Collections.NonGeneric",
-                    "Microsoft.CSharp",
-                    "Microsoft.VisualBasic.Core",
-                    "System.Net.WebClient").ConfigureAwait(false);
-            }
-        }
-
-        private async ValueTask<(Streams streams, List<Diagnostic> diagnostics)> CompilateAsync(string code)
+        private async ValueTask<(CompilationResults streams, List<Diagnostic> diagnostics)> CompilateAsync(string code)
         {
             List<Diagnostic> results = [];
             try
             {
                 await Task.Yield();
                 bool isExe = Options.OutputType == OutputType.Run;
-                Streams streams = Options.LanguageType switch
+                CompilationResults streams = Options.LanguageType switch
                 {
-                    LanguageType.CSharp or LanguageType.VisualBasic => await RoslynCompilateAsync(code, Options, results, isExe).ConfigureAwait(false),
-                    LanguageType.IL => ILCompilate(code, results, isExe),
+                    LanguageType.CSharp or LanguageType.VisualBasic => await RoslynCompilateAsync(code, results, isExe).ConfigureAwait(false),
+                    LanguageType.IL => await ILCompilateAsync(code, results, isExe),
                     _ => throw new Exception("Invalid language type.")
                 };
                 return (streams, results);
@@ -107,11 +76,11 @@ namespace SharpScript.Common
             try
             {
                 await Task.Yield();
-                bool isExe = Options.OutputType == OutputType.Run;
+                bool isConsole = Options.OutputType == OutputType.Run;
                 results = Options.LanguageType switch
                 {
-                    LanguageType.CSharp or LanguageType.VisualBasic => await GetRoslynDiagnosticsAsync(code, Options, results, isExe).ConfigureAwait(false),
-                    LanguageType.IL => GetILDiagnostics(code, results, isExe),
+                    LanguageType.CSharp or LanguageType.VisualBasic => await GetRoslynDiagnosticsAsync(code, results, isConsole).ConfigureAwait(false),
+                    LanguageType.IL => await GetILDiagnosticsAsync(code, results, isConsole),
                     _ => throw new Exception("Invalid language type.")
                 };
                 return results;
@@ -135,329 +104,36 @@ namespace SharpScript.Common
             return results;
         }
 
-        private static async ValueTask<Streams> RoslynCompilateAsync(string code, CompilateOptions options, ICollection<Diagnostic> results, bool isExe)
+        public ValueTask<IEnumerable<CompletionItem>> GetCompletionsAsync(string code, int position)
         {
-            MemoryStream assemblyStream = new();
-            MemoryStream symbolStream = new();
-        start:
-            Compilation compilation = await (options.InputOptions switch
+            if (Options.InputOptions is RoslynOptions options)
             {
-                CSharpInputOptions csharp => GetRoslynCompilateAsync(code, csharp, isExe),
-                VisualBasicInputOptions vb => GetRoslynCompilateAsync(code, vb, isExe),
-                _ => throw new Exception("Invalid language type.")
-            }).ConfigureAwait(false);
-            EmitResult emitResult = compilation.Emit(assemblyStream, symbolStream);
-            if (emitResult.Success)
-            {
-                assemblyStream.Seek(0, SeekOrigin.Begin);
-                symbolStream.Seek(0, SeekOrigin.Begin);
-                return new Streams(assemblyStream, symbolStream);
+                bool isConsole = Options.OutputType == OutputType.Run;
+                return new RoslynCodeSession(code, options, isConsole, factory.CreateLogger<RoslynCodeSession>()).GetCompletionsAsync(position);
             }
-            else
-            {
-                if (!isExe && options.LanguageType == LanguageType.CSharp
-                    && emitResult.Diagnostics.Any(x => x is { Id: "CS8805", Severity: DiagnosticSeverity.Error }))
-                {
-                    isExe = true;
-                    goto start;
-                }
-                results.AddRange(emitResult.Diagnostics.Select(x => new Diagnostic(x)));
-                return null;
-            }
+            return ValueTask.FromResult<IEnumerable<CompletionItem>>([]);
         }
 
-        private static async ValueTask<T> GetRoslynDiagnosticsAsync<T>(string code, CompilateOptions options, T results, bool isExe) where T : ICollection<Diagnostic>
+        private ValueTask<CompilationResults> RoslynCompilateAsync(string code, ICollection<Diagnostic> results, bool isConsole) =>
+            new RoslynCodeSession(code, Options.InputOptions as RoslynOptions, isConsole, factory.CreateLogger<RoslynCodeSession>()).Compile(results);
+
+        private ValueTask<T> GetRoslynDiagnosticsAsync<T>(string code, T results, bool isConsole) where T : ICollection<Diagnostic> =>
+            new RoslynCodeSession(code, Options.InputOptions as RoslynOptions, isConsole, factory.CreateLogger<RoslynCodeSession>()).GetDiagnosticsAsync(results);
+
+        private static ValueTask<CompilationResults> ILCompilateAsync(string code, ICollection<Diagnostic> results, bool isConsole) =>
+            new ILCodeSession(code, isConsole).Compile(results);
+
+        private static ValueTask<T> GetILDiagnosticsAsync<T>(string code, T results, bool isConsole) where T : ICollection<Diagnostic> =>
+            new ILCodeSession(code, isConsole).GetDiagnosticsAsync(results);
+
+        private async ValueTask<string> DecompileAsync(CompilationResults streams) => Options.OutputOptions switch
         {
-            MemoryStream assemblyStream = new();
-            MemoryStream symbolStream = new();
-        start:
-            Compilation compilation = await (options.InputOptions switch
-            {
-                CSharpInputOptions csharp => GetRoslynCompilateAsync(code, csharp, isExe),
-                VisualBasicInputOptions vb => GetRoslynCompilateAsync(code, vb, isExe),
-                _ => throw new Exception("Invalid language type.")
-            }).ConfigureAwait(false);
-            ImmutableArray<RoslynDiagnostic> diagnostics = compilation.GetDiagnostics();
-            if (!isExe && options.LanguageType == LanguageType.CSharp
-                && diagnostics.Any(x => x is { Id: "CS8805", Severity: DiagnosticSeverity.Error }))
-            {
-                isExe = true;
-                goto start;
-            }
-            results.AddRange(diagnostics.Select(x => new Diagnostic(x)));
-            return results;
-        }
-
-        private static async Task<Compilation> GetRoslynCompilateAsync(string code, CSharpInputOptions options, bool isExe)
-        {
-            (IList<MetadataReference> references, code) = await AddReferencesAsync(code).ConfigureAwait(false);
-            SyntaxTree syntaxTree =
-                CSharpSyntaxFactory.ParseSyntaxTree(
-                    code,
-                    new CSharpParseOptions(
-                        options.LanguageVersion,
-                        DocumentationMode.Parse,
-                        SourceCodeKind.Regular),
-                    null);
-            Compilation compilation =
-                CSharpCompilation.Create(
-                    "SharpScript",
-                    [syntaxTree],
-                    references,
-                    new CSharpCompilationOptions(
-                        isExe ? OutputKind.ConsoleApplication : OutputKind.DynamicallyLinkedLibrary,
-                        allowUnsafe: true,
-                        concurrentBuild: false));
-            return compilation;
-        }
-
-        private static async Task<Compilation> GetRoslynCompilateAsync(string code, VisualBasicInputOptions options, bool isExe)
-        {
-            (IList<MetadataReference> references, code) = await AddReferencesAsync(code).ConfigureAwait(false);
-            SyntaxTree syntaxTree =
-                VisualBasicSyntaxFactory.ParseSyntaxTree(
-                    code,
-                    new VisualBasicParseOptions(
-                        options.LanguageVersion,
-                        DocumentationMode.Parse,
-                        SourceCodeKind.Regular),
-                    null);
-            Compilation compilation =
-                VisualBasicCompilation.Create(
-                    "SharpScript",
-                    [syntaxTree],
-                    references,
-                    new VisualBasicCompilationOptions(
-                        isExe ? OutputKind.ConsoleApplication : OutputKind.DynamicallyLinkedLibrary,
-                        concurrentBuild: false));
-            return compilation;
-        }
-
-        private static async ValueTask<(IList<MetadataReference> references, string code)> AddReferencesAsync(string code)
-        {
-            if (code.StartsWith("#r ", StringComparison.OrdinalIgnoreCase))
-            {
-                using StringReader reader = new(code);
-                List<MetadataReference> references = [.. Compiler.references];
-                HttpClient client = null;
-                try
-                {
-                    while (reader.Peek() > 0)
-                    {
-                        string line = reader.ReadLine();
-                        if (line.StartsWith("#r ", StringComparison.OrdinalIgnoreCase))
-                        {
-                            string path = line[3..].Trim(' ', '\'', '"');
-                            client ??= new() { BaseAddress = new(baseUrl) };
-                            using Stream stream = await client.GetStreamAsync($"{path}.wasm").ConfigureAwait(false);
-                            references.Add(MetadataReference.CreateFromImage(WebcilConverterUtil.ConvertFromWebcil(stream)));
-                        }
-                        else
-                        {
-                            code = line;
-                            break;
-                        }
-                    }
-                }
-                finally
-                {
-                    client?.Dispose();
-                }
-                code += reader.ReadToEnd();
-                return (references, code);
-            }
-            return (references, code);
-        }
-
-        private static Streams ILCompilate(string code, ICollection<Diagnostic> results, bool isExe)
-        {
-            Logger logger = new(results);
-            Driver driver = new(logger, isExe ? Driver.Target.Exe : Driver.Target.Dll, false, false, false);
-
-            try
-            {
-                MemoryStream assemblyStream = new();
-                if (driver.Assemble([code], assemblyStream))
-                {
-                    assemblyStream.Seek(0, SeekOrigin.Begin);
-                    return new Streams(assemblyStream, null);
-                }
-            }
-            catch (Exception ex) when (ex.GetType().Name.StartsWith("yy"))
-            {
-                return null;
-            }
-
-            return null;
-        }
-
-        private static T GetILDiagnostics<T>(string code, T results, bool isExe) where T : ICollection<Diagnostic>
-        {
-            Logger logger = new(results);
-            Driver driver = new(logger, isExe ? Driver.Target.Exe : Driver.Target.Dll, false, false, false);
-
-            try
-            {
-                using MemoryStream assemblyStream = new();
-                _ = driver.Assemble([code], assemblyStream);
-                return results;
-            }
-            catch (Exception ex) when (ex.GetType().Name.StartsWith("yy"))
-            {
-                return results;
-            }
-        }
-
-        private async ValueTask<string> DecompileAsync(Streams streams) => Options.OutputOptions switch
-        {
-            CSharpOutputOptions csharp => await CSharpDecompileAsync(streams, csharp).ConfigureAwait(false),
-            ILOutputOptions => await ILDecompileAsync(streams).ConfigureAwait(false),
+            CSharpOutputOptions csharp => await Decompiler.CSharpDecompileAsync(streams, csharp).ConfigureAwait(false),
+            ILOutputOptions => await Decompiler.ILDecompileAsync(streams).ConfigureAwait(false),
             _ => throw new Exception("Invalid output type.")
         };
 
-        private static async ValueTask<string> CSharpDecompileAsync(Streams streams, CSharpOutputOptions options)
-        {
-            using PEFile assemblyFile = new("", streams.AssemblyStream);
-            PortablePdbDebugInfoProvider debugInfo = null;
-            try
-            {
-                //try { debugInfo = streams.SymbolStream != null ? new PortablePdbDebugInfoProvider(streams.SymbolStream) : null; }
-                //catch { }
-
-                CSharpDecompiler decompiler =
-                    new(assemblyFile,
-                        new PreCachedAssemblyResolver(references),
-                        new DecompilerSettings(options.LanguageVersion))
-                    {
-                        DebugInfoProvider = debugInfo
-                    };
-                ICSharpCode.Decompiler.CSharp.Syntax.SyntaxTree syntaxTree = decompiler.DecompileWholeModuleAsSingleFile();
-
-                SortTree(syntaxTree);
-
-                StringBuilder code = new();
-                await using StringWriter codeWriter = new(code);
-                new ExtendedCSharpOutputVisitor(codeWriter, CreateFormattingOptions())
-                    .VisitSyntaxTree(syntaxTree);
-                return code.ToString();
-            }
-            finally
-            {
-                debugInfo?.Dispose();
-            }
-        }
-
-        private static void SortTree(ICSharpCode.Decompiler.CSharp.Syntax.SyntaxTree root)
-        {
-            // Note: the sorting logic cannot be reused, but should match IL and Jit ASM ordering
-            AstNode firstMovedNode = null;
-            foreach (AstNode node in root.Children)
-            {
-                if (node == firstMovedNode) { break; }
-                if (node is NamespaceDeclaration @namespace && IsNonUserCode(@namespace))
-                {
-                    node.Remove();
-                    root.AddChildWithExistingRole(node);
-                    firstMovedNode ??= node;
-                }
-            }
-        }
-
-        private static bool IsNonUserCode(NamespaceDeclaration @namespace) =>
-            // Note: the logic cannot be reused, but should match IL and Jit ASM
-            @namespace.Members.Any(member => member is not TypeDeclaration type || !IsCompilerGenerated(type));
-
-        private static bool IsCompilerGenerated(TypeDeclaration type) =>
-            type.Attributes.Any(section => section.Attributes.Any(attribute => attribute.Type is SimpleType { Identifier: nameof(CompilerGeneratedAttribute) or "CompilerGenerated" }));
-
-        private static CSharpFormattingOptions CreateFormattingOptions()
-        {
-            CSharpFormattingOptions options = FormattingOptionsFactory.CreateAllman();
-            options.IndentationString = "    ";
-            options.MinimumBlankLinesBetweenTypes = 1;
-            return options;
-        }
-
-        private static async ValueTask<string> ILDecompileAsync(Streams streams)
-        {
-            using PEFile assemblyFile = new("", streams.AssemblyStream);
-            PortablePdbDebugInfoProvider debugInfo = null;
-            try
-            {
-                //try { debugInfo = streams.SymbolStream != null ? new PortablePdbDebugInfoProvider(streams.SymbolStream) : null; }
-                //catch { }
-
-                StringBuilder code = new();
-                await using StringWriter codeWriter = new(code);
-
-                PlainTextOutput output = new(codeWriter) { IndentationString = "    " };
-                ReflectionDisassembler disassembler = new(output, default)
-                {
-                    DebugInfo = debugInfo,
-                    ShowSequencePoints = true
-                };
-
-                disassembler.WriteAssemblyHeader(assemblyFile);
-                output.WriteLine(); // empty line
-
-                MetadataReader metadata = assemblyFile.Metadata;
-                DecompileTypes(assemblyFile, output, disassembler, metadata);
-                return code.ToString();
-            }
-            finally
-            {
-                debugInfo?.Dispose();
-            }
-        }
-
-        private static void DecompileTypes(PEFile assemblyFile, PlainTextOutput output, ReflectionDisassembler disassembler, MetadataReader metadata)
-        {
-            const int MaxNonUserTypeHandles = 10;
-            TypeDefinitionHandle[] nonUserTypeHandlesLease = default;
-            int nonUserTypeHandlesCount = -1;
-
-            // user code (first)                
-            foreach (TypeDefinitionHandle typeHandle in metadata.TypeDefinitions)
-            {
-                TypeDefinition type = metadata.GetTypeDefinition(typeHandle);
-                if (!type.GetDeclaringType().IsNil)
-                {
-                    continue; // not a top-level type
-                }
-
-                if (IsNonUserCode(metadata, type) && nonUserTypeHandlesCount < MaxNonUserTypeHandles)
-                {
-                    if (nonUserTypeHandlesCount == -1)
-                    {
-                        nonUserTypeHandlesLease = new TypeDefinitionHandle[MaxNonUserTypeHandles];
-                        nonUserTypeHandlesCount = 0;
-                    }
-
-                    nonUserTypeHandlesLease[nonUserTypeHandlesCount] = typeHandle;
-                    nonUserTypeHandlesCount += 1;
-                    continue;
-                }
-
-                disassembler.DisassembleType(assemblyFile, typeHandle);
-                output.WriteLine();
-            }
-
-            // non-user code (second)
-            if (nonUserTypeHandlesCount > 0)
-            {
-                foreach (TypeDefinitionHandle typeHandle in nonUserTypeHandlesLease[..nonUserTypeHandlesCount])
-                {
-                    disassembler.DisassembleType(assemblyFile, typeHandle);
-                    output.WriteLine();
-                }
-            }
-        }
-
-        private static bool IsNonUserCode(MetadataReader metadata, TypeDefinition type) =>
-            // Note: the logic cannot be reused, but should match C# and Jit ASM
-            !type.NamespaceDefinition.IsNil && type.IsCompilerGenerated(metadata);
-
-        private static async ValueTask<List<string>> ExecuteAsync(Streams streams)
+        private static async ValueTask<List<string>> ExecuteAsync(CompilationResults streams)
         {
             bool finished = false;
             List<string> results = [];
@@ -508,7 +184,7 @@ namespace SharpScript.Common
         {
             try
             {
-                (Streams assemblyStream, List<Diagnostic> diagnostics) = await CompilateAsync(code).ConfigureAwait(false);
+                (CompilationResults assemblyStream, List<Diagnostic> diagnostics) = await CompilateAsync(code).ConfigureAwait(false);
                 if (assemblyStream != null)
                 {
                     switch (Options.OutputType)
@@ -529,65 +205,6 @@ namespace SharpScript.Common
                 logger.LogError(ex, "Compilate or {type} assembly failed. {message} (0x{hResult:X})", Options?.OutputType == OutputType.Run ? "execute" : "decompile", ex.GetMessage(), ex.HResult);
             }
             return new CompileResult([], null);
-        }
-
-        private static async ValueTask<List<MetadataReference>> GetMetadataReferencesAsync(params string[] assemblies)
-        {
-            List<MetadataReference> references = [];
-            using HttpClient client = new() { BaseAddress = new Uri(baseUrl) };
-            foreach (string assembly in assemblies)
-            {
-                using Stream stream = await client.GetStreamAsync($"{assembly}.wasm").ConfigureAwait(false);
-                references.Add(MetadataReference.CreateFromImage(WebcilConverterUtil.ConvertFromWebcil(stream)));
-            }
-            return references;
-        }
-
-        private class Logger(ICollection<Diagnostic> results) : Mobius.ILasm.interfaces.ILogger
-        {
-            public void Info(string message) => results.Add(new Diagnostic(DiagnosticSeverity.Info, message));
-
-            public void Warning(string message) => results.Add(new Diagnostic(DiagnosticSeverity.Warning, message));
-
-            public void Error(string message) => results.Add(new Diagnostic(DiagnosticSeverity.Error, message));
-
-            public void Warning(Mono.ILASM.Location location, string message) => results.Add(new Diagnostic(location, DiagnosticSeverity.Warning, message));
-
-            public void Error(Mono.ILASM.Location location, string message) => results.Add(new Diagnostic(location, DiagnosticSeverity.Error, message));
-        }
-
-        private partial record Streams(MemoryStream AssemblyStream, MemoryStream SymbolStream) : IDisposable
-        {
-            public void Dispose()
-            {
-                AssemblyStream?.Dispose();
-                SymbolStream?.Dispose();
-                GC.SuppressFinalize(this);
-            }
-        }
-
-        private class ExtendedCSharpOutputVisitor(TextWriter textWriter, CSharpFormattingOptions formattingPolicy) : CSharpOutputVisitor(textWriter, formattingPolicy)
-        {
-            public override void VisitTypeDeclaration(TypeDeclaration typeDeclaration)
-            {
-                base.VisitTypeDeclaration(typeDeclaration);
-                if (typeDeclaration.NextSibling is NamespaceDeclaration or TypeDeclaration)
-                { NewLine(); }
-            }
-
-            public override void VisitNamespaceDeclaration(NamespaceDeclaration namespaceDeclaration)
-            {
-                base.VisitNamespaceDeclaration(namespaceDeclaration);
-                if (namespaceDeclaration.NextSibling is NamespaceDeclaration or TypeDeclaration)
-                { NewLine(); }
-            }
-
-            public override void VisitAttributeSection(AttributeSection attributeSection)
-            {
-                base.VisitAttributeSection(attributeSection);
-                if (attributeSection is { AttributeTarget: "assembly" or "module", NextSibling: not AttributeSection { AttributeTarget: "assembly" or "module" } })
-                { NewLine(); }
-            }
         }
     }
 
@@ -629,7 +246,7 @@ namespace SharpScript.Common
         }
     }
 
-    public partial class CompilateOptions()
+    public class CompilateOptions()
     {
         private LanguageType languageType = LanguageType.CSharp;
         public LanguageType LanguageType
@@ -686,13 +303,52 @@ namespace SharpScript.Common
 
     public interface IInputOptions
     {
+        string LanguageName => null;
         Array LanguageVersions => null;
         Enum LanguageVersion { get => null; set { } }
     }
 
-    public abstract partial class InputOptions : IInputOptions;
+    public abstract class InputOptions : IInputOptions;
 
-    public sealed partial class CSharpInputOptions : InputOptions, IInputOptions
+    public abstract class RoslynOptions : InputOptions, IInputOptions
+    {
+        public virtual string LanguageName => this switch
+        {
+            CSharpInputOptions => LanguageNames.CSharp,
+            VisualBasicInputOptions => LanguageNames.VisualBasic,
+            _ => throw new Exception("Invalid language type.")
+        };
+
+        public void GetOptions(bool isConsole, out CompilationOptions compilation, out ParseOptions parse)
+        {
+            switch (this)
+            {
+                case CSharpInputOptions csharp:
+                    compilation = new CSharpCompilationOptions(
+                        isConsole ? OutputKind.ConsoleApplication : OutputKind.DynamicallyLinkedLibrary,
+                        allowUnsafe: true,
+                        concurrentBuild: false);
+                    parse = new CSharpParseOptions(
+                        csharp.LanguageVersion,
+                        DocumentationMode.Parse,
+                        SourceCodeKind.Regular);
+                    break;
+                case VisualBasicInputOptions vb:
+                    compilation = new VisualBasicCompilationOptions(
+                        isConsole ? OutputKind.ConsoleApplication : OutputKind.DynamicallyLinkedLibrary,
+                        concurrentBuild: false);
+                    parse = new VisualBasicParseOptions(
+                        vb.LanguageVersion,
+                        DocumentationMode.Parse,
+                        SourceCodeKind.Regular);
+                    break;
+                default:
+                    throw new Exception("Invalid language type.");
+            }
+        }
+    }
+
+    public sealed class CSharpInputOptions : RoslynOptions, IInputOptions
     {
         Array IInputOptions.LanguageVersions => Enum.GetValues<CSharpLanguageVersion>();
         Enum IInputOptions.LanguageVersion
@@ -701,10 +357,11 @@ namespace SharpScript.Common
             set => LanguageVersion = (CSharpLanguageVersion)(value ?? CSharpLanguageVersion.Preview);
         }
 
+        public override string LanguageName => LanguageNames.CSharp;
         public CSharpLanguageVersion LanguageVersion { get; set; } = CSharpLanguageVersion.Preview;
     }
 
-    public sealed partial class VisualBasicInputOptions : InputOptions, IInputOptions
+    public sealed class VisualBasicInputOptions : RoslynOptions, IInputOptions
     {
         Array IInputOptions.LanguageVersions => Enum.GetValues<VisualBasicLanguageVersion>();
         Enum IInputOptions.LanguageVersion
@@ -713,10 +370,11 @@ namespace SharpScript.Common
             set => LanguageVersion = (VisualBasicLanguageVersion)(value ?? VisualBasicLanguageVersion.Latest);
         }
 
+        public override string LanguageName => LanguageNames.VisualBasic;
         public VisualBasicLanguageVersion LanguageVersion { get; set; } = VisualBasicLanguageVersion.Latest;
     }
 
-    public sealed partial class ILInputOptions : InputOptions;
+    public sealed class ILInputOptions : InputOptions;
 
     public interface IOutputOptions
     {
@@ -724,9 +382,9 @@ namespace SharpScript.Common
         Enum LanguageVersion { get => default; set { } }
     }
 
-    public abstract partial class OutputOptions : IOutputOptions;
+    public abstract class OutputOptions : IOutputOptions;
 
-    public sealed partial class CSharpOutputOptions : OutputOptions, IOutputOptions
+    public sealed class CSharpOutputOptions : OutputOptions, IOutputOptions
     {
         public static List<LanguageVersion> LanguageVersions
         {
@@ -748,7 +406,7 @@ namespace SharpScript.Common
         public LanguageVersion LanguageVersion { get; set; } = LanguageVersion.CSharp1;
     }
 
-    public sealed partial class ILOutputOptions : OutputOptions;
+    public sealed class ILOutputOptions : OutputOptions;
 
-    public sealed partial class RunOutputOptions : OutputOptions;
+    public sealed class RunOutputOptions : OutputOptions;
 }

@@ -19,18 +19,21 @@ namespace SharpScript
         {
             WebAssemblyHostBuilder builder = WebAssemblyHostBuilder.CreateDefault(args);
             Current = builder.Build();
-            Compiler = new Compiler(Current.Services.GetRequiredService<ILogger<Compiler>>());
+            Compiler = new Compiler(Current.Services.GetRequiredService<ILoggerFactory>());
             return Current.RunAsync();
         }
 
         [JSInvokable]
-        public static Task InitAsync(string baseUrl) => Compiler.InitAsync(baseUrl).AsTask();
+        public static Task InitAsync(string baseUrl) => RoslynCodeSession.InitAsync(baseUrl).AsTask();
 
         [JSInvokable]
         public static Task<CompileResult> ProcessAsync(string code) => Compiler.ProcessAsync(code).AsTask();
 
         [JSInvokable]
         public static Task<List<Diagnostic>> GetDiagnosticsAsync(string code) => Compiler.GetDiagnosticsAsync(code).AsTask();
+
+        [JSInvokable]
+        public static Task<IEnumerable<CompletionItem>> GetCompletionsAsync(string code, int position) => Compiler.GetCompletionsAsync(code, position).AsTask();
 
         [JSInvokable]
         public static IEnumerable<string> GetLanguageTypes() => Compiler.LanguageTypes.Select(x => x.ToString());
