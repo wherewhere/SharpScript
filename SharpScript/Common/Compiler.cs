@@ -1,28 +1,16 @@
-﻿using ICSharpCode.Decompiler;
-using ICSharpCode.Decompiler.CSharp;
-using ICSharpCode.Decompiler.CSharp.OutputVisitor;
-using ICSharpCode.Decompiler.CSharp.Syntax;
-using ICSharpCode.Decompiler.Disassembler;
-using ICSharpCode.Decompiler.Metadata;
-using Microsoft.CodeAnalysis;
+﻿using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.Text;
 using Microsoft.CodeAnalysis.VisualBasic;
 using Microsoft.Extensions.Logging;
-using Mobius.ILasm.Core;
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Reflection;
-using System.Reflection.Metadata;
-using System.Runtime.CompilerServices;
 using System.Runtime.Loader;
 using System.Text;
 using System.Threading.Tasks;
 using CSharpLanguageVersion = Microsoft.CodeAnalysis.CSharp.LanguageVersion;
 using LanguageVersion = ICSharpCode.Decompiler.CSharp.LanguageVersion;
-using RoslynDiagnostic = Microsoft.CodeAnalysis.Diagnostic;
 using VisualBasicLanguageVersion = Microsoft.CodeAnalysis.VisualBasic.LanguageVersion;
 
 namespace SharpScript.Common
@@ -32,9 +20,92 @@ namespace SharpScript.Common
         public static LanguageType[] LanguageTypes { get; } = Enum.GetValues<LanguageType>();
         public static OutputType[] OutputTypes { get; } = Enum.GetValues<OutputType>();
 
-        private readonly ILogger<Compiler> logger = factory.CreateLogger<Compiler>();
+        private readonly ILogger<Compiler> _logger = factory.CreateLogger<Compiler>();
 
-        public CompilateOptions Options { get; set; } = new();
+        private ICodeSession<ICodeSession> _codeSession;
+        public ICodeSession<ICodeSession> CodeSession
+        {
+            get
+            {
+                if (_codeSession  == null)
+                {
+                    bool isConsole = OutputType == OutputType.Run;
+                    switch (InputOptions)
+                    {
+                        case RoslynOptions options:
+                            _codeSession = new RoslynCodeSession(string.Empty, options, isConsole, factory.CreateLogger<RoslynCodeSession>());
+                            break;
+                        case ILInputOptions:
+                            _codeSession = new ILCodeSession(string.Empty, isConsole);
+                            break;
+                    }
+                }
+                return _codeSession;
+            }
+        }
+
+        private LanguageType languageType = LanguageType.CSharp;
+        public LanguageType LanguageType
+        {
+            get => languageType;
+            set
+            {
+                if (languageType != value)
+                {
+                    InputOptions = value switch
+                    {
+                        LanguageType.CSharp => new CSharpInputOptions(),
+                        LanguageType.VisualBasic => new VisualBasicInputOptions(),
+                        LanguageType.IL => new ILInputOptions(),
+                        _ => throw new Exception("Invalid language type."),
+                    };
+                    languageType = value;
+                    UpdateCodeSession(outputType == OutputType.Run);
+                }
+            }
+        }
+
+        public InputOptions InputOptions { get; set; } = new CSharpInputOptions();
+
+        private OutputType outputType = OutputType.Run;
+        public OutputType OutputType
+        {
+            get => outputType;
+            set
+            {
+                if (outputType != value)
+                {
+                    OutputOptions = value switch
+                    {
+                        OutputType.CSharp => new CSharpOutputOptions(),
+                        OutputType.IL => new ILOutputOptions(),
+                        OutputType.Run => new RunOutputOptions(),
+                        _ => throw new Exception("Invalid output type."),
+                    };
+                    bool isConsole = value == OutputType.Run;
+                    if (isConsole ^ (value == OutputType.Run))
+                    {
+                        UpdateCodeSession(isConsole);
+                    }
+                    outputType = value;
+                }
+            }
+        }
+
+        public OutputOptions OutputOptions { get; set; } = new RunOutputOptions();
+
+        private void UpdateCodeSession(bool isConsole)
+        {
+            switch (InputOptions)
+            {
+                case RoslynOptions options:
+                    _codeSession = new RoslynCodeSession(string.Empty, options, isConsole, factory.CreateLogger<RoslynCodeSession>());
+                    break;
+                case ILInputOptions:
+                    _codeSession = new ILCodeSession(string.Empty, isConsole);
+                    break;
+            }
+        }
 
         private async ValueTask<(CompilationResults streams, List<Diagnostic> diagnostics)> CompilateAsync(string code)
         {
@@ -42,26 +113,23 @@ namespace SharpScript.Common
             try
             {
                 await Task.Yield();
-                bool isExe = Options.OutputType == OutputType.Run;
-                CompilationResults streams = Options.LanguageType switch
-                {
-                    LanguageType.CSharp or LanguageType.VisualBasic => await RoslynCompilateAsync(code, results, isExe).ConfigureAwait(false),
-                    LanguageType.IL => await ILCompilateAsync(code, results, isExe),
-                    _ => throw new Exception("Invalid language type.")
-                };
+                CompilationResults streams = await CodeSession.SetSourceText(code).Compile(results).ConfigureAwait(false);
                 return (streams, results);
             }
             catch (AggregateException aex) when (aex.InnerExceptions?.Count > 1)
             {
                 results.Add(new Diagnostic(aex));
+                _logger.LogError(aex, "Compilate failed. {message} (0x{hResult:X})", aex.GetMessage(), aex.HResult);
             }
-            catch (AggregateException aex)
+            catch (AggregateException aex) when (aex.InnerException is Exception ex)
             {
-                results.Add(new Diagnostic(aex.InnerException));
+                results.Add(new Diagnostic(ex));
+                _logger.LogError(ex, "Compilate failed. {message} (0x{hResult:X})", ex.GetMessage(), ex.HResult);
             }
             catch (Exception ex)
             {
                 results.Add(new Diagnostic(ex));
+                _logger.LogError(ex, "Compilate failed. {message} (0x{hResult:X})", ex.GetMessage(), ex.HResult);
             }
             finally
             {
@@ -76,57 +144,36 @@ namespace SharpScript.Common
             try
             {
                 await Task.Yield();
-                bool isConsole = Options.OutputType == OutputType.Run;
-                results = Options.LanguageType switch
-                {
-                    LanguageType.CSharp or LanguageType.VisualBasic => await GetRoslynDiagnosticsAsync(code, results, isConsole).ConfigureAwait(false),
-                    LanguageType.IL => await GetILDiagnosticsAsync(code, results, isConsole),
-                    _ => throw new Exception("Invalid language type.")
-                };
+                bool isConsole = OutputType == OutputType.Run;
+                results = await CodeSession.SetSourceText(code).GetDiagnosticsAsync(results).ConfigureAwait(false);
                 return results;
             }
             catch (AggregateException aex) when (aex.InnerExceptions?.Count > 1)
             {
                 results.Add(new Diagnostic(aex));
+                _logger.LogError(aex, "Get diagnostics failed. {message} (0x{hResult:X})", aex.GetMessage(), aex.HResult);
             }
-            catch (AggregateException aex)
+            catch (AggregateException aex) when (aex.InnerException is Exception ex)
             {
-                results.Add(new Diagnostic(aex.InnerException));
+                results.Add(new Diagnostic(ex.InnerException));
+                _logger.LogError(ex, "Get diagnostics failed. {message} (0x{hResult:X})", ex.GetMessage(), ex.HResult);
             }
             catch (Exception ex)
             {
                 results.Add(new Diagnostic(ex));
-            }
-            finally
-            {
-                GC.Collect();
+                _logger.LogError(ex, "Get diagnostics failed. {message} (0x{hResult:X})", ex.GetMessage(), ex.HResult);
             }
             return results;
         }
 
         public ValueTask<IEnumerable<CompletionItem>> GetCompletionsAsync(string code, int position)
         {
-            if (Options.InputOptions is RoslynOptions options)
-            {
-                bool isConsole = Options.OutputType == OutputType.Run;
-                return new RoslynCodeSession(code, options, isConsole, factory.CreateLogger<RoslynCodeSession>()).GetCompletionsAsync(position);
-            }
-            return ValueTask.FromResult<IEnumerable<CompletionItem>>([]);
+            return InputOptions is RoslynOptions
+                ? CodeSession.SetSourceText(code).GetCompletionsAsync(position)
+                : ValueTask.FromResult<IEnumerable<CompletionItem>>([]);
         }
 
-        private ValueTask<CompilationResults> RoslynCompilateAsync(string code, ICollection<Diagnostic> results, bool isConsole) =>
-            new RoslynCodeSession(code, Options.InputOptions as RoslynOptions, isConsole, factory.CreateLogger<RoslynCodeSession>()).Compile(results);
-
-        private ValueTask<T> GetRoslynDiagnosticsAsync<T>(string code, T results, bool isConsole) where T : ICollection<Diagnostic> =>
-            new RoslynCodeSession(code, Options.InputOptions as RoslynOptions, isConsole, factory.CreateLogger<RoslynCodeSession>()).GetDiagnosticsAsync(results);
-
-        private static ValueTask<CompilationResults> ILCompilateAsync(string code, ICollection<Diagnostic> results, bool isConsole) =>
-            new ILCodeSession(code, isConsole).Compile(results);
-
-        private static ValueTask<T> GetILDiagnosticsAsync<T>(string code, T results, bool isConsole) where T : ICollection<Diagnostic> =>
-            new ILCodeSession(code, isConsole).GetDiagnosticsAsync(results);
-
-        private async ValueTask<string> DecompileAsync(CompilationResults streams) => Options.OutputOptions switch
+        private async ValueTask<string> DecompileAsync(CompilationResults streams) => OutputOptions switch
         {
             CSharpOutputOptions csharp => await Decompiler.CSharpDecompileAsync(streams, csharp).ConfigureAwait(false),
             ILOutputOptions => await Decompiler.ILDecompileAsync(streams).ConfigureAwait(false),
@@ -187,7 +234,7 @@ namespace SharpScript.Common
                 (CompilationResults assemblyStream, List<Diagnostic> diagnostics) = await CompilateAsync(code).ConfigureAwait(false);
                 if (assemblyStream != null)
                 {
-                    switch (Options.OutputType)
+                    switch (OutputType)
                     {
                         case OutputType.CSharp
                             or OutputType.IL:
@@ -202,7 +249,7 @@ namespace SharpScript.Common
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Compilate or {type} assembly failed. {message} (0x{hResult:X})", Options?.OutputType == OutputType.Run ? "execute" : "decompile", ex.GetMessage(), ex.HResult);
+                _logger.LogError(ex, "Compilate or {type} assembly failed. {message} (0x{hResult:X})", OutputType == OutputType.Run ? "execute" : "decompile", ex.GetMessage(), ex.HResult);
             }
             return new CompileResult([], null);
         }
@@ -210,6 +257,7 @@ namespace SharpScript.Common
 
     public record struct CompileResult(List<Diagnostic> Diagnostics, string Decompiled, params List<string> Outputs);
 
+    [Flags]
     public enum LanguageType
     {
         CSharp = 0b011,
@@ -217,88 +265,12 @@ namespace SharpScript.Common
         IL = 0b001
     }
 
+    [Flags]
     public enum OutputType
     {
-        CSharp,
-        IL,
-        Run
-    }
-
-    public sealed class Diagnostic(DiagnosticSeverity severity, string message)
-    {
-        public string ID { get; }
-        public LinePositionSpan Location { get; }
-        public string Message => message;
-        public string Severity => severity.ToString();
-
-        public Diagnostic(Exception exception) : this(DiagnosticSeverity.Error, exception.Message) { }
-
-        public Diagnostic(RoslynDiagnostic diagnostic) : this(diagnostic.Severity, diagnostic.GetMessage())
-        {
-            ID = diagnostic.Id;
-            Location = diagnostic.Location.GetLineSpan().Span;
-        }
-
-        public Diagnostic(Mono.ILASM.Location location, DiagnosticSeverity severity, string message) : this (severity, message)
-        {
-            var position = new LinePosition(location.line - 1, location.column);
-            Location = new LinePositionSpan(position, position);
-        }
-    }
-
-    public class CompilateOptions()
-    {
-        private LanguageType languageType = LanguageType.CSharp;
-        public LanguageType LanguageType
-        {
-            get => languageType;
-            set
-            {
-                if (languageType != value)
-                {
-                    InputOptions = value switch
-                    {
-                        LanguageType.CSharp => new CSharpInputOptions(),
-                        LanguageType.VisualBasic => new VisualBasicInputOptions(),
-                        LanguageType.IL => new ILInputOptions(),
-                        _ => throw new Exception("Invalid language type."),
-                    };
-                    languageType = value;
-                }
-            }
-        }
-
-        public string LanguageName => LanguageType switch
-        {
-            LanguageType.CSharp => "csharp",
-            LanguageType.VisualBasic => "vb",
-            LanguageType.IL => "csharp",
-            _ => throw new Exception("Invalid language type.")
-        };
-
-        public InputOptions InputOptions { get; set; } = new CSharpInputOptions();
-
-        private OutputType outputType = OutputType.Run;
-        public OutputType OutputType
-        {
-            get => outputType;
-            set
-            {
-                if (outputType != value)
-                {
-                    OutputOptions = value switch
-                    {
-                        OutputType.CSharp => new CSharpOutputOptions(),
-                        OutputType.IL => new ILOutputOptions(),
-                        OutputType.Run => new RunOutputOptions(),
-                        _ => throw new Exception("Invalid output type."),
-                    };
-                    outputType = value;
-                }
-            }
-        }
-
-        public OutputOptions OutputOptions { get; set; } = new RunOutputOptions();
+        CSharp = 0b011,
+        IL = 0b001,
+        Run = 0b100
     }
 
     public interface IInputOptions

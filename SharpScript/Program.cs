@@ -39,18 +39,18 @@ namespace SharpScript
         public static IEnumerable<string> GetLanguageTypes() => Compiler.LanguageTypes.Select(x => x.ToString());
 
         [JSInvokable]
-        public static void SetLanguageType(string type) => Compiler.Options.LanguageType = Enum.Parse<LanguageType>(type, true);
+        public static void SetLanguageType(string type) => Compiler.LanguageType = Enum.Parse<LanguageType>(type, true);
 
         [JSInvokable]
         public static IEnumerable<string> GetOutputTypes() => Compiler.OutputTypes.Select(x => x.ToString());
 
         [JSInvokable]
-        public static void SetOutputType(string type) => Compiler.Options.OutputType = Enum.Parse<OutputType>(type, true);
+        public static void SetOutputType(string type) => Compiler.OutputType = Enum.Parse<OutputType>(type, true);
 
         [JSInvokable]
         public static IEnumerable<string> GetInputLanguageVersions()
         {
-            if (((IInputOptions)Compiler.Options.InputOptions).LanguageVersions is Array array)
+            if (((IInputOptions)Compiler.InputOptions).LanguageVersions is Array array)
             {
                 foreach (object @enum in array)
                 {
@@ -62,16 +62,16 @@ namespace SharpScript
         [JSInvokable]
         public static void SetInputLanguageVersion(string type)
         {
-            if (((IInputOptions)Compiler.Options.InputOptions).LanguageVersion?.GetType() is Type @enum)
+            if (((IInputOptions)Compiler.InputOptions).LanguageVersion?.GetType() is Type @enum)
             {
-                ((IInputOptions)Compiler.Options.InputOptions).LanguageVersion = (Enum)Enum.Parse(@enum, type, true);
+                ((IInputOptions)Compiler.InputOptions).LanguageVersion = (Enum)Enum.Parse(@enum, type, true);
             }
         }
 
         [JSInvokable]
         public static IEnumerable<string> GetOutputLanguageVersions()
         {
-            if (((IOutputOptions)Compiler.Options.OutputOptions).IsCSharp)
+            if (((IOutputOptions)Compiler.OutputOptions).IsCSharp)
             {
                 foreach (object @enum in CSharpOutputOptions.LanguageVersions)
                 {
@@ -83,9 +83,9 @@ namespace SharpScript
         [JSInvokable]
         public static void SetOutputLanguageVersion(string type)
         {
-            if (((IOutputOptions)Compiler.Options.OutputOptions).LanguageVersion?.GetType() is Type @enum)
+            if (((IOutputOptions)Compiler.OutputOptions).LanguageVersion?.GetType() is Type @enum)
             {
-                ((IOutputOptions)Compiler.Options.OutputOptions).LanguageVersion = (Enum)Enum.Parse(@enum, type, true);
+                ((IOutputOptions)Compiler.OutputOptions).LanguageVersion = (Enum)Enum.Parse(@enum, type, true);
             }
         }
     }

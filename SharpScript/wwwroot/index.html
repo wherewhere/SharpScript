@@ -94,7 +94,7 @@
                         </fluent-button>
                         <fluent-select v-if="inputLanguages.length" v-model="inputLanguage" style="min-width: auto;">
                             <fluent-option v-for="item in inputLanguages" :value="item">
-                                {{ getLauguageVersion(item) }}
+                                {{ getVersion(item) }}
                             </fluent-option>
                         </fluent-select>
                     </div>
@@ -108,11 +108,16 @@
                         <fluent-option value="IL">IL</fluent-option>
                         <fluent-option value="Run">Run</fluent-option>
                     </fluent-select>
-                    <fluent-select v-if="outputLanguages.length" v-model="outputLanguage" style="min-width: auto;">
-                        <fluent-option v-for="item in outputLanguages" :value="item">
-                            {{ getLauguageVersion(item) }}
-                        </fluent-option>
-                    </fluent-select>
+                    <div style="display: flex; column-gap: 4px;">
+                        <fluent-button v-if="!isInitDotnet" @click="initLinterAsync" :disabled="loading">
+                            Init Linter
+                        </fluent-button>
+                        <fluent-select v-if="outputLanguages.length" v-model="outputLanguage" style="min-width: auto;">
+                            <fluent-option v-for="item in outputLanguages" :value="item">
+                                {{ getVersion(item) }}
+                            </fluent-option>
+                        </fluent-select>
+                    </div>
                 </div>
                 <div class="editor">
                     <codemirror v-if="results.decompiled" v-model:value="results.decompiled"
@@ -121,16 +126,24 @@
                         <pre class="unset" v-for="item in results.outputs">{{ item }}</pre>
                     </div>
                     <div v-if="results.diagnostics.length" style="font-family: var(--font-monospace); padding: 0 12px;">
-                        <div class="unset" v-for="item in results.diagnostics">
-                            <span style="color: var(--accent-fill-rest);">{{ item.severity }}</span>&emsp;
-                            <span>{{ item.id || "\t" }}</span>&emsp;
-                            <span>{{ item.message }}</span>&emsp;
-                            <span>
-                                [{{ item.location.start.line + 1 }}, {{ item.location.start.character }}] - [{{
-                                item.location.end.line + 1
-                                }}, {{ item.location.end.character }}]
-                            </span>
-                        </div>
+                        <table cellpadding="4">
+                            <thead>
+                                <tr>
+                                    <th></th>
+                                    <th>ID</th>
+                                    <th>Message</th>
+                                    <th>Location</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="item in results.diagnostics">
+                                    <td :class="item.severity.toLowerCase() + '-icon'"></td>
+                                    <td>{{ item.id }}</td>
+                                    <td>{{ item.message }}</td>
+                                    <td>{{ getLocation(item) }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
@@ -147,9 +160,9 @@
         import { basicSetup, EditorView } from "codemirror";
         import { autocompletion, ifNotIn } from "@codemirror/autocomplete";
         import { indentWithTab } from "@codemirror/commands";
-        import { Compartment, EditorState } from "@codemirror/state";
+        import { Compartment, EditorState, Facet } from "@codemirror/state";
         import { indentUnit } from "@codemirror/language";
-        import { linter } from "@codemirror/lint";
+        import { linter, lintGutter } from "@codemirror/lint";
         import { keymap } from "@codemirror/view";
         import { csharp } from "@replit/codemirror-lang-csharp";
         import { cil } from "mirrorsharp-codemirror-6-preview/codemirror/lang-cil";
@@ -293,13 +306,23 @@
                         this.loading = true;
                         const message = this.message;
                         this.message = "Compiling...";
-                        await this.initAsync();
+                        this.setSettings();
+                        await (this.language === "IL" ? this.initDotNetAsync() : this.initCompilerAsync());
+                        this.initEditer();
+                        await this.$nextTick();
                         this.results = await DotNet.invokeMethodAsync("SharpScript", "ProcessAsync", this.code);
                         this.message = message;
                     }
                     catch (e) {
                         this.message = "Error";
-                        this.results.diagnostics.push(e.message);
+                        this.results.diagnostics.push({
+                            location: {
+                                start: { line: 0, character: 0 },
+                                end: { line: 0, character: 0 }
+                            },
+                            message: e.message,
+                            severity: "Error"
+                        });
                         throw e;
                     }
                     finally {
@@ -323,10 +346,21 @@
                         console.warn(e);
                     }
                 },
-                async initAsync() {
-                    this.setSettings();
-                    await (this.language === "IL" ? this.initDotNetAsync() : this.initCompilerAsync());
-                    this.initEditer();
+                async initLinterAsync() {
+                    try {
+                        this.loading = true;
+                        const message = this.message;
+                        this.message = "Init Linter...";
+                        await (this.language === "IL" ? this.initDotNetAsync() : this.initCompilerAsync());
+                        this.initEditer();
+                        this.message = message;
+                    }
+                    catch (e) {
+                        console.warn(e);
+                    }
+                    finally {
+                        this.loading = false;
+                    }
                 },
                 async initDotNetAsync() {
                     if (!this.isInitDotnet) {
@@ -391,6 +425,9 @@
                             return [];
                         }))
                     });
+                    editor.dispatch({
+                        effects: editorHost.lintGutterSet.reconfigure(lintGutter())
+                    });
                     function mapTextTagsToType(tags) {
                         switch (tags.length) {
                             case 0: if (tags.length === 0)
@@ -445,7 +482,7 @@
                             return "plaintext";
                     }
                 },
-                getLauguageVersion(version) {
+                getVersion(version) {
                     return version.replace("VisualBasic", "VB ").replace("CSharp", "C# ").replace('_', '.');
                 },
                 getDefaultCode(language) {
@@ -459,6 +496,9 @@
                         default:
                             return '';
                     }
+                },
+                getLocation(item) {
+                    return `[${item.location.start.line + 1}, ${item.location.start.character}] - [${item.location.end.line + 1}, ${item.location.end.character}]`;
                 },
                 loadSettings() {
                     const hash = location.hash.substring(1);
@@ -522,6 +562,7 @@
                     languageSet: new Compartment(),
                     readonlySet: new Compartment(),
                     linterSet: new Compartment(),
+                    lintGutterSet: new Compartment(),
                     autocompletionSet: new Compartment(),
                 }
             },
@@ -571,18 +612,20 @@
                     }
                     return this.themeSet.of(vscodeLight);
                 };
+                const empty = Facet.define().of();
                 this.editor = new EditorView({
                     doc: this.value,
                     parent: this.$el,
                     extensions: [
                         basicSetup,
-                        keymap.of([indentWithTab]),
-                        this.languageSet.of(this.getLauguage(this.language || "csharp")),
                         getTheme(),
-                        this.readonlySet.of(EditorState.readOnly.of(!!this.readonly)),
-                        this.linterSet.of(linter()),
-                        this.autocompletionSet.of(autocompletion()),
+                        keymap.of([indentWithTab]),
                         indentUnit.of("    "),
+                        this.autocompletionSet.of(empty),
+                        this.linterSet.of(empty),
+                        this.lintGutterSet.of(empty),
+                        this.languageSet.of(this.getLauguage(this.language || "csharp")),
+                        this.readonlySet.of(EditorState.readOnly.of(!!this.readonly)),
                         EditorView.updateListener.of(e => {
                             if (e.docChanged) {
                                 this.changed = true;
@@ -686,6 +729,25 @@
                     width: 100%;
                     height: 50%;
                 }
+        }
+
+        #vue-app .hidden-icon,
+        #vue-app .info-icon {
+            height: 20px;
+            margin-top: 3.5px;
+            content: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2040%2040'%3E%3Cpath%20fill='%23aaf'%20stroke='%2377e'%20stroke-width='6'%20stroke-linejoin='round'%20d='M5%205L35%205L35%2035L5%2035Z'/%3E%3C/svg%3E");
+        }
+
+        #vue-app .warning-icon {
+            height: 20px;
+            margin-top: 3.5px;
+            content: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2040%2040'%3E%3Cpath%20fill='%23fe8'%20stroke='%23fd7'%20stroke-width='6'%20stroke-linejoin='round'%20d='M20%206L37%2035L3%2035Z'/%3E%3C/svg%3E");
+        }
+
+        #vue-app .error-icon {
+            height: 20px;
+            margin-top: 3.5px;
+            content: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2040%2040'%3E%3Ccircle%20cx='20'%20cy='20'%20r='15'%20fill='%23f87'%20stroke='%23f43'%20stroke-width='6'/%3E%3C/svg%3E");
         }
 
         #vue-app .cm-editor {

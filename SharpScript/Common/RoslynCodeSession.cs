@@ -1,5 +1,6 @@
 ﻿using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Completion;
+using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Emit;
 using Microsoft.CodeAnalysis.Text;
 using Microsoft.Extensions.Logging;
@@ -11,23 +12,28 @@ using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
+using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using CSharpLanguageVersion = Microsoft.CodeAnalysis.CSharp.LanguageVersion;
+using RoslynDiagnostic = Microsoft.CodeAnalysis.Diagnostic;
 
 namespace SharpScript.Common
 {
-    public sealed class RoslynCodeSession : ICodeSession
+    public sealed class RoslynCodeSession : ICodeSession<RoslynCodeSession>
     {
         private static readonly SourceText EmptySourceText = SourceText.From(string.Empty);
-        private static string baseUrl;
+        private static string _baseUrl;
 
+        private readonly ImmutableArray<DiagnosticAnalyzer> _analyzers;
         private readonly ILogger<RoslynCodeSession> _logger;
         private readonly RoslynOptions _options;
         private readonly bool _isConsole;
+        private readonly string _language;
+        private string _code;
         private bool _outOfDate;
 
-        public static List<MetadataReference> References { get; private set; }
+        public static List<MetadataReference> References { get; private set; } = [];
 
         private RoslynCodeSession _consoleVersion;
         private RoslynCodeSession ConsoleVersion
@@ -90,13 +96,15 @@ namespace SharpScript.Common
             _options = options;
             _isConsole = isConsole;
             _logger = logger ?? NullLogger<RoslynCodeSession>.Instance;
+            _code = code ?? string.Empty;
             _sourceText = code == null ? EmptySourceText : SourceText.From(code, Encoding.Default);
             Workspace = new AdhocWorkspace();
             ProjectId projectId = ProjectId.CreateNewId();
             DocumentId docId = DocumentId.CreateNewId(projectId, "SharpScript.CodeSession");
             options.GetOptions(isConsole, out CompilationOptions compilation, out ParseOptions parse);
+            _language = compilation.Language;
             Solution solution = Workspace.CurrentSolution
-                .AddProject(projectId, "SharpScript.Project.CodeSession", "SharpScript", compilation.Language)
+                .AddProject(projectId, "SharpScript.Project.CodeSession", "SharpScript", _language)
                 .AddDocument(docId, "SharpScript.CodeSession.Document", _sourceText);
             Workspace.OpenDocument(docId);
             solution = solution
@@ -104,11 +112,17 @@ namespace SharpScript.Common
                 .WithProjectCompilationOptions(projectId, compilation)
                 .WithProjectParseOptions(projectId, parse);
             _currentDocument = solution.GetDocument(docId);
+            _analyzers = [..GetAnalyzers(_language switch
+            {
+                LanguageNames.CSharp => "Microsoft.CodeAnalysis.CSharp.Features",
+                LanguageNames.VisualBasic => "Microsoft.CodeAnalysis.VisualBasic.Features",
+                _ => throw new NotSupportedException($"Language '{_language}' is not supported.")
+            }, _language)];
         }
 
         public static async ValueTask InitAsync(string baseUrl)
         {
-            RoslynCodeSession.baseUrl = baseUrl;
+            _baseUrl = baseUrl;
             if (References?.Count is not > 0)
             {
                 References = await GetMetadataReferencesAsync(
@@ -177,16 +191,22 @@ namespace SharpScript.Common
             _outOfDate = false;
         }
 
-        public void SetSourceText(string code)
+        public RoslynCodeSession SetSourceText(string code)
         {
-            SourceText = SourceText.From(code, Encoding.Default);
-            EnsureUpToDate();
+            if (_code != code)
+            {
+                SourceText = SourceText.From(code, Encoding.Default);
+                _code = code;
+                EnsureUpToDate();
+            }
+            return this;
         }
 
         public async ValueTask<T> GetDiagnosticsAsync<T>(T results) where T : ICollection<Diagnostic>
         {
             Compilation compilation = await CurrentDocument.Project.GetCompilationAsync().ConfigureAwait(false);
-            results.AddRange( compilation.GetDiagnostics().Select(x => new Diagnostic(x)));
+            ImmutableArray<RoslynDiagnostic> diagnostics = await compilation.WithAnalyzers(_analyzers).GetAllDiagnosticsAsync();
+            results.AddRange(!_isConsole && _options is CSharpInputOptions { LanguageVersion: >= CSharpLanguageVersion.CSharp9 } ? diagnostics.Where(x => x is not { Id: "CS8805", Severity: DiagnosticSeverity.Error }).Select(x => new Diagnostic(x)) : diagnostics.Select(x => new Diagnostic(x)));
             return results;
         }
 
@@ -263,12 +283,12 @@ namespace SharpScript.Common
             }
         }
 
-        public RoslynCodeSession WithIsConsole(bool isConsole) => new(SourceText.ToString(), _options, isConsole, _logger);
+        public RoslynCodeSession WithIsConsole(bool isConsole) => new(_code, _options, isConsole, _logger);
 
         private static async ValueTask<List<MetadataReference>> GetMetadataReferencesAsync(params string[] assemblies)
         {
             List<MetadataReference> references = [];
-            using HttpClient client = new() { BaseAddress = new Uri(baseUrl) };
+            using HttpClient client = new() { BaseAddress = new Uri(_baseUrl) };
             foreach (string assembly in assemblies)
             {
                 using Stream stream = await client.GetStreamAsync($"{assembly}.wasm").ConfigureAwait(false);
@@ -276,9 +296,22 @@ namespace SharpScript.Common
             }
             return references;
         }
+
+        private static IEnumerable<DiagnosticAnalyzer> GetAnalyzers(string assemblyName, string language) =>
+            Assembly.Load(new AssemblyName(assemblyName))
+                    .GetTypes()
+                    .Where(x => x.IsSubclassOf(typeof(DiagnosticAnalyzer)) && x is { IsAbstract: false } && x.GetCustomAttributes(typeof(DiagnosticAnalyzerAttribute), true).OfType<DiagnosticAnalyzerAttribute>().Any(x => x.Languages.Contains(language)))
+                    .Select(Activator.CreateInstance)
+                    .OfType<DiagnosticAnalyzer>();
+
+        private class PreloadedAnalyzerAssemblyLoader(Assembly assembly) : IAnalyzerAssemblyLoader
+        {
+            public Assembly LoadFromPath(string fullPath) => assembly;
+            void IAnalyzerAssemblyLoader.AddDependencyLocation(string fullPath) { }
+        }
     }
 
-    public sealed class ILCodeSession(string code, bool isConsole) : ICodeSession
+    public sealed class ILCodeSession(string code, bool isConsole) : ICodeSession<ILCodeSession>
     {
         private string _code = code;
 
@@ -319,7 +352,11 @@ namespace SharpScript.Common
             }
         }
 
-        public void SetSourceText(string code) => _code = code;
+        public ILCodeSession SetSourceText(string code)
+        {
+            _code = code;
+            return this;
+        }
 
         private class Logger(ICollection<Diagnostic> results) : Mobius.ILasm.interfaces.ILogger
         {
@@ -339,8 +376,14 @@ namespace SharpScript.Common
     {
         ValueTask<T> GetDiagnosticsAsync<T>(T results) where T : ICollection<Diagnostic>;
         ValueTask<IEnumerable<CompletionItem>> GetCompletionsAsync(int position) => ValueTask.FromResult<IEnumerable<CompletionItem>>([]);
-        void SetSourceText(string code);
+        ICodeSession SetSourceText(string code);
         ValueTask<CompilationResults> Compile(ICollection<Diagnostic> results);
+    }
+
+    public interface ICodeSession<out TSelf> : ICodeSession where TSelf : ICodeSession
+    {
+        new TSelf SetSourceText(string code);
+        ICodeSession ICodeSession.SetSourceText(string code) => SetSourceText(code);
     }
 
     public enum CharacterOperation
@@ -348,6 +391,29 @@ namespace SharpScript.Common
         None = 0,
         Inserted = 1,
         Deleted = 2
+    }
+
+    public sealed class Diagnostic(DiagnosticSeverity severity, string message)
+    {
+        public string ID { get; }
+        public LinePositionSpan Location { get; }
+        public string Message => message;
+        public string Severity => severity.ToString();
+
+        public Diagnostic(Exception exception) : this(DiagnosticSeverity.Error, exception.Message) { }
+
+        public Diagnostic(RoslynDiagnostic diagnostic) : this(diagnostic.Severity, diagnostic.GetMessage())
+        {
+            ID = diagnostic.Id;
+            Location = diagnostic.Location.GetLineSpan().Span;
+            Console.WriteLine(diagnostic.GetType());
+        }
+
+        public Diagnostic(Mono.ILASM.Location location, DiagnosticSeverity severity, string message) : this(severity, message)
+        {
+            LinePosition position = new(location.line - 1, location.column);
+            Location = new LinePositionSpan(position, position);
+        }
     }
 
     public record CompilationResults(MemoryStream AssemblyStream, MemoryStream SymbolStream) : IDisposable
