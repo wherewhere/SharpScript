@@ -24,7 +24,7 @@ namespace SharpScript.Common
             foreach (string path in assemblyPaths)
             {
                 PEFile file = new(path);
-                _peFileCache.TryAdd(file.Name, (file, Task.FromResult<MetadataFile>(file)));
+                _ = _peFileCache.TryAdd(file.Name, (file, Task.FromResult<MetadataFile>(file)));
             }
         }
 

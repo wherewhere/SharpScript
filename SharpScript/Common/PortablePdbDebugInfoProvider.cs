@@ -26,7 +26,7 @@ namespace SharpScript.Common
         {
             MethodDebugInformation debugInfo = _reader.GetMethodDebugInformation(method);
             SequencePointCollection points = debugInfo.GetSequencePoints();
-            return points.Select(static point => new ICSharpCode.Decompiler.DebugInfo.SequencePoint
+            return [.. points.Select(static point => new ICSharpCode.Decompiler.DebugInfo.SequencePoint
             {
                 Offset = point.Offset,
                 StartLine = point.StartLine,
@@ -34,11 +34,11 @@ namespace SharpScript.Common
                 EndLine = point.EndLine,
                 EndColumn = point.EndColumn,
                 DocumentUrl = "_"
-            }).ToArray();
+            })];
         }
 
         public IList<Variable> GetVariables(MethodDefinitionHandle method) =>
-            EnumerateLocals(method).Select(local => new Variable(local.Index, _reader.GetString(local.Name))).ToArray();
+            [.. EnumerateLocals(method).Select(local => new Variable(local.Index, _reader.GetString(local.Name)))];
 
         public bool TryGetName(MethodDefinitionHandle method, int index, out string name)
         {

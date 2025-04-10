@@ -172,7 +172,7 @@
         createApp({
             data() {
                 return {
-                    code: `using System;\nConsole.WriteLine("Hello, World!");`,
+                    code: 'using System;\nConsole.WriteLine("Hello, World!");',
                     language: "CSharp",
                     inputLanguages: ["Default", "CSharp1", "CSharp2", "CSharp3", "CSharp4", "CSharp5", "CSharp6", "CSharp7", "CSharp7_1", "CSharp7_2", "CSharp7_3", "CSharp8", "CSharp9", "CSharp10", "CSharp11", "CSharp12", "CSharp13", "LatestMajor", "Preview", "Latest"],
                     inputLanguage: "Preview",
@@ -418,7 +418,18 @@
                                                     return "info";
                                             }
                                         })(),
-                                        message: diagnostic.message
+                                        message: `${diagnostic.id ? `${diagnostic.id}: ` : ''}${diagnostic.message}`,
+                                        actions: diagnostic.actions.map(x => {
+                                            return {
+                                                name: x.title,
+                                                async apply(view) {
+                                                    const result = await x.action.invokeMethodAsync("InvokeAsync");
+                                                    if (result) {
+                                                        editor.dispatch({ changes: { from: 0, to: editor.state.doc.length, insert: result } });
+                                                    }
+                                                }
+                                            }
+                                        })
                                     }
                                 });
                             }
@@ -488,9 +499,9 @@
                 getDefaultCode(language) {
                     switch (language) {
                         case "CSharp":
-                            return `using System;\nConsole.WriteLine("Hello, World!");`;
+                            return 'using System;\nConsole.WriteLine("Hello, World!");';
                         case "VisualBasic":
-                            return `Imports System\nPublic Module Program\n    Public Sub Main()\n        Console.WriteLine("Hello, World!")\n    End Sub\nEnd Module`;
+                            return 'Imports System\nPublic Module Program\n    Public Sub Main()\n        Console.WriteLine("Hello, World!")\n    End Sub\nEnd Module';
                         case "IL":
                             return `.assembly ' ' {\n}\n.method static void Main() {\n    .entrypoint\n    ldstr "Hello, World!"\n    call void [System.Console]System.Console::WriteLine(string)\n    ret\n}`;
                         default:

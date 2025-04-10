@@ -1,10 +1,13 @@
 ﻿using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CodeActions;
+using Microsoft.CodeAnalysis.CodeFixes;
 using Microsoft.CodeAnalysis.Completion;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Emit;
 using Microsoft.CodeAnalysis.Text;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.JSInterop;
 using Mobius.ILasm.Core;
 using System;
 using System.Collections.Generic;
@@ -14,8 +17,10 @@ using System.Linq;
 using System.Net.Http;
 using System.Reflection;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using CSharpLanguageVersion = Microsoft.CodeAnalysis.CSharp.LanguageVersion;
+using RoslynCodeAction = Microsoft.CodeAnalysis.CodeActions.CodeAction;
 using RoslynDiagnostic = Microsoft.CodeAnalysis.Diagnostic;
 
 namespace SharpScript.Common
@@ -25,13 +30,14 @@ namespace SharpScript.Common
         private static readonly SourceText EmptySourceText = SourceText.From(string.Empty);
         private static string _baseUrl;
 
+        private readonly Dictionary<string, List<CodeFixProvider>> _providers;
         private readonly ImmutableArray<DiagnosticAnalyzer> _analyzers;
-        private readonly ILogger<RoslynCodeSession> _logger;
         private readonly RoslynOptions _options;
-        private readonly bool _isConsole;
         private readonly string _language;
-        private string _code;
+        private readonly bool _isConsole;
         private bool _outOfDate;
+
+        internal readonly ILogger<RoslynCodeSession> _logger;
 
         public static List<MetadataReference> References { get; private set; } = [];
 
@@ -46,23 +52,25 @@ namespace SharpScript.Common
             }
         }
 
-        public AdhocWorkspace Workspace { get; set; }
+        public AdhocWorkspace Workspace { get; }
 
-        private SourceText _sourceText;
-        public SourceText SourceText
+        private string _code;
+        public string SourceCode
         {
-            get => _sourceText;
-            private set
+            get => _code;
+            set
             {
-                if (value == _sourceText)
+                if (_code != value)
                 {
-                    return;
+                    _code = value;
+                    SourceText = SourceText.From(value, Encoding.Default);
+                    _outOfDate = true;
+                    EnsureUpToDate();
                 }
-
-                _sourceText = value;
-                _outOfDate = true;
             }
         }
+
+        public SourceText SourceText { get; private set; }
 
         private Document _currentDocument;
         public Document CurrentDocument
@@ -97,7 +105,7 @@ namespace SharpScript.Common
             _isConsole = isConsole;
             _logger = logger ?? NullLogger<RoslynCodeSession>.Instance;
             _code = code ?? string.Empty;
-            _sourceText = code == null ? EmptySourceText : SourceText.From(code, Encoding.Default);
+            SourceText = code == null ? EmptySourceText : SourceText.From(code, Encoding.Default);
             Workspace = new AdhocWorkspace();
             ProjectId projectId = ProjectId.CreateNewId();
             DocumentId docId = DocumentId.CreateNewId(projectId, "SharpScript.CodeSession");
@@ -105,19 +113,20 @@ namespace SharpScript.Common
             _language = compilation.Language;
             Solution solution = Workspace.CurrentSolution
                 .AddProject(projectId, "SharpScript.Project.CodeSession", "SharpScript", _language)
-                .AddDocument(docId, "SharpScript.CodeSession.Document", _sourceText);
-            Workspace.OpenDocument(docId);
-            solution = solution
                 .AddMetadataReferences(projectId, References)
                 .WithProjectCompilationOptions(projectId, compilation)
-                .WithProjectParseOptions(projectId, parse);
-            _currentDocument = solution.GetDocument(docId);
-            _analyzers = [..GetAnalyzers(_language switch
+                .WithProjectParseOptions(projectId, parse)
+                .AddDocument(docId, "SharpScript.CodeSession.Document", SourceText);
+            _ = Workspace.TryApplyChanges(solution);
+            Workspace.OpenDocument(docId);
+            _currentDocument = Workspace.CurrentSolution.GetDocument(docId);
+            GetAnalyzers(_language switch
             {
                 LanguageNames.CSharp => "Microsoft.CodeAnalysis.CSharp.Features",
                 LanguageNames.VisualBasic => "Microsoft.CodeAnalysis.VisualBasic.Features",
                 _ => throw new NotSupportedException($"Language '{_language}' is not supported.")
-            }, _language)];
+            }, _language, out IEnumerable<DiagnosticAnalyzer> analyzers, out _providers);
+            _analyzers = [.. analyzers];
         }
 
         public static async ValueTask InitAsync(string baseUrl)
@@ -141,6 +150,183 @@ namespace SharpScript.Common
                     "Microsoft.CSharp",
                     "Microsoft.VisualBasic.Core",
                     "System.Net.WebClient").ConfigureAwait(false);
+            }
+        }
+
+        private void EnsureUpToDate()
+        {
+            if (!_outOfDate) { return; }
+            _currentDocument = _currentDocument.WithText(SourceText);
+            _ = Workspace.TryApplyChanges(_currentDocument.Project.Solution);
+            _outOfDate = false;
+        }
+
+        public RoslynCodeSession SetSourceText(string code)
+        {
+            SourceCode = code;
+            return this;
+        }
+
+        public async Task RefreshSourceTextAsync(CancellationToken cancellationToken = default)
+        {
+            _currentDocument = Workspace.CurrentSolution.GetDocument(_currentDocument.Id);
+            SourceText = await _currentDocument.GetTextAsync(cancellationToken).ConfigureAwait(false);
+            _code = SourceText.ToString();
+        }
+
+        public async ValueTask<T> GetDiagnosticsAsync<T>(T results, CancellationToken cancellationToken = default) where T : ICollection<Diagnostic>
+        {
+            Compilation compilation = await CurrentDocument.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false);
+            ImmutableArray<RoslynDiagnostic> diagnostics = await compilation.WithAnalyzers(_analyzers).GetAllDiagnosticsAsync(cancellationToken).ConfigureAwait(false);
+            IEnumerable<RoslynDiagnostic> filtered = !_isConsole && _options is CSharpInputOptions { LanguageVersion: >= CSharpLanguageVersion.CSharp9 } ? diagnostics.Where(x => x is not { Id: "CS8805", Severity: DiagnosticSeverity.Error }) : diagnostics;
+            foreach (RoslynDiagnostic diagnostic in filtered)
+            {
+                List<RoslynCodeAction> actions = await GetCodeActionsAsync(diagnostic, cancellationToken).ConfigureAwait(false);
+                results.Add(new Diagnostic(diagnostic, [.. actions.Select(x => new CodeAction(x, this))]));
+            }
+            return results;
+        }
+
+        private async ValueTask<List<RoslynCodeAction>> GetCodeActionsAsync(RoslynDiagnostic diagnostic, CancellationToken cancellationToken = default)
+        {
+            List<RoslynCodeAction> codeActions = [];
+            CodeFixContext context = new(CurrentDocument, diagnostic, (x, _) => codeActions.Add(x), cancellationToken);
+            if (_providers.TryGetValue(diagnostic.Id, out List<CodeFixProvider> providers))
+            {
+                for (int i = providers.Count; --i >= 0;)
+                {
+                    CodeFixProvider provider = providers[i];
+                    try
+                    {
+                        await provider.RegisterCodeFixesAsync(context).ConfigureAwait(false);
+                    }
+                    catch (TypeInitializationException ex)
+                    {
+                        _logger.LogError(ex, "Not supports provider '{provider}' for diagnostic '{diagnosticId}'.", provider.GetType().Name, diagnostic.Id);
+                        _ = providers.Remove(provider);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error while registering code fixes for provider '{provider}' with diagnostic '{diagnosticId}'.", provider.GetType().Name, diagnostic.Id);
+                    }
+                }
+            }
+            return codeActions;
+        }
+
+        private bool ShouldTriggerCompletions(int position) => ShouldTriggerCompletions(position, '\0', CharacterOperation.None);
+        private bool ShouldTriggerCompletions(int position, char @char, CharacterOperation kind = CharacterOperation.Inserted)
+        {
+            CompletionTrigger None(CharacterOperation operation)
+            {
+                _logger.LogWarning("Unexpected character operation '{operation}'. Using '{enum}.{member}' instead.", operation, nameof(CharacterOperation), nameof(CharacterOperation.None));
+                return CompletionTrigger.Invoke;
+            }
+
+            CompletionTrigger trigger = kind switch
+            {
+                CharacterOperation.None => CompletionTrigger.Invoke,
+                CharacterOperation.Inserted => CompletionTrigger.CreateInsertionTrigger(@char),
+                CharacterOperation.Deleted => CompletionTrigger.CreateDeletionTrigger(@char),
+                _ => None(kind)
+            };
+            return ShouldTriggerCompletions(position, trigger);
+        }
+
+        private bool ShouldTriggerCompletions(int position, CompletionTrigger completionTrigger)
+        {
+            CompletionService service = CompletionService;
+            return service == null || service.ShouldTriggerCompletion(SourceText, position, completionTrigger);
+        }
+
+        public async ValueTask<IEnumerable<CompletionItem>> GetCompletionsAsync(int position, CancellationToken cancellationToken = default)
+        {
+            if (CompletionService is not CompletionService service)
+            {
+                return [];
+            }
+
+            if (!ShouldTriggerCompletions(position))
+            {
+                _logger.LogDebug("ShouldTriggerCompletionsAsync false, skipping.");
+                return [];
+            }
+
+            CompletionList completions = await service.GetCompletionsAsync(CurrentDocument, position, cancellationToken: cancellationToken).ConfigureAwait(false);
+            TextSpan typedSpan = CompletionService.GetDefaultCompletionListSpan(SourceText, position);
+            string typedText = SourceText.GetSubText(typedSpan).ToString();
+
+            IReadOnlyList<Microsoft.CodeAnalysis.Completion.CompletionItem> filteredItems = typedText.Length != 0
+                ? CompletionService.FilterItems(CurrentDocument, [.. completions.ItemsList], typedText)
+                : completions.ItemsList;
+
+            return filteredItems.Select(x => new CompletionItem(x.DisplayText, x.FilterText, x.SortText, x.InlineDescription, x.Tags, x.Span));
+        }
+
+        public async ValueTask<CompilationResults> Compile(ICollection<Diagnostic> results, CancellationToken cancellationToken = default)
+        {
+            MemoryStream assemblyStream = new();
+            MemoryStream symbolStream = new();
+            Compilation compilation = await CurrentDocument.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false);
+            EmitResult emitResult = compilation.Emit(assemblyStream, symbolStream, cancellationToken: cancellationToken);
+            if (emitResult.Success)
+            {
+                _ = assemblyStream.Seek(0, SeekOrigin.Begin);
+                _ = symbolStream.Seek(0, SeekOrigin.Begin);
+                return new CompilationResults(assemblyStream, symbolStream);
+            }
+            else
+            {
+                if (!_isConsole && _options is CSharpInputOptions { LanguageVersion: >= CSharpLanguageVersion.CSharp9 }
+                    && emitResult.Diagnostics.Any(x => x is { Id: "CS8805", Severity: DiagnosticSeverity.Error }))
+                {
+                    return await ConsoleVersion.Compile(results, cancellationToken).ConfigureAwait(false);
+                }
+                results.AddRange(emitResult.Diagnostics.Select(x => new Diagnostic(x)));
+                return null;
+            }
+        }
+
+        public RoslynCodeSession WithIsConsole(bool isConsole) => new(_code, _options, isConsole, _logger);
+
+        private static async ValueTask<List<MetadataReference>> GetMetadataReferencesAsync(params string[] assemblies)
+        {
+            List<MetadataReference> references = [];
+            using HttpClient client = new() { BaseAddress = new Uri(_baseUrl) };
+            foreach (string assembly in assemblies)
+            {
+                using Stream stream = await client.GetStreamAsync($"{assembly}.wasm").ConfigureAwait(false);
+                byte[] array = await WebcilConverterUtil.ConvertFromWebcilAsync(stream).ConfigureAwait(false);
+                references.Add(MetadataReference.CreateFromImage(array));
+            }
+            return references;
+        }
+
+        private static void GetAnalyzers(string assemblyName, string language, out IEnumerable<DiagnosticAnalyzer> analyzers, out Dictionary<string, List<CodeFixProvider>> providers)
+        {
+            Type[] types = Assembly.Load(new AssemblyName(assemblyName)).GetTypes();
+
+            analyzers = types.Where(x => x.IsSubclassOf(typeof(DiagnosticAnalyzer)) && x is { IsAbstract: false } && x.GetCustomAttributes(typeof(DiagnosticAnalyzerAttribute), true).OfType<DiagnosticAnalyzerAttribute>().Any(x => x.Languages.Contains(language)))
+                             .Select(Activator.CreateInstance)
+                             .OfType<DiagnosticAnalyzer>();
+
+            IEnumerable<CodeFixProvider> codeFixProvider =
+                types.Where(x => x.IsSubclassOf(typeof(CodeFixProvider)) && x is { IsAbstract: false } && x.IsDefined(typeof(ExportCodeFixProviderAttribute)))
+                     .Select(Activator.CreateInstance)
+                     .OfType<CodeFixProvider>();
+
+            providers = [];
+            foreach (CodeFixProvider provider in codeFixProvider)
+            {
+                foreach (string id in provider.FixableDiagnosticIds)
+                {
+                    if (!providers.TryGetValue(id, out List<CodeFixProvider> list))
+                    {
+                        list = [];
+                        providers.Add(id, list);
+                    }
+                    list.Add(provider);
+                }
             }
         }
 
@@ -180,130 +366,6 @@ namespace SharpScript.Common
         //    return (references, code);
         //}
 
-        private void EnsureUpToDate()
-        {
-            if (!_outOfDate)
-            {
-                return;
-            }
-            _currentDocument = _currentDocument.WithText(SourceText);
-            Workspace.TryApplyChanges(_currentDocument.Project.Solution);
-            _outOfDate = false;
-        }
-
-        public RoslynCodeSession SetSourceText(string code)
-        {
-            if (_code != code)
-            {
-                SourceText = SourceText.From(code, Encoding.Default);
-                _code = code;
-                EnsureUpToDate();
-            }
-            return this;
-        }
-
-        public async ValueTask<T> GetDiagnosticsAsync<T>(T results) where T : ICollection<Diagnostic>
-        {
-            Compilation compilation = await CurrentDocument.Project.GetCompilationAsync().ConfigureAwait(false);
-            ImmutableArray<RoslynDiagnostic> diagnostics = await compilation.WithAnalyzers(_analyzers).GetAllDiagnosticsAsync();
-            results.AddRange(!_isConsole && _options is CSharpInputOptions { LanguageVersion: >= CSharpLanguageVersion.CSharp9 } ? diagnostics.Where(x => x is not { Id: "CS8805", Severity: DiagnosticSeverity.Error }).Select(x => new Diagnostic(x)) : diagnostics.Select(x => new Diagnostic(x)));
-            return results;
-        }
-
-        private bool ShouldTriggerCompletions(int position) => ShouldTriggerCompletions(position, '\0', CharacterOperation.None);
-        private bool ShouldTriggerCompletions(int position, char @char, CharacterOperation kind = CharacterOperation.Inserted)
-        {
-            CompletionTrigger None(CharacterOperation operation)
-            {
-                _logger.LogWarning("Unexpected character operation '{operation}'. Using '{enum}.{member}' instead.", operation, nameof(CharacterOperation), nameof(CharacterOperation.None));
-                return CompletionTrigger.Invoke;
-            }
-
-            CompletionTrigger trigger = kind switch
-            {
-                CharacterOperation.None => CompletionTrigger.Invoke,
-                CharacterOperation.Inserted => CompletionTrigger.CreateInsertionTrigger(@char),
-                CharacterOperation.Deleted => CompletionTrigger.CreateDeletionTrigger(@char),
-                _ => None(kind)
-            };
-            return ShouldTriggerCompletions(position, trigger);
-        }
-
-        private bool ShouldTriggerCompletions(int position, CompletionTrigger completionTrigger)
-        {
-            CompletionService service = CompletionService;
-            return service == null || service.ShouldTriggerCompletion(SourceText, position, completionTrigger);
-        }
-
-        public async ValueTask<IEnumerable<CompletionItem>> GetCompletionsAsync(int position)
-        {
-            if (CompletionService is not CompletionService service)
-            {
-                return [];
-            }
-
-            if (!ShouldTriggerCompletions(position))
-            {
-                _logger.LogDebug("ShouldTriggerCompletionsAsync false, skipping.");
-                return [];
-            }
-
-            CompletionList completions = await service.GetCompletionsAsync(CurrentDocument, position).ConfigureAwait(false);
-            TextSpan typedSpan = CompletionService.GetDefaultCompletionListSpan(SourceText, position);
-            string typedText = SourceText.GetSubText(typedSpan).ToString();
-
-            IReadOnlyList<Microsoft.CodeAnalysis.Completion.CompletionItem> filteredItems = typedText.Length != 0
-                ? CompletionService.FilterItems(CurrentDocument, [.. completions.ItemsList], typedText)
-                : completions.ItemsList;
-
-            return filteredItems.Select(x => new CompletionItem(x.DisplayText, x.FilterText, x.SortText, x.InlineDescription, x.Tags, x.Span));
-        }
-
-        public async ValueTask<CompilationResults> Compile(ICollection<Diagnostic> results)
-        {
-            MemoryStream assemblyStream = new();
-            MemoryStream symbolStream = new();
-            Compilation compilation = await CurrentDocument.Project.GetCompilationAsync();
-            EmitResult emitResult = compilation.Emit(assemblyStream, symbolStream);
-            if (emitResult.Success)
-            {
-                assemblyStream.Seek(0, SeekOrigin.Begin);
-                symbolStream.Seek(0, SeekOrigin.Begin);
-                return new CompilationResults(assemblyStream, symbolStream);
-            }
-            else
-            {
-                if (!_isConsole && _options is CSharpInputOptions { LanguageVersion: >= CSharpLanguageVersion.CSharp9}
-                    && emitResult.Diagnostics.Any(x => x is { Id: "CS8805", Severity: DiagnosticSeverity.Error }))
-                {
-                    return await ConsoleVersion.Compile(results);
-                }
-                results.AddRange(emitResult.Diagnostics.Select(x => new Diagnostic(x)));
-                return null;
-            }
-        }
-
-        public RoslynCodeSession WithIsConsole(bool isConsole) => new(_code, _options, isConsole, _logger);
-
-        private static async ValueTask<List<MetadataReference>> GetMetadataReferencesAsync(params string[] assemblies)
-        {
-            List<MetadataReference> references = [];
-            using HttpClient client = new() { BaseAddress = new Uri(_baseUrl) };
-            foreach (string assembly in assemblies)
-            {
-                using Stream stream = await client.GetStreamAsync($"{assembly}.wasm").ConfigureAwait(false);
-                references.Add(MetadataReference.CreateFromImage(WebcilConverterUtil.ConvertFromWebcil(stream)));
-            }
-            return references;
-        }
-
-        private static IEnumerable<DiagnosticAnalyzer> GetAnalyzers(string assemblyName, string language) =>
-            Assembly.Load(new AssemblyName(assemblyName))
-                    .GetTypes()
-                    .Where(x => x.IsSubclassOf(typeof(DiagnosticAnalyzer)) && x is { IsAbstract: false } && x.GetCustomAttributes(typeof(DiagnosticAnalyzerAttribute), true).OfType<DiagnosticAnalyzerAttribute>().Any(x => x.Languages.Contains(language)))
-                    .Select(Activator.CreateInstance)
-                    .OfType<DiagnosticAnalyzer>();
-
         private class PreloadedAnalyzerAssemblyLoader(Assembly assembly) : IAnalyzerAssemblyLoader
         {
             public Assembly LoadFromPath(string fullPath) => assembly;
@@ -315,8 +377,9 @@ namespace SharpScript.Common
     {
         private string _code = code;
 
-        public ValueTask<CompilationResults> Compile(ICollection<Diagnostic> results)
+        public ValueTask<CompilationResults> Compile(ICollection<Diagnostic> results, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             Logger logger = new(results);
             Driver driver = new(logger, isConsole ? Driver.Target.Exe : Driver.Target.Dll, false, false, false);
             try
@@ -324,7 +387,7 @@ namespace SharpScript.Common
                 MemoryStream assemblyStream = new();
                 if (driver.Assemble([_code], assemblyStream))
                 {
-                    assemblyStream.Seek(0, SeekOrigin.Begin);
+                    _ = assemblyStream.Seek(0, SeekOrigin.Begin);
                     return ValueTask.FromResult(new CompilationResults(assemblyStream, null));
                 }
             }
@@ -335,8 +398,9 @@ namespace SharpScript.Common
             return ValueTask.FromResult<CompilationResults>(null);
         }
 
-        public ValueTask<T> GetDiagnosticsAsync<T>(T results) where T: ICollection<Diagnostic>
+        public ValueTask<T> GetDiagnosticsAsync<T>(T results, CancellationToken cancellationToken = default) where T : ICollection<Diagnostic>
         {
+            cancellationToken.ThrowIfCancellationRequested();
             Logger logger = new(results);
             Driver driver = new(logger, isConsole ? Driver.Target.Exe : Driver.Target.Dll, false, false, false);
 
@@ -374,10 +438,10 @@ namespace SharpScript.Common
 
     public interface ICodeSession
     {
-        ValueTask<T> GetDiagnosticsAsync<T>(T results) where T : ICollection<Diagnostic>;
-        ValueTask<IEnumerable<CompletionItem>> GetCompletionsAsync(int position) => ValueTask.FromResult<IEnumerable<CompletionItem>>([]);
+        ValueTask<T> GetDiagnosticsAsync<T>(T results, CancellationToken cancellationToken = default) where T : ICollection<Diagnostic>;
+        ValueTask<IEnumerable<CompletionItem>> GetCompletionsAsync(int position, CancellationToken cancellationToken = default) => ValueTask.FromResult<IEnumerable<CompletionItem>>([]);
         ICodeSession SetSourceText(string code);
-        ValueTask<CompilationResults> Compile(ICollection<Diagnostic> results);
+        ValueTask<CompilationResults> Compile(ICollection<Diagnostic> results, CancellationToken cancellationToken = default);
     }
 
     public interface ICodeSession<out TSelf> : ICodeSession where TSelf : ICodeSession
@@ -399,20 +463,47 @@ namespace SharpScript.Common
         public LinePositionSpan Location { get; }
         public string Message => message;
         public string Severity => severity.ToString();
+        public CodeAction[] Actions { get; } = [];
 
         public Diagnostic(Exception exception) : this(DiagnosticSeverity.Error, exception.Message) { }
 
-        public Diagnostic(RoslynDiagnostic diagnostic) : this(diagnostic.Severity, diagnostic.GetMessage())
+        public Diagnostic(RoslynDiagnostic diagnostic, params CodeAction[] actions) : this(diagnostic.Severity, diagnostic.GetMessage())
         {
             ID = diagnostic.Id;
             Location = diagnostic.Location.GetLineSpan().Span;
-            Console.WriteLine(diagnostic.GetType());
+            Actions = actions;
         }
 
         public Diagnostic(Mono.ILASM.Location location, DiagnosticSeverity severity, string message) : this(severity, message)
         {
             LinePosition position = new(location.line - 1, location.column);
             Location = new LinePositionSpan(position, position);
+        }
+    }
+
+    public class CodeAction(RoslynCodeAction action, RoslynCodeSession session)
+    {
+        public string Title => action.Title;
+        public DotNetObjectReference<CodeAction> Action => DotNetObjectReference.Create(this);
+
+        [JSInvokable]
+        public async Task<string> InvokeAsync()
+        {
+            try
+            {
+                ImmutableArray<CodeActionOperation> operations = await action.GetOperationsAsync(default).ConfigureAwait(false);
+                foreach (CodeActionOperation operation in operations)
+                {
+                    operation.Apply(session.Workspace, default);
+                }
+                await session.RefreshSourceTextAsync().ConfigureAwait(false);
+                return session.SourceCode;
+            }
+            catch (Exception ex)
+            {
+                session._logger.LogError(ex, "Error while applying code action '{title}'.", action.Title);
+                return null;
+            }
         }
     }
 

@@ -8,6 +8,7 @@ using System.IO;
 using System.Reflection;
 using System.Runtime.Loader;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using CSharpLanguageVersion = Microsoft.CodeAnalysis.CSharp.LanguageVersion;
 using LanguageVersion = ICSharpCode.Decompiler.CSharp.LanguageVersion;
@@ -27,7 +28,7 @@ namespace SharpScript.Common
         {
             get
             {
-                if (_codeSession  == null)
+                if (_codeSession == null)
                 {
                     bool isConsole = OutputType == OutputType.Run;
                     switch (InputOptions)
@@ -107,13 +108,12 @@ namespace SharpScript.Common
             }
         }
 
-        private async ValueTask<(CompilationResults streams, List<Diagnostic> diagnostics)> CompilateAsync(string code)
+        private async ValueTask<(CompilationResults streams, List<Diagnostic> diagnostics)> CompilateAsync(string code, CancellationToken cancellationToken = default)
         {
             List<Diagnostic> results = [];
             try
             {
-                await Task.Yield();
-                CompilationResults streams = await CodeSession.SetSourceText(code).Compile(results).ConfigureAwait(false);
+                CompilationResults streams = await CodeSession.SetSourceText(code).Compile(results, cancellationToken).ConfigureAwait(false);
                 return (streams, results);
             }
             catch (AggregateException aex) when (aex.InnerExceptions?.Count > 1)
@@ -138,14 +138,13 @@ namespace SharpScript.Common
             return (null, results);
         }
 
-        public async ValueTask<List<Diagnostic>> GetDiagnosticsAsync(string code)
+        public async ValueTask<List<Diagnostic>> GetDiagnosticsAsync(string code, CancellationToken cancellationToken = default)
         {
             List<Diagnostic> results = [];
             try
             {
-                await Task.Yield();
                 bool isConsole = OutputType == OutputType.Run;
-                results = await CodeSession.SetSourceText(code).GetDiagnosticsAsync(results).ConfigureAwait(false);
+                results = await CodeSession.SetSourceText(code).GetDiagnosticsAsync(results, cancellationToken).ConfigureAwait(false);
                 return results;
             }
             catch (AggregateException aex) when (aex.InnerExceptions?.Count > 1)
@@ -166,17 +165,17 @@ namespace SharpScript.Common
             return results;
         }
 
-        public ValueTask<IEnumerable<CompletionItem>> GetCompletionsAsync(string code, int position)
+        public ValueTask<IEnumerable<CompletionItem>> GetCompletionsAsync(string code, int position, CancellationToken cancellationToken = default)
         {
             return InputOptions is RoslynOptions
-                ? CodeSession.SetSourceText(code).GetCompletionsAsync(position)
+                ? CodeSession.SetSourceText(code).GetCompletionsAsync(position, cancellationToken)
                 : ValueTask.FromResult<IEnumerable<CompletionItem>>([]);
         }
 
-        private async ValueTask<string> DecompileAsync(CompilationResults streams) => OutputOptions switch
+        private ValueTask<string> DecompileAsync(CompilationResults streams) => OutputOptions switch
         {
-            CSharpOutputOptions csharp => await Decompiler.CSharpDecompileAsync(streams, csharp).ConfigureAwait(false),
-            ILOutputOptions => await Decompiler.ILDecompileAsync(streams).ConfigureAwait(false),
+            CSharpOutputOptions csharp => Decompiler.CSharpDecompileAsync(streams, csharp),
+            ILOutputOptions => Decompiler.ILDecompileAsync(streams),
             _ => throw new Exception("Invalid output type.")
         };
 
@@ -195,7 +194,7 @@ namespace SharpScript.Common
                     Assembly assembly = context.LoadFromStream(assemblyStream);
                     if (assembly.EntryPoint is MethodInfo main)
                     {
-                        string[][] args = main.GetParameters().Length > 0 ? [Array.Empty<string>()] : null;
+                        string[][] args = main.GetParameters().Length > 0 ? [[]] : null;
                         TextWriter temp = Console.Out;
                         await using StringWriter writer = new(output);
                         Console.SetOut(writer);
@@ -227,11 +226,11 @@ namespace SharpScript.Common
             return results;
         }
 
-        public async ValueTask<CompileResult> ProcessAsync(string code)
+        public async ValueTask<CompileResult> ProcessAsync(string code, CancellationToken cancellationToken = default)
         {
             try
             {
-                (CompilationResults assemblyStream, List<Diagnostic> diagnostics) = await CompilateAsync(code).ConfigureAwait(false);
+                (CompilationResults assemblyStream, List<Diagnostic> diagnostics) = await CompilateAsync(code, cancellationToken).ConfigureAwait(false);
                 if (assemblyStream != null)
                 {
                     switch (OutputType)
@@ -363,7 +362,7 @@ namespace SharpScript.Common
             get
             {
                 List<LanguageVersion> list = [.. Enum.GetValues<LanguageVersion>()];
-                list.Remove(LanguageVersion.Preview);
+                _ = list.Remove(LanguageVersion.Preview);
                 return list;
             }
         }

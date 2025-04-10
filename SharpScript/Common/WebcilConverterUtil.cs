@@ -1,11 +1,12 @@
-﻿using System;
+﻿using SharpScript.Common.NT_Structs;
+using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
-using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
-using SharpScript.Common.NT_Structs;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace SharpScript.Common
 {
@@ -40,17 +41,17 @@ namespace SharpScript.Common
         /// <param name="inputStream">The input sStream.</param>
         /// <param name="wrappedInWebAssembly">The Webcil is wrapped in Wasm [default value is <c>true</c>].</param>
         /// <returns>A byte[] Portable Executable</returns>
-        public static byte[] ConvertFromWebcil(Stream inputStream, bool wrappedInWebAssembly = true)
+        public static async ValueTask<byte[]> ConvertFromWebcilAsync(Stream inputStream, bool wrappedInWebAssembly = true, CancellationToken cancellationToken = default)
         {
             Stream webcilStream;
             if (wrappedInWebAssembly)
             {
-                using WasmWebcilUnwrapper unwrapper = new(inputStream);
+                await using WasmWebcilUnwrapper unwrapper = new(inputStream);
                 webcilStream = new MemoryStream();
-                unwrapper.WriteUnwrapped(webcilStream);
+                await unwrapper.WriteUnwrappedAsync(webcilStream, cancellationToken).ConfigureAwait(false);
 
-                webcilStream.Flush();
-                webcilStream.Seek(0, SeekOrigin.Begin);
+                await webcilStream.FlushAsync(cancellationToken).ConfigureAwait(false);
+                _ = webcilStream.Seek(0, SeekOrigin.Begin);
             }
             else
             {
@@ -58,19 +59,19 @@ namespace SharpScript.Common
             }
 
             // These are Webcil variables
-            WebcilHeader webcilHeader = ReadHeader(webcilStream);
-            ImmutableArray<WebcilSectionHeader> webcilSectionHeaders = ReadSectionHeaders(webcilStream, webcilHeader.coff_sections);
-            int webcilSectionHeadersCount = webcilSectionHeaders.Length;
+            WebcilHeader webcilHeader = await ReadHeaderAsync(webcilStream, cancellationToken).ConfigureAwait(false);
+            List<WebcilSectionHeader> webcilSectionHeaders = await ReadSectionHeadersAsync(webcilStream, webcilHeader.coff_sections, cancellationToken).ConfigureAwait(false);
+            int webcilSectionHeadersCount = webcilSectionHeaders.Count;
             uint webcilSectionHeadersSizeOfRawData = (uint)webcilSectionHeaders.Sum(x => x.SizeOfRawData);
 
             // These are PE (Portable Executable) variables
-            int sectionStart = SizeofDOSHeader + SizeofMSDOS + SizeofNTHeaders + webcilSectionHeadersCount * SizeofSectionHeader; // 496
+            int sectionStart = SizeofDOSHeader + SizeofMSDOS + SizeofNTHeaders + (webcilSectionHeadersCount * SizeofSectionHeader); // 496
             int sectionStartRounded = sectionStart.RoundToNearest();
             byte[] extraBytesAfterSections = new byte[sectionStartRounded - sectionStart];
             int pointerToRawDataFirstSectionHeader = webcilSectionHeaders[0].PointerToRawData;
             int pointerToRawDataOffsetBetweenWebcilAndPE = sectionStartRounded - pointerToRawDataFirstSectionHeader;
 
-            using MemoryStream peStream = new();
+            await using MemoryStream peStream = new();
 
             IMAGE_DOS_HEADER DOSHeader = new()
             {
@@ -94,9 +95,9 @@ namespace SharpScript.Common
                 ReservedWords2 = DOSReservedWords2,
                 FileAddressOfNewExeHeader = 0x80
             };
-            peStream.WriteStruct(DOSHeader);
+            await peStream.WriteStructAsync(DOSHeader, cancellationToken).ConfigureAwait(false);
 
-            peStream.Write(MSDOS);
+            await peStream.WriteAsync(MSDOS, cancellationToken).ConfigureAwait(false);
 
             IMAGE_NT_HEADERS32 IMAGE_NT_HEADERS32 = new()
             {
@@ -164,7 +165,7 @@ namespace SharpScript.Common
                     ]
                 }
             };
-            peStream.WriteStruct(IMAGE_NT_HEADERS32);
+            await peStream.WriteStructAsync(IMAGE_NT_HEADERS32, cancellationToken).ConfigureAwait(false);
 
             IMAGE_SECTION_HEADER textSectionHeader = new()
             {
@@ -175,7 +176,7 @@ namespace SharpScript.Common
                 PointerToRawData = webcilSectionHeaders[0].GetCorrectedPointerToRawData(pointerToRawDataOffsetBetweenWebcilAndPE),
                 Characteristics = 0x60000020
             };
-            peStream.WriteStruct(textSectionHeader);
+            await peStream.WriteStructAsync(textSectionHeader, cancellationToken).ConfigureAwait(false);
 
             IMAGE_SECTION_HEADER rsrcSectionHeader = new()
             {
@@ -186,7 +187,7 @@ namespace SharpScript.Common
                 PointerToRawData = webcilSectionHeaders[1].GetCorrectedPointerToRawData(pointerToRawDataOffsetBetweenWebcilAndPE),
                 Characteristics = 0x40000040
             };
-            peStream.WriteStruct(rsrcSectionHeader);
+            await peStream.WriteStructAsync(rsrcSectionHeader, cancellationToken).ConfigureAwait(false);
 
             IMAGE_SECTION_HEADER relocSectionHeader = new()
             {
@@ -197,7 +198,7 @@ namespace SharpScript.Common
                 PointerToRawData = webcilSectionHeaders[2].GetCorrectedPointerToRawData(pointerToRawDataOffsetBetweenWebcilAndPE),
                 Characteristics = 0x42000040
             };
-            peStream.WriteStruct(relocSectionHeader);
+            await peStream.WriteStructAsync(relocSectionHeader, cancellationToken).ConfigureAwait(false);
 
             if (extraBytesAfterSections.Length > 0)
             {
@@ -208,21 +209,21 @@ namespace SharpScript.Common
             foreach (WebcilSectionHeader webcilSectionHeader in webcilSectionHeaders)
             {
                 byte[] buffer = new byte[webcilSectionHeader.SizeOfRawData];
-                webcilStream.Seek(webcilSectionHeader.PointerToRawData, SeekOrigin.Begin);
+                _ = webcilStream.Seek(webcilSectionHeader.PointerToRawData, SeekOrigin.Begin);
                 webcilStream.ReadExactly(buffer);
 
                 peStream.Write(buffer, 0, buffer.Length);
             }
 
             peStream.Flush();
-            peStream.Seek(0, SeekOrigin.Begin);
+            _ = peStream.Seek(0, SeekOrigin.Begin);
 
             return peStream.ToArray();
         }
 
-        private static WebcilHeader ReadHeader(Stream webcilStream)
+        private static async ValueTask<WebcilHeader> ReadHeaderAsync(Stream webcilStream, CancellationToken cancellationToken = default)
         {
-            WebcilHeader webcilHeader = ReadStructure<WebcilHeader>(webcilStream);
+            WebcilHeader webcilHeader = await ReadStructureAsync<WebcilHeader>(webcilStream, cancellationToken).ConfigureAwait(false);
 
             if (!BitConverter.IsLittleEndian)
             {
@@ -238,19 +239,19 @@ namespace SharpScript.Common
             return webcilHeader;
         }
 
-        private static ImmutableArray<WebcilSectionHeader> ReadSectionHeaders(Stream webcilStream, int sectionsHeaders)
+        private static async ValueTask<List<WebcilSectionHeader>> ReadSectionHeadersAsync(Stream webcilStream, int sectionsHeaders, CancellationToken cancellationToken = default)
         {
             List<WebcilSectionHeader> result = [];
             for (int i = 0; i < sectionsHeaders; i++)
             {
-                result.Add(ReadSectionHeader(webcilStream));
+                result.Add(await ReadSectionHeaderAsync(webcilStream, cancellationToken).ConfigureAwait(false));
             }
-            return [.. result];
+            return result;
         }
 
-        private static WebcilSectionHeader ReadSectionHeader(Stream webcilStream)
+        private static async ValueTask<WebcilSectionHeader> ReadSectionHeaderAsync(Stream webcilStream, CancellationToken cancellationToken = default)
         {
-            WebcilSectionHeader sectionHeader = ReadStructure<WebcilSectionHeader>(webcilStream);
+            WebcilSectionHeader sectionHeader = await ReadStructureAsync<WebcilSectionHeader>(webcilStream, cancellationToken).ConfigureAwait(false);
 
             if (!BitConverter.IsLittleEndian)
             {
@@ -272,7 +273,7 @@ namespace SharpScript.Common
                       sizeof(uint) + // 4 byte signature
                       SizeofFileHeader +
                       SizeofOptionalHeader + // size of optional header
-                      numSectionHeaders * SizeofSectionHeader; // size of all section headers
+                      (numSectionHeaders * SizeofSectionHeader); // size of all section headers
             return (uint)soh.RoundToNearest();
         }
 
@@ -289,20 +290,26 @@ namespace SharpScript.Common
             return (uint)totalSeconds;
         }
 
-        private static T ReadStructure<T>(Stream s) where T : unmanaged
+        private static async ValueTask<T> ReadStructureAsync<T>(Stream s, CancellationToken cancellationToken = default) where T : unmanaged
         {
-            T structure = default;
+            int size;
             unsafe
             {
-                byte* p = (byte*)&structure;
-                Span<byte> buffer = new(p, sizeof(T));
-                int read = s.Read(buffer);
-                if (read != sizeof(T))
+                size = sizeof(T);
+            }
+            byte[] buffer = new byte[size];
+            int read = await s.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
+            if (read != size)
+            {
+                throw new InvalidOperationException("Couldn't read the full structure from the stream.");
+            }
+            unsafe
+            {
+                fixed (byte* ptr = buffer)
                 {
-                    throw new InvalidOperationException("Couldn't read the full structure from the stream.");
+                    return *(T*)ptr;
                 }
             }
-            return structure;
         }
 
         internal static int RoundToNearest(this int number, int nearest = 512)
@@ -319,13 +326,13 @@ namespace SharpScript.Common
             return remainder >= halfNearest ? number + nearest - remainder : number - remainder;
         }
 
-        internal static void WriteStruct<T>(this Stream stream, T structData) where T : struct
+        internal static async ValueTask WriteStructAsync<T>(this Stream stream, T structData, CancellationToken cancellationToken = default) where T : struct
         {
             byte[] bytes = StructToBytes(structData);
-            stream.Write(bytes);
+            await stream.WriteAsync(bytes, cancellationToken).ConfigureAwait(false);
         }
 
-        private static byte[] StructToBytes<T>(T structData) where T : struct
+        private static unsafe byte[] StructToBytes<T>(T structData) where T : struct
         {
             int size = Marshal.SizeOf(structData);
             byte[] byteArray = new byte[size];

@@ -1,11 +1,15 @@
 ﻿using System;
 using System.IO;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace SharpScript.Common
 {
-    internal class WasmWebcilUnwrapper(Stream wasmStream) : IDisposable
+    internal sealed class WasmWebcilUnwrapper(Stream wasmStream) : IDisposable, IAsyncDisposable
     {
+        private bool disposed;
+
         /// <summary>
         /// Everything from the above wat module before the data section
         /// extracted by wasm-reader -s wrapper.wasm
@@ -18,21 +22,21 @@ namespace SharpScript.Common
             0x0a, 0x1b, 0x02, 0x0c, 0x00, 0x20, 0x00, 0x41, 0x00, 0x41, 0x04, 0xfc, 0x08, 0x00, 0x00, 0x0b, 0x0c, 0x00, 0x20, 0x00, 0x41, 0x00, 0x20, 0x01, 0xfc, 0x08, 0x01, 0x00, 0x0b,
         ];
 
-        public void WriteUnwrapped(Stream outputStream)
+        public async ValueTask WriteUnwrappedAsync(Stream outputStream, CancellationToken cancellationToken = default)
         {
-            ValidateWasmPrefix();
+            await ValidateWasmPrefixAsync(cancellationToken).ConfigureAwait(false);
 
             using BinaryReader reader = new(wasmStream, System.Text.Encoding.UTF8, leaveOpen: true);
             byte[] bytes = ReadDataSection(reader);
-            outputStream.Write(bytes);
+            await outputStream.WriteAsync(bytes, cancellationToken).ConfigureAwait(false);
         }
 
-        private void ValidateWasmPrefix()
+        private async ValueTask ValidateWasmPrefixAsync(CancellationToken cancellationToken = default)
         {
             // Create a byte array matching the length of the prefix.
             byte[] prefix = s_wasmWrapperPrefix;
             byte[] buffer = new byte[prefix.Length];
-            int bytesRead = wasmStream.Read(buffer, 0, buffer.Length);
+            int bytesRead = await wasmStream.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
             if (bytesRead < buffer.Length)
             {
                 throw new InvalidOperationException("Unable to read Wasm prefix.");
@@ -48,7 +52,7 @@ namespace SharpScript.Common
         private static void SkipSection(BinaryReader reader)
         {
             uint size = ULEB128Decode(reader);
-            reader.BaseStream.Seek(size, SeekOrigin.Current);
+            _ = reader.BaseStream.Seek(size, SeekOrigin.Current);
         }
 
         private static byte[] ReadDataSection(BinaryReader reader)
@@ -75,7 +79,7 @@ namespace SharpScript.Common
             }
 
             // Read and ignore the size of the data section.
-            ULEB128Decode(reader);
+            _ = ULEB128Decode(reader);
 
             // Read the number of segments.
             int segmentsCount = (int)ULEB128Decode(reader);
@@ -99,7 +103,7 @@ namespace SharpScript.Common
                 }
 
                 // Skip other segments.
-                reader.BaseStream.Seek(segmentSize, SeekOrigin.Current);
+                _ = reader.BaseStream.Seek(segmentSize, SeekOrigin.Current);
             }
 
             throw new Exception("Unable to read DataSection.");
@@ -129,9 +133,41 @@ namespace SharpScript.Common
             return result;
         }
 
+        private void Dispose(bool disposing)
+        {
+            if (!disposed)
+            {
+                if (disposing)
+                {
+                    wasmStream.Dispose();
+                }
+                disposed = true;
+            }
+        }
+
+        private async ValueTask DisposeAsyncCore(bool disposing)
+        {
+            if (!disposed)
+            {
+                if (disposing)
+                {
+                    await wasmStream.DisposeAsync().ConfigureAwait(false);
+                }
+                Dispose(disposing: false);
+                disposed = true;
+            }
+        }
+
         public void Dispose()
         {
-            wasmStream.Dispose();
+            Dispose(disposing: true);
+            GC.SuppressFinalize(this);
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            await DisposeAsyncCore(disposing: true).ConfigureAwait(false);
+            GC.SuppressFinalize(this);
         }
     }
 }
