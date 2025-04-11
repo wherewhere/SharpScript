@@ -4,6 +4,7 @@ using Microsoft.CodeAnalysis.CodeFixes;
 using Microsoft.CodeAnalysis.Completion;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Emit;
+using Microsoft.CodeAnalysis.QuickInfo;
 using Microsoft.CodeAnalysis.Text;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -21,6 +22,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using CSharpLanguageVersion = Microsoft.CodeAnalysis.CSharp.LanguageVersion;
 using RoslynCodeAction = Microsoft.CodeAnalysis.CodeActions.CodeAction;
+using RoslynCompletionItem = Microsoft.CodeAnalysis.Completion.CompletionItem;
 using RoslynDiagnostic = Microsoft.CodeAnalysis.Diagnostic;
 
 namespace SharpScript.Common
@@ -96,6 +98,23 @@ namespace SharpScript.Common
                 }
 
                 return _completionService;
+            }
+        }
+
+        private QuickInfoService _quickInfoService;
+        public QuickInfoService QuickInfoService
+        {
+            get
+            {
+                EnsureUpToDate();
+                _quickInfoService ??= QuickInfoService.GetService(CurrentDocument);
+
+                if (_quickInfoService == null)
+                {
+                    _logger.LogWarning("Could not find quick info service for document '{name}'.", CurrentDocument.Name);
+                }
+
+                return _quickInfoService;
             }
         }
 
@@ -256,11 +275,18 @@ namespace SharpScript.Common
             TextSpan typedSpan = CompletionService.GetDefaultCompletionListSpan(SourceText, position);
             string typedText = SourceText.GetSubText(typedSpan).ToString();
 
-            IReadOnlyList<Microsoft.CodeAnalysis.Completion.CompletionItem> filteredItems = typedText.Length != 0
+            IReadOnlyList<RoslynCompletionItem> filteredItems = typedText.Length != 0
                 ? CompletionService.FilterItems(CurrentDocument, [.. completions.ItemsList], typedText)
                 : completions.ItemsList;
 
-            return filteredItems.Select(x => new CompletionItem(x.DisplayText, x.FilterText, x.SortText, x.InlineDescription, x.Tags, x.Span));
+            return filteredItems.Select(x => new CompletionItem(x));
+        }
+
+        public async ValueTask<InfoTipItem> GetInfoTipAsync(int position, CancellationToken cancellationToken = default)
+        {
+            QuickInfoItem info = await QuickInfoService.GetQuickInfoAsync(CurrentDocument, position, cancellationToken).ConfigureAwait(false);
+            if (info is null or { Sections.IsEmpty: true }) { return default; }
+            return new InfoTipItem(info);
         }
 
         public async ValueTask<CompilationResults> Compile(ICollection<Diagnostic> results, CancellationToken cancellationToken = default)
@@ -440,6 +466,7 @@ namespace SharpScript.Common
     {
         ValueTask<T> GetDiagnosticsAsync<T>(T results, CancellationToken cancellationToken = default) where T : ICollection<Diagnostic>;
         ValueTask<IEnumerable<CompletionItem>> GetCompletionsAsync(int position, CancellationToken cancellationToken = default) => ValueTask.FromResult<IEnumerable<CompletionItem>>([]);
+        ValueTask<InfoTipItem> GetInfoTipAsync(int position, CancellationToken cancellationToken = default) => ValueTask.FromResult<InfoTipItem>(default);
         ICodeSession SetSourceText(string code);
         ValueTask<CompilationResults> Compile(ICollection<Diagnostic> results, CancellationToken cancellationToken = default);
     }
@@ -517,5 +544,23 @@ namespace SharpScript.Common
         }
     }
 
-    public record struct CompletionItem(string DisplayText, string FilterText, string SortText, string InlineDescription, ImmutableArray<string> Tags, TextSpan Span);
+    public record struct CompletionItem(string DisplayText, string FilterText, string SortText, string InlineDescription, ImmutableArray<string> Tags, TextSpan Span)
+    {
+        public CompletionItem(RoslynCompletionItem item) : this(item.DisplayText, item.FilterText, item.SortText, item.InlineDescription, item.Tags, item.Span) { }
+    }
+
+    public record struct InfoTipItem(ImmutableArray<string> Tags, TextSpan Span, params InfoTipSection[] Sections)
+    {
+        public InfoTipItem(QuickInfoItem item) : this(item.Tags, item.Span, [.. item.Sections.Select(x => new InfoTipSection(x))]) { }
+    }
+
+    public record struct InfoTipSection(string Kind, params InfoTipTaggedText[] Parts)
+    {
+        public InfoTipSection(QuickInfoSection section) : this(section.Kind, [.. section.TaggedParts.Select(x => new InfoTipTaggedText(x))]) { }
+    }
+
+    public record struct InfoTipTaggedText(string Tag, string Text)
+    {
+        public InfoTipTaggedText(TaggedText text) : this(text.Tag, text.Text) { }
+    }
 }

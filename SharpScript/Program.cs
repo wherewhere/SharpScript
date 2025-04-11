@@ -36,6 +36,9 @@ namespace SharpScript
         public static Task<IEnumerable<CompletionItem>> GetCompletionsAsync(string code, int position) => Compiler.GetCompletionsAsync(code, position).AsTask();
 
         [JSInvokable]
+        public static Task<InfoTipItem> GetInfoTipAsync(string code, int position) => Compiler.GetInfoTipAsync(code, position).AsTask();
+
+        [JSInvokable]
         public static IEnumerable<string> GetLanguageTypes() => Compiler.LanguageTypes.Select(x => x.ToString());
 
         [JSInvokable]

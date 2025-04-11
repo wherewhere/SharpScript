@@ -172,6 +172,13 @@ namespace SharpScript.Common
                 : ValueTask.FromResult<IEnumerable<CompletionItem>>([]);
         }
 
+        public ValueTask<InfoTipItem> GetInfoTipAsync(string code, int position, CancellationToken cancellationToken = default)
+        {
+            return InputOptions is RoslynOptions
+                ? CodeSession.SetSourceText(code).GetInfoTipAsync(position, cancellationToken)
+                : ValueTask.FromResult<InfoTipItem>(default);
+        }
+
         private ValueTask<string> DecompileAsync(CompilationResults streams) => OutputOptions switch
         {
             CSharpOutputOptions csharp => Decompiler.CSharpDecompileAsync(streams, csharp),
