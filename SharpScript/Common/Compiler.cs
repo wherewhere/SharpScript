@@ -304,8 +304,10 @@ namespace SharpScript.Common
                 case CSharpInputOptions csharp:
                     compilation = new CSharpCompilationOptions(
                         isConsole ? OutputKind.ConsoleApplication : OutputKind.DynamicallyLinkedLibrary,
+                        optimizationLevel: OptimizationLevel.Release,
                         allowUnsafe: true,
-                        concurrentBuild: false);
+                        concurrentBuild: false,
+                        nullableContextOptions: NullableContextOptions.Enable);
                     parse = new CSharpParseOptions(
                         csharp.LanguageVersion,
                         DocumentationMode.Parse,
