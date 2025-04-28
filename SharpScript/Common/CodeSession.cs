@@ -16,8 +16,10 @@ using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
+using System.Net.Http.Json;
 using System.Reflection;
 using System.Text;
+using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using CSharpLanguageVersion = Microsoft.CodeAnalysis.CSharp.LanguageVersion;
@@ -27,7 +29,7 @@ using RoslynDiagnostic = Microsoft.CodeAnalysis.Diagnostic;
 
 namespace SharpScript.Common
 {
-    public sealed class RoslynCodeSession : ICodeSession<RoslynCodeSession>
+    public sealed partial class RoslynCodeSession : ICodeSession<RoslynCodeSession>
     {
         private static readonly SourceText EmptySourceText = SourceText.From(string.Empty);
         private static string _baseUrl;
@@ -148,12 +150,13 @@ namespace SharpScript.Common
             _analyzers = [.. analyzers];
         }
 
-        public static async ValueTask InitAsync(string baseUrl)
+        public static async ValueTask InitAsync(string baseUrl, ILogger<RoslynCodeSession> logger)
         {
             _baseUrl = baseUrl;
             if (References?.Count is not > 0)
             {
                 References = await GetMetadataReferencesAsync(
+                    logger,
                     "System.Runtime",
                     "System.Private.CoreLib",
                     "System.Console",
@@ -175,8 +178,9 @@ namespace SharpScript.Common
         private void EnsureUpToDate()
         {
             if (!_outOfDate) { return; }
-            _currentDocument = _currentDocument.WithText(SourceText);
-            _ = Workspace.TryApplyChanges(_currentDocument.Project.Solution);
+            Document document = _currentDocument.WithText(SourceText);
+            _ = Workspace.TryApplyChanges(document.Project.Solution);
+            _currentDocument = Workspace.CurrentSolution.GetDocument(_currentDocument.Id);
             _outOfDate = false;
         }
 
@@ -186,11 +190,20 @@ namespace SharpScript.Common
             return this;
         }
 
-        public async Task RefreshSourceTextAsync(CancellationToken cancellationToken = default)
+        public async ValueTask<IReadOnlyList<TextChange>> RollbackWorkspaceChangesAsync()
         {
+            Project oldProject = _currentDocument.Project;
+            Project newProject = Workspace.CurrentSolution.GetProject(oldProject.Id)!;
+            if (newProject == oldProject)
+            {
+                return [];
+            }
+
+            SourceText newText = await newProject.GetDocument(_currentDocument.Id).GetTextAsync().ConfigureAwait(false);
+            Workspace.TryApplyChanges(oldProject.Solution);
             _currentDocument = Workspace.CurrentSolution.GetDocument(_currentDocument.Id);
-            SourceText = await _currentDocument.GetTextAsync(cancellationToken).ConfigureAwait(false);
-            _code = SourceText.ToString();
+
+            return newText.GetTextChanges(SourceText);
         }
 
         public async ValueTask<T> GetDiagnosticsAsync<T>(T results, CancellationToken cancellationToken = default) where T : ICollection<Diagnostic>
@@ -279,8 +292,11 @@ namespace SharpScript.Common
                 ? CompletionService.FilterItems(CurrentDocument, [.. completions.ItemsList], typedText)
                 : completions.ItemsList;
 
-            return filteredItems.Select(x => new CompletionItem(x));
+            return filteredItems.Select(x => new CompletionItem(x, this));
         }
+
+        public Task<ImmutableArray<TaggedText>> GetCompletionDescriptionAsync(RoslynCompletionItem item, CancellationToken cancellationToken = default) =>
+            _completionService.GetDescriptionAsync(_currentDocument, item, cancellationToken).ContinueWith(x => x.Result.TaggedParts);
 
         public async ValueTask<InfoTipItem> GetInfoTipAsync(int position, CancellationToken cancellationToken = default)
         {
@@ -315,15 +331,47 @@ namespace SharpScript.Common
 
         public RoslynCodeSession WithIsConsole(bool isConsole) => new(_code, _options, isConsole, _logger);
 
-        private static async ValueTask<List<MetadataReference>> GetMetadataReferencesAsync(params string[] assemblies)
+        private static async ValueTask<List<MetadataReference>> GetMetadataReferencesAsync(ILogger<RoslynCodeSession> logger, params string[] assemblies)
         {
             List<MetadataReference> references = [];
             using HttpClient client = new() { BaseAddress = new Uri(_baseUrl) };
+            BlazorBoot boot = await client.GetFromJsonAsync("blazor.boot.json", SourceGenerationContext.Default.BlazorBoot).ConfigureAwait(false);
             foreach (string assembly in assemblies)
             {
-                using Stream stream = await client.GetStreamAsync($"{assembly}.wasm").ConfigureAwait(false);
-                byte[] array = await WebcilConverterUtil.ConvertFromWebcilAsync(stream).ConfigureAwait(false);
-                references.Add(MetadataReference.CreateFromImage(array));
+                try
+                {
+                    string fileName = $"{assembly}.wasm";
+                    if (boot.Resources.Assembly.ContainsKey(fileName))
+                    {
+                        using Stream stream = await client.GetStreamAsync(fileName).ConfigureAwait(false);
+                        byte[] array = await WebcilConverterUtil.ConvertFromWebcilAsync(stream).ConfigureAwait(false);
+                        references.Add(MetadataReference.CreateFromImage(array, documentation: await CreateDocumentation().ConfigureAwait(false)));
+                        async ValueTask<XmlDocumentationProvider> CreateDocumentation()
+                        {
+                            try
+                            {
+                                byte[] bytes = await client.GetByteArrayAsync($"{assembly}.xml");
+                                if (bytes?.Length > 0)
+                                {
+                                    return XmlDocumentationProvider.CreateFromBytes(bytes);
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                logger.LogTrace(ex, "The documentation for '{assembly}' was not found.", assembly);
+                            }
+                            return null;
+                        }
+                    }
+                    else
+                    {
+                        logger.LogWarning("The assembly '{assembly}' was not found.", assembly);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "The reference for '{assembly}' was not found.", assembly);
+                }
             }
             return references;
         }
@@ -392,11 +440,20 @@ namespace SharpScript.Common
         //    return (references, code);
         //}
 
-        private class PreloadedAnalyzerAssemblyLoader(Assembly assembly) : IAnalyzerAssemblyLoader
+        private sealed class BlazorBoot
         {
-            public Assembly LoadFromPath(string fullPath) => assembly;
-            void IAnalyzerAssemblyLoader.AddDependencyLocation(string fullPath) { }
+            [JsonPropertyName("resources")]
+            public Resources Resources { get; init; }
         }
+
+        private sealed class Resources
+        {
+            [JsonPropertyName("assembly")]
+            public Dictionary<string, string> Assembly { get; init; }
+        }
+
+        [JsonSerializable(typeof(BlazorBoot))]
+        private sealed partial class SourceGenerationContext : JsonSerializerContext;
     }
 
     public sealed class ILCodeSession(string code, bool isConsole) : ICodeSession<ILCodeSession>
@@ -514,7 +571,7 @@ namespace SharpScript.Common
         public DotNetObjectReference<CodeAction> Action => DotNetObjectReference.Create(this);
 
         [JSInvokable]
-        public async Task<string> InvokeAsync()
+        public async Task<IReadOnlyList<TextChange>> InvokeAsync()
         {
             try
             {
@@ -523,8 +580,7 @@ namespace SharpScript.Common
                 {
                     operation.Apply(session.Workspace, default);
                 }
-                await session.RefreshSourceTextAsync().ConfigureAwait(false);
-                return session.SourceCode;
+                return await session.RollbackWorkspaceChangesAsync().ConfigureAwait(false);
             }
             catch (Exception ex)
             {
@@ -546,7 +602,24 @@ namespace SharpScript.Common
 
     public record struct CompletionItem(string DisplayText, string FilterText, string SortText, string InlineDescription, ImmutableArray<string> Tags, TextSpan Span)
     {
-        public CompletionItem(RoslynCompletionItem item) : this(item.DisplayText, item.FilterText, item.SortText, item.InlineDescription, item.Tags, item.Span) { }
+        public DotNetObjectReference<IGetCompletionDescription> Description { get; init; } = null;
+
+        public CompletionItem(RoslynCompletionItem item, RoslynCodeSession session) : this(item.DisplayText, item.FilterText, item.SortText, item.InlineDescription, item.Tags, item.Span)
+        {
+            Description = DotNetObjectReference.Create<IGetCompletionDescription>(new RoslynGetCompletionDescription(item, session));
+        }
+    }
+
+    public interface IGetCompletionDescription
+    {
+        [JSInvokable]
+        Task<ImmutableArray<TaggedText>> GetDescriptionAsync();
+    }
+
+    public sealed class RoslynGetCompletionDescription(RoslynCompletionItem item, RoslynCodeSession session) : IGetCompletionDescription
+    {
+        [JSInvokable]
+        public Task<ImmutableArray<TaggedText>> GetDescriptionAsync() => session.GetCompletionDescriptionAsync(item);
     }
 
     public record struct InfoTipItem(ImmutableArray<string> Tags, TextSpan Span, params InfoTipSection[] Sections)

@@ -97,14 +97,17 @@ namespace SharpScript.Common
 
         private void UpdateCodeSession(bool isConsole)
         {
-            switch (InputOptions)
+            if (_codeSession != null)
             {
-                case RoslynOptions options:
-                    _codeSession = new RoslynCodeSession(string.Empty, options, isConsole, factory.CreateLogger<RoslynCodeSession>());
-                    break;
-                case ILInputOptions:
-                    _codeSession = new ILCodeSession(string.Empty, isConsole);
-                    break;
+                switch (InputOptions)
+                {
+                    case RoslynOptions options:
+                        _codeSession = new RoslynCodeSession(string.Empty, options, isConsole, factory.CreateLogger<RoslynCodeSession>());
+                        break;
+                    case ILInputOptions:
+                        _codeSession = new ILCodeSession(string.Empty, isConsole);
+                        break;
+                }
             }
         }
 
@@ -306,7 +309,6 @@ namespace SharpScript.Common
                         isConsole ? OutputKind.ConsoleApplication : OutputKind.DynamicallyLinkedLibrary,
                         optimizationLevel: OptimizationLevel.Release,
                         allowUnsafe: true,
-                        concurrentBuild: false,
                         nullableContextOptions: NullableContextOptions.Enable);
                     parse = new CSharpParseOptions(
                         csharp.LanguageVersion,
@@ -315,8 +317,7 @@ namespace SharpScript.Common
                     break;
                 case VisualBasicInputOptions vb:
                     compilation = new VisualBasicCompilationOptions(
-                        isConsole ? OutputKind.ConsoleApplication : OutputKind.DynamicallyLinkedLibrary,
-                        concurrentBuild: false);
+                        isConsole ? OutputKind.ConsoleApplication : OutputKind.DynamicallyLinkedLibrary);
                     parse = new VisualBasicParseOptions(
                         vb.LanguageVersion,
                         DocumentationMode.Parse,

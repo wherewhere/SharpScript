@@ -39,4 +39,18 @@
     </Content>
   </ItemGroup>
 
+  <Target Name="GetFrameworkXmlDocumentation" AfterTargets="ResolveReferences">
+    <ItemGroup>
+      <OutputDocuments Include="@(Reference->'%(RootDir)%(Directory)%(Filename).xml')" Condition="Exists('%(RootDir)%(Directory)%(Filename).xml')" />
+    </ItemGroup>
+  </Target>
+
+  <Target Name="CopyAssembliesToOutputDirectory" AfterTargets="CopyFilesToOutputDirectory" DependsOnTargets="GetFrameworkXmlDocumentation">
+    <Copy SourceFiles="@(OutputDocuments)" DestinationFolder="$(OutputPath)wwwroot\_framework" />
+  </Target>
+
+  <Target Name="CopyAssembliesToPublishDirectory" AfterTargets="CopyFilesToPublishDirectory" DependsOnTargets="GetFrameworkXmlDocumentation">
+    <Copy SourceFiles="@(OutputDocuments)" DestinationFolder="$(PublishDir)wwwroot\_framework" />
+  </Target>
+
 </Project>

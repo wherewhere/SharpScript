@@ -42,6 +42,7 @@
                 "codemirror": "https://cdn.jsdelivr.net/npm/codemirror/dist/index.js",
                 "comlink": "https://cdn.jsdelivr.net/npm/comlink/+esm",
                 "crelt": "https://cdn.jsdelivr.net/npm/crelt/+esm",
+                "lz-string": "https://cdn.jsdelivr.net/npm/lz-string/+esm",
                 "mirrorsharp-codemirror-6-preview/codemirror/lang-cil": "https://cdn.jsdelivr.net/npm/mirrorsharp-codemirror-6-preview/codemirror/languages/cil.js",
                 "mirrorsharp-codemirror-6-preview/codemirror/lang-vb": "https://cdn.jsdelivr.net/npm/mirrorsharp-codemirror-6-preview/codemirror/languages/vb.js",
                 "style-mod": "https://cdn.jsdelivr.net/npm/style-mod/+esm",
@@ -130,7 +131,7 @@
                         <table cellpadding="4">
                             <thead>
                                 <tr>
-                                    <th></th>
+                                    <th style="width: 20px;"></th>
                                     <th>ID</th>
                                     <th>Message</th>
                                     <th>Location</th>
@@ -157,9 +158,10 @@
     </template>
 
     <script type="module">
+        import LZString from "lz-string";
+        import * as Comlink from "comlink";
         import { createApp, toRaw } from "vue";
         import { AnsiUp } from "ansi_up";
-        import * as Comlink from "comlink";
         import { basicSetup, EditorView } from "codemirror";
         import { autocompletion, ifNotIn } from "@codemirror/autocomplete";
         import { indentWithTab } from "@codemirror/commands";
@@ -366,6 +368,14 @@
                         console.warn(e);
                     }
                 },
+                async getDescriptionAsync(index) {
+                    try {
+                        return await this.dotnet.getDescriptionAsync(index);
+                    }
+                    catch (e) {
+                        console.warn(e);
+                    }
+                },
                 async initLinterAsync() {
                     try {
                         this.loading = true;
@@ -425,7 +435,8 @@
                     editor.dispatch({
                         effects: editorHost.linterSet.reconfigure(linter(async view => {
                             const diagnostics = await this.getDiagnosticsAsync(view.state.doc.toString());
-                            if (diagnostics) {
+                            if (diagnostics instanceof Array) {
+                                const that = this;
                                 return diagnostics.map(diagnostic => {
                                     return {
                                         from: getIndex(view.state.doc, diagnostic.location.start),
@@ -444,13 +455,15 @@
                                         })(),
                                         message: `${diagnostic.id ? `${diagnostic.id}: ` : ''}${diagnostic.message}`,
                                         actions: diagnostic.actions.map(x => {
-                                            const that = this;
                                             return {
                                                 name: x.title,
                                                 async apply(view) {
-                                                    const result = await that.invokeActionAsync(x.action);
-                                                    if (result) {
-                                                        editor.dispatch({ changes: { from: 0, to: editor.state.doc.length, insert: result } });
+                                                    const results = await that.invokeActionAsync(x.action);
+                                                    if (results instanceof Array) {
+                                                        results.forEach(x => {
+                                                            const span = x.span;
+                                                            editorHost.editor.dispatch({ changes: { from: span.start, to: span.end, insert: x.newText } });
+                                                        });
                                                     }
                                                 }
                                             }
@@ -475,43 +488,61 @@
                                 return `${tags[0].toLowerCase()}-${tags[1].toLowerCase()}`;
                         }
                     }
-                    editor.dispatch({
-                        effects: editorHost.autocompletionSet.reconfigure(autocompletion({
-                            override: [ifNotIn([';', '{', '}'], async context => {
-                                const from = context.pos;
-                                const completions = await this.getCompletionsAsync(context.state.doc.toString(), from);
-                                const matchContext = context.matchBefore(/[\w\d]+/) ?? { from };
-                                return {
-                                    from: matchContext.from ?? from,
-                                    options: completions.map(item => {
-                                        return {
-                                            label: item.displayText,
-                                            detail: item.inlineDescription,
-                                            type: mapTextTagsToType(item.tags)
-                                        }
-                                    }),
-                                    filter: false,
-                                };
-                            })]
-                        }))
-                    });
-                    function createSection() {
-                        const section = document.createElement("div");
-                        section.className = "mirrorsharp-parts-section";
-                        return section;
-                    }
                     function renderPartTo(parent, part) {
                         const span = document.createElement("span");
                         span.className = `tok-${part.tag.toLowerCase()}`;
                         span.textContent = part.text;
                         parent.appendChild(span);
                     }
-                    function renderPartsTo(parent, parts) {
-                        let section = parent;
+                    function createSection() {
+                        const section = document.createElement("div");
+                        section.className = "mirrorsharp-parts-section";
+                        return section;
+                    }
+                    function renderPartsTo(parent, parts, splitLinesToSections) {
+                        let section = splitLinesToSections ? createSection() : parent;
                         for (const part of parts) {
+                            if (part.kind === "linebreak" && splitLinesToSections) {
+                                parent.appendChild(section);
+                                section = createSection();
+                                continue;
+                            }
                             renderPartTo(section, part);
                         }
+                        if (splitLinesToSections) {
+                            parent.appendChild(section);
+                        }
                     }
+                    function renderParts(parts, splitLinesToSections) {
+                        const container = document.createElement("div");
+                        renderPartsTo(container, parts, splitLinesToSections);
+                        return container;
+                    }
+                    editor.dispatch({
+                        effects: editorHost.autocompletionSet.reconfigure(autocompletion({
+                            override: [ifNotIn([';', '{', '}'], async context => {
+                                const from = context.pos;
+                                const completions = await this.getCompletionsAsync(context.state.doc.toString(), from);
+                                const matchContext = context.matchBefore(/[\w\d]+/) ?? { from };
+                                const that = this;
+                                return {
+                                    from: matchContext.from ?? from,
+                                    options: completions.map(item => {
+                                        return {
+                                            label: item.displayText,
+                                            detail: item.inlineDescription,
+                                            type: mapTextTagsToType(item.tags),
+                                            async info() {
+                                                const results = await that.getDescriptionAsync(item.description);
+                                                return renderParts(results, true);
+                                            }
+                                        }
+                                    }),
+                                    filter: false
+                                };
+                            })]
+                        }))
+                    });
                     editorHost.roslynTooltip = () => hoverTooltip(async (view, pos) => {
                         const tooltip = await this.getInfoTipAsync(view.state.doc.toString(), pos);
                         return {
@@ -527,7 +558,7 @@
                                         icon.classList.add("cm-completionIcon", `cm-completionIcon-${mapTextTagsToType(tooltip.tags)}`);
                                         element.appendChild(icon);
                                     }
-                                    renderPartsTo(element, section.parts);
+                                    renderPartsTo(element, section.parts, false);
                                     dom.appendChild(element);
                                 });
                                 return { dom };
@@ -596,7 +627,7 @@
                             }
                         }
                         if (params.has("code")) {
-                            this.code = decodeURIComponent(atob(params.get("code")));
+                            this.code = LZString.decompressFromBase64(params.get("code"));
                         }
                     }
                 },
@@ -613,7 +644,7 @@
                     }
                     const code = this.code;
                     if (code) {
-                        settings.code = btoa(encodeURIComponent(code));
+                        settings.code = LZString.compressToBase64(code);
                     }
                     location.hash = new URLSearchParams(settings);
                 },
@@ -1084,20 +1115,20 @@
                 }
         }
 
-        #vue-app .hidden-icon,
-        #vue-app .info-icon {
+        #vue-app .hidden-icon::after,
+        #vue-app .info-icon::after {
             width: 20px;
             margin-top: 3.5px;
             content: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2040%2040'%3E%3Cpath%20fill='%23aaf'%20stroke='%2377e'%20stroke-width='6'%20stroke-linejoin='round'%20d='M5%205L35%205L35%2035L5%2035Z'/%3E%3C/svg%3E");
         }
 
-        #vue-app .warning-icon {
+        #vue-app .warning-icon::after {
             width: 20px;
             margin-top: 3.5px;
             content: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2040%2040'%3E%3Cpath%20fill='%23fe8'%20stroke='%23fd7'%20stroke-width='6'%20stroke-linejoin='round'%20d='M20%206L37%2035L3%2035Z'/%3E%3C/svg%3E");
         }
 
-        #vue-app .error-icon {
+        #vue-app .error-icon::after {
             width: 20px;
             margin-top: 3.5px;
             content: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2040%2040'%3E%3Ccircle%20cx='20'%20cy='20'%20r='15'%20fill='%23f87'%20stroke='%23f43'%20stroke-width='6'/%3E%3C/svg%3E");
@@ -1110,6 +1141,7 @@
 
             #vue-app .cm-editor .cm-scroller,
             #vue-app .cm-editor .cm-diagnostic,
+            #vue-app .cm-editor .cm-completionInfo,
             #vue-app .cm-editor .cm-tooltip-autocomplete > ul {
                 font-family: var(--font-monospace);
             }
