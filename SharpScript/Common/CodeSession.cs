@@ -341,9 +341,9 @@ namespace SharpScript.Common
                 try
                 {
                     string fileName = $"{assembly}.wasm";
-                    if (boot.Resources.Assembly.ContainsKey(fileName))
+                    if (boot.Resources.FingerPrinting.FirstOrDefault(x => x.Value.Equals(fileName, StringComparison.OrdinalIgnoreCase)) is { Key.Length: > 0 } result)
                     {
-                        using Stream stream = await client.GetStreamAsync(fileName).ConfigureAwait(false);
+                        using Stream stream = await client.GetStreamAsync(result.Key).ConfigureAwait(false);
                         byte[] array = await WebcilConverterUtil.ConvertFromWebcilAsync(stream).ConfigureAwait(false);
                         references.Add(MetadataReference.CreateFromImage(array, documentation: await CreateDocumentation().ConfigureAwait(false)));
                         async ValueTask<XmlDocumentationProvider> CreateDocumentation()
@@ -448,8 +448,8 @@ namespace SharpScript.Common
 
         private sealed class Resources
         {
-            [JsonPropertyName("assembly")]
-            public Dictionary<string, string> Assembly { get; init; }
+            [JsonPropertyName("fingerprinting")]
+            public Dictionary<string, string> FingerPrinting { get; init; }
         }
 
         [JsonSerializable(typeof(BlazorBoot))]
