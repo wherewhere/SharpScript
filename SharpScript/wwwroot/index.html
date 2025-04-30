@@ -226,8 +226,8 @@
                                 this.code = this.getDefaultCode(newValue);
                             }
                             await this.initDotNetAsync();
-                            await this.dotnet.invokeMethodAsync("SharpScript", "SetLanguageType", newValue);
-                            this.inputLanguages = await this.dotnet.invokeMethodAsync("SharpScript", "GetInputLanguageVersions");
+                            await this.dotnet.setLanguageTypeAsync(newValue);
+                            this.inputLanguages = await this.dotnet.getInputLanguageVersionsAsync();
                             this.message = message;
                         }
                         catch (e) {
@@ -248,7 +248,7 @@
                             const message = this.message;
                             this.message = "Changing version...";
                             await this.initDotNetAsync();
-                            await this.dotnet.invokeMethodAsync("SharpScript", "SetInputLanguageVersion", newValue);
+                            await this.dotnet.setInputLanguageVersionAsync(newValue);
                             this.message = message;
                         }
                         catch (e) {
@@ -269,8 +269,8 @@
                             const message = this.message;
                             this.message = "Changing output...";
                             await this.initDotNetAsync();
-                            await this.dotnet.invokeMethodAsync("SharpScript", "SetOutputType", newValue);
-                            this.outputLanguages = await this.dotnet.invokeMethodAsync("SharpScript", "GetOutputLanguageVersions");
+                            await this.dotnet.setOutputTypeAsync(newValue);
+                            this.outputLanguages = await this.dotnet.getOutputLanguageVersionsAsync();
                             this.message = message;
                         }
                         catch (e) {
@@ -291,7 +291,7 @@
                             const message = this.message;
                             this.message = "Changing version...";
                             await this.initDotNetAsync();
-                            await this.dotnet.invokeMethodAsync("SharpScript", "SetOutputLanguageVersion", newValue);
+                            await this.dotnet.setOutputLanguageVersionAsync(newValue);
                             this.message = message;
                         }
                         catch (e) {
@@ -316,7 +316,7 @@
                         await (this.language === "IL" ? this.initDotNetAsync() : this.initCompilerAsync());
                         this.initEditer();
                         await this.$nextTick();
-                        this.results = await this.dotnet.invokeMethodAsync("SharpScript", "ProcessAsync", this.code);
+                        this.results = await this.dotnet.processAsync(this.code);
                         this.message = message;
                     }
                     catch (e) {
@@ -338,7 +338,7 @@
                 },
                 async getDiagnosticsAsync(code) {
                     try {
-                        return await this.dotnet.invokeMethodAsync("SharpScript", "GetDiagnosticsAsync", code);
+                        return await this.dotnet.getDiagnosticsAsync(code);
                     }
                     catch (e) {
                         console.warn(e);
@@ -346,7 +346,7 @@
                 },
                 async getCompletionsAsync(code, position) {
                     try {
-                        return await this.dotnet.invokeMethodAsync("SharpScript", "GetCompletionsAsync", code, position);
+                        return await this.dotnet.getCompletionsAsync(code, position);
                     }
                     catch (e) {
                         console.warn(e);
@@ -354,23 +354,31 @@
                 },
                 async getInfoTipAsync(code, position) {
                     try {
-                        return await this.dotnet.invokeMethodAsync("SharpScript", "GetInfoTipAsync", code, position);
+                        return await this.dotnet.getInfoTipAsync(code, position);
                     }
                     catch (e) {
                         console.warn(e);
                     }
                 },
-                async invokeActionAsync(index) {
+                async diagnosticInvokeAsync(index) {
                     try {
-                        return await this.dotnet.invokeActionAsync(index);
+                        return await this.dotnet.diagnosticInvokeAsync(index);
                     }
                     catch (e) {
                         console.warn(e);
                     }
                 },
-                async getDescriptionAsync(index) {
+                async completionGetDescriptionAsync(index) {
                     try {
-                        return await this.dotnet.getDescriptionAsync(index);
+                        return await this.dotnet.completionGetDescriptionAsync(index);
+                    }
+                    catch (e) {
+                        console.warn(e);
+                    }
+                },
+                async completionGetChangeAsync(index) {
+                    try {
+                        return await this.dotnet.completionGetChangeAsync(index);
                     }
                     catch (e) {
                         console.warn(e);
@@ -414,7 +422,7 @@
                         await this.initDotNetAsync();
                         const message = this.message;
                         this.message = "Downloading references...";
-                        await this.dotnet.invokeMethodAsync("SharpScript", "InitAsync", new URL("_framework/", document.baseURI).toString());
+                        await this.dotnet.initAsync(new URL("_framework/", document.baseURI).toString());
                         this.message = message;
                         this.isInitCompiler = true;
                     }
@@ -458,11 +466,13 @@
                                             return {
                                                 name: x.title,
                                                 async apply(view) {
-                                                    const results = await that.invokeActionAsync(x.action);
+                                                    const results = await that.diagnosticInvokeAsync(x.action);
                                                     if (results instanceof Array) {
-                                                        results.forEach(x => {
-                                                            const span = x.span;
-                                                            editorHost.editor.dispatch({ changes: { from: span.start, to: span.end, insert: x.newText } });
+                                                        view.dispatch({
+                                                            changes: results.map(x => {
+                                                                const span = x.span;
+                                                                return { from: span.start, to: span.end, insert: x.newText }
+                                                            })
                                                         });
                                                     }
                                                 }
@@ -533,8 +543,37 @@
                                             detail: item.inlineDescription,
                                             type: mapTextTagsToType(item.tags),
                                             async info() {
-                                                const results = await that.getDescriptionAsync(item.description);
+                                                const results = await that.completionGetDescriptionAsync(item.self);
                                                 return renderParts(results, true);
+                                            },
+                                            async apply(view, completion, from, to) {
+                                                const results = await that.completionGetChangeAsync(item.self);
+                                                if (results) {
+                                                    const textChanges = results.textChanges;
+                                                    if (textChanges instanceof Array) {
+                                                        const selection = { anchor: results.newPosition ?? to };
+                                                        const changes = textChanges.map((x, i) => {
+                                                            const span = x.span;
+                                                            if (typeof results.newPosition !== "number") {
+                                                                if (i == 0) {
+                                                                    selection.anchor = from;
+                                                                }
+                                                                selection.anchor += x.newText.length;
+                                                                if (span.start < from) {
+                                                                    selection.anchor -= Math.min(from, span.end) - span.start;
+                                                                }
+                                                            }
+                                                            return { from: span.start, to: span.end, insert: x.newText };
+                                                        });
+                                                        view.dispatch({ changes });
+                                                        if (selection.anchor <= view.state.doc.length) {
+                                                            view.dispatch({ selection });
+                                                        }
+                                                    }
+                                                }
+                                                else {
+                                                    return view.dispatch({ changes: { from, to, insert: completion.label } });
+                                                }
                                             }
                                         }
                                     }),
@@ -546,7 +585,7 @@
                     editorHost.roslynTooltip = () => hoverTooltip(async (view, pos) => {
                         const tooltip = await this.getInfoTipAsync(view.state.doc.toString(), pos);
                         return {
-                            pos: pos,
+                            pos,
                             create() {
                                 const dom = document.createElement("div")
                                 dom.classList.add("mirrorsharp-infotip");
@@ -962,7 +1001,7 @@
                                     const desc = instructions[text];
                                     if (desc) {
                                         return {
-                                            pos: pos,
+                                            pos,
                                             create() {
                                                 const dom = document.createElement("div")
                                                 dom.classList.add("mirrorsharp-infotip");

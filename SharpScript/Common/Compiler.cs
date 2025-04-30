@@ -168,11 +168,11 @@ namespace SharpScript.Common
             return results;
         }
 
-        public ValueTask<IEnumerable<CompletionItem>> GetCompletionsAsync(string code, int position, CancellationToken cancellationToken = default)
+        public ValueTask<IEnumerable<RoslynCompletionItem>> GetCompletionsAsync(string code, int position, CancellationToken cancellationToken = default)
         {
             return InputOptions is RoslynOptions
                 ? CodeSession.SetSourceText(code).GetCompletionsAsync(position, cancellationToken)
-                : ValueTask.FromResult<IEnumerable<CompletionItem>>([]);
+                : ValueTask.FromResult<IEnumerable<RoslynCompletionItem>>([]);
         }
 
         public ValueTask<InfoTipItem> GetInfoTipAsync(string code, int position, CancellationToken cancellationToken = default)

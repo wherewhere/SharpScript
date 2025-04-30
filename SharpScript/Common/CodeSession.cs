@@ -23,8 +23,7 @@ using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using CSharpLanguageVersion = Microsoft.CodeAnalysis.CSharp.LanguageVersion;
-using RoslynCodeAction = Microsoft.CodeAnalysis.CodeActions.CodeAction;
-using RoslynCompletionItem = Microsoft.CodeAnalysis.Completion.CompletionItem;
+using RoslynCompletionChange = Microsoft.CodeAnalysis.Completion.CompletionChange;
 using RoslynDiagnostic = Microsoft.CodeAnalysis.Diagnostic;
 
 namespace SharpScript.Common
@@ -213,15 +212,15 @@ namespace SharpScript.Common
             IEnumerable<RoslynDiagnostic> filtered = !_isConsole && _options is CSharpInputOptions { LanguageVersion: >= CSharpLanguageVersion.CSharp9 } ? diagnostics.Where(x => x is not { Id: "CS8805", Severity: DiagnosticSeverity.Error }) : diagnostics;
             foreach (RoslynDiagnostic diagnostic in filtered)
             {
-                List<RoslynCodeAction> actions = await GetCodeActionsAsync(diagnostic, cancellationToken).ConfigureAwait(false);
-                results.Add(new Diagnostic(diagnostic, [.. actions.Select(x => new CodeAction(x, this))]));
+                List<CodeAction> actions = await GetCodeActionsAsync(diagnostic, cancellationToken).ConfigureAwait(false);
+                results.Add(new Diagnostic(diagnostic, [.. actions.Select(x => new RoslynCodeAction(x, this))]));
             }
             return results;
         }
 
-        private async ValueTask<List<RoslynCodeAction>> GetCodeActionsAsync(RoslynDiagnostic diagnostic, CancellationToken cancellationToken = default)
+        private async ValueTask<List<CodeAction>> GetCodeActionsAsync(RoslynDiagnostic diagnostic, CancellationToken cancellationToken = default)
         {
-            List<RoslynCodeAction> codeActions = [];
+            List<CodeAction> codeActions = [];
             CodeFixContext context = new(CurrentDocument, diagnostic, (x, _) => codeActions.Add(x), cancellationToken);
             if (_providers.TryGetValue(diagnostic.Id, out List<CodeFixProvider> providers))
             {
@@ -271,7 +270,7 @@ namespace SharpScript.Common
             return service == null || service.ShouldTriggerCompletion(SourceText, position, completionTrigger);
         }
 
-        public async ValueTask<IEnumerable<CompletionItem>> GetCompletionsAsync(int position, CancellationToken cancellationToken = default)
+        public async ValueTask<IEnumerable<RoslynCompletionItem>> GetCompletionsAsync(int position, CancellationToken cancellationToken = default)
         {
             if (CompletionService is not CompletionService service)
             {
@@ -288,15 +287,18 @@ namespace SharpScript.Common
             TextSpan typedSpan = CompletionService.GetDefaultCompletionListSpan(SourceText, position);
             string typedText = SourceText.GetSubText(typedSpan).ToString();
 
-            IReadOnlyList<RoslynCompletionItem> filteredItems = typedText.Length != 0
+            IReadOnlyList<CompletionItem> filteredItems = typedText.Length != 0
                 ? CompletionService.FilterItems(CurrentDocument, [.. completions.ItemsList], typedText)
                 : completions.ItemsList;
 
-            return filteredItems.Select(x => new CompletionItem(x, this));
+            return filteredItems.Select(x => new RoslynCompletionItem(x, this));
         }
 
-        public Task<ImmutableArray<TaggedText>> GetCompletionDescriptionAsync(RoslynCompletionItem item, CancellationToken cancellationToken = default) =>
+        public Task<ImmutableArray<TaggedText>> GetCompletionDescriptionAsync(CompletionItem item, CancellationToken cancellationToken = default) =>
             _completionService.GetDescriptionAsync(_currentDocument, item, cancellationToken).ContinueWith(x => x.Result.TaggedParts);
+
+        public Task<CompletionChange> GetCompletionChangeAsync(CompletionItem item, CancellationToken cancellationToken = default) =>
+            _completionService.GetChangeAsync(_currentDocument, item, cancellationToken: cancellationToken).ContinueWith(x => new CompletionChange(x.Result));
 
         public async ValueTask<InfoTipItem> GetInfoTipAsync(int position, CancellationToken cancellationToken = default)
         {
@@ -522,7 +524,7 @@ namespace SharpScript.Common
     public interface ICodeSession
     {
         ValueTask<T> GetDiagnosticsAsync<T>(T results, CancellationToken cancellationToken = default) where T : ICollection<Diagnostic>;
-        ValueTask<IEnumerable<CompletionItem>> GetCompletionsAsync(int position, CancellationToken cancellationToken = default) => ValueTask.FromResult<IEnumerable<CompletionItem>>([]);
+        ValueTask<IEnumerable<RoslynCompletionItem>> GetCompletionsAsync(int position, CancellationToken cancellationToken = default) => ValueTask.FromResult<IEnumerable<RoslynCompletionItem>>([]);
         ValueTask<InfoTipItem> GetInfoTipAsync(int position, CancellationToken cancellationToken = default) => ValueTask.FromResult<InfoTipItem>(default);
         ICodeSession SetSourceText(string code);
         ValueTask<CompilationResults> Compile(ICollection<Diagnostic> results, CancellationToken cancellationToken = default);
@@ -547,11 +549,11 @@ namespace SharpScript.Common
         public LinePositionSpan Location { get; }
         public string Message => message;
         public string Severity => severity.ToString();
-        public CodeAction[] Actions { get; } = [];
+        public ICodeAction[] Actions { get; } = [];
 
         public Diagnostic(Exception exception) : this(DiagnosticSeverity.Error, exception.Message) { }
 
-        public Diagnostic(RoslynDiagnostic diagnostic, params CodeAction[] actions) : this(diagnostic.Severity, diagnostic.GetMessage())
+        public Diagnostic(RoslynDiagnostic diagnostic, params RoslynCodeAction[] actions) : this(diagnostic.Severity, diagnostic.GetMessage())
         {
             ID = diagnostic.Id;
             Location = diagnostic.Location.GetLineSpan().Span;
@@ -565,10 +567,19 @@ namespace SharpScript.Common
         }
     }
 
-    public class CodeAction(RoslynCodeAction action, RoslynCodeSession session)
+    public interface ICodeAction : IDisposable
+    {
+        string Title { get; }
+        DotNetObjectReference<ICodeAction> Action { get; }
+        [JSInvokable]
+        Task<IReadOnlyList<TextChange>> InvokeAsync();
+        void IDisposable.Dispose() { Action?.Dispose(); GC.SuppressFinalize(this); }
+    }
+
+    public sealed class RoslynCodeAction(CodeAction action, RoslynCodeSession session) : ICodeAction
     {
         public string Title => action.Title;
-        public DotNetObjectReference<CodeAction> Action => DotNetObjectReference.Create(this);
+        public DotNetObjectReference<ICodeAction> Action => DotNetObjectReference.Create<ICodeAction>(this);
 
         [JSInvokable]
         public async Task<IReadOnlyList<TextChange>> InvokeAsync()
@@ -590,7 +601,7 @@ namespace SharpScript.Common
         }
     }
 
-    public record CompilationResults(MemoryStream AssemblyStream, MemoryStream SymbolStream) : IDisposable
+    public sealed record CompilationResults(MemoryStream AssemblyStream, MemoryStream SymbolStream) : IDisposable
     {
         public void Dispose()
         {
@@ -600,26 +611,40 @@ namespace SharpScript.Common
         }
     }
 
-    public record struct CompletionItem(string DisplayText, string FilterText, string SortText, string InlineDescription, ImmutableArray<string> Tags, TextSpan Span)
+    public record struct CompletionChange(ImmutableArray<TextChange> TextChanges, int? NewPosition)
     {
-        public DotNetObjectReference<IGetCompletionDescription> Description { get; init; } = null;
-
-        public CompletionItem(RoslynCompletionItem item, RoslynCodeSession session) : this(item.DisplayText, item.FilterText, item.SortText, item.InlineDescription, item.Tags, item.Span)
-        {
-            Description = DotNetObjectReference.Create<IGetCompletionDescription>(new RoslynGetCompletionDescription(item, session));
-        }
+        public CompletionChange(RoslynCompletionChange change) : this(change.TextChanges, change.NewPosition) { }
     }
 
-    public interface IGetCompletionDescription
+    public interface ICompletionItem : IDisposable
     {
+        string DisplayText { get; }
+        string FilterText { get; }
+        string SortText { get; }
+        string InlineDescription { get; }
+        ImmutableArray<string> Tags { get; }
+        TextSpan Span { get; }
+        DotNetObjectReference<ICompletionItem> Self { get; }
         [JSInvokable]
         Task<ImmutableArray<TaggedText>> GetDescriptionAsync();
+        [JSInvokable]
+        Task<CompletionChange> GetChangeAsync();
+        void IDisposable.Dispose() { Self?.Dispose(); GC.SuppressFinalize(this); }
     }
 
-    public sealed class RoslynGetCompletionDescription(RoslynCompletionItem item, RoslynCodeSession session) : IGetCompletionDescription
+    public sealed class RoslynCompletionItem(CompletionItem item, RoslynCodeSession session) : ICompletionItem
     {
+        public string DisplayText => item.DisplayText;
+        public string FilterText => item.FilterText;
+        public string SortText => item.SortText;
+        public string InlineDescription => item.InlineDescription;
+        public ImmutableArray<string> Tags => item.Tags;
+        public TextSpan Span => item.Span;
+        public DotNetObjectReference<ICompletionItem> Self => DotNetObjectReference.Create<ICompletionItem>(this);
         [JSInvokable]
         public Task<ImmutableArray<TaggedText>> GetDescriptionAsync() => session.GetCompletionDescriptionAsync(item);
+        [JSInvokable]
+        public Task<CompletionChange> GetChangeAsync() => session.GetCompletionChangeAsync(item);
     }
 
     public record struct InfoTipItem(ImmutableArray<string> Tags, TextSpan Span, params InfoTipSection[] Sections)

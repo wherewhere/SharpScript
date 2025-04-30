@@ -21,7 +21,7 @@ const document = {
 };
 const Node = { COMMENT_NODE: 8 };
 const history = { state: {} };
-let actions = [], descriptions = [];
+let diagnostics = [], completions = [];
 const dotnet = {
     init(baseURI, onDownloadResourceProgress) {
         document.baseURI = baseURI;
@@ -31,44 +31,88 @@ const dotnet = {
         importScripts("_framework/blazor.webassembly.js");
         await Blazor.start();
     },
-    async invokeMethodAsync(assembly, method, ...args) {
-        const result = await DotNet.invokeMethodAsync(assembly, method, ...args);
-        switch (method) {
-            case "GetDiagnosticsAsync":
-                if (result instanceof Array) {
-                    actions.forEach(x => x.dispose());
-                    actions = [];
-                    result.forEach(diagnostic => {
-                        diagnostic.actions = diagnostic.actions.map(x => {
-                            actions.push(x.action);
-                            return {
-                                title: x.title,
-                                action: actions.length - 1
-                            }
-                        });
-                    });
-                }
-                break;
-            case "GetCompletionsAsync":
-                if (result instanceof Array) {
-                    descriptions.forEach(x => x.dispose());
-                    descriptions = [];
-                    result.forEach(x => {
-                        descriptions.push(x.description);
-                        x.description = descriptions.length - 1;
-                    });
-                }
-                break;
+    async initAsync(baseUrl) {
+        return await DotNet.invokeMethodAsync("SharpScript", "InitAsync", baseUrl);
+    },
+    async processAsync(code) {
+        return await DotNet.invokeMethodAsync("SharpScript", "ProcessAsync", code);
+    },
+    async getDiagnosticsAsync(code) {
+        const result = await DotNet.invokeMethodAsync("SharpScript", "GetDiagnosticsAsync", code);
+        if (result instanceof Array) {
+            diagnostics.forEach(x => x.dispose());
+            diagnostics = [];
+            result.forEach(diagnostic => {
+                diagnostic.actions = diagnostic.actions.map(x => {
+                    diagnostics.push(x.action);
+                    return {
+                        title: x.title,
+                        action: diagnostics.length - 1
+                    }
+                });
+            });
         }
         return result;
     },
-    async invokeActionAsync(index) {
-        const action = actions[index];
-        return await action.invokeMethodAsync("InvokeAsync");
+    async getCompletionsAsync(code, position) {
+        const result = await DotNet.invokeMethodAsync("SharpScript", "GetCompletionsAsync", code, position);
+        if (result instanceof Array) {
+            completions.forEach(x => x.dispose());
+            completions = [];
+            result.forEach(x => {
+                completions.push(x.self);
+                x.self = completions.length - 1;
+            });
+        }
+        return result;
     },
-    async getDescriptionAsync(index) {
-        const description = descriptions[index];
-        return await description.invokeMethodAsync("GetDescriptionAsync");
+    async getInfoTipAsync(code, position) {
+        return await DotNet.invokeMethodAsync("SharpScript", "GetInfoTipAsync", code, position);
+    },
+    async getLanguageTypesAsync() {
+        return await DotNet.invokeMethodAsync("SharpScript", "GetLanguageTypes");
+    },
+    async setLanguageTypeAsync(type) {
+        return await DotNet.invokeMethodAsync("SharpScript", "SetLanguageType", type);
+    },
+    async getOutputTypesAsync() {
+        return await DotNet.invokeMethodAsync("SharpScript", "GetOutputTypes");
+    },
+    async setOutputTypeAsync(type) {
+        return await DotNet.invokeMethodAsync("SharpScript", "SetOutputType", type);
+    },
+    async getInputLanguageVersionsAsync() {
+        return await DotNet.invokeMethodAsync("SharpScript", "GetInputLanguageVersions");
+    },
+    async setInputLanguageVersionAsync(type) {
+        return await DotNet.invokeMethodAsync("SharpScript", "SetInputLanguageVersion", type);
+    },
+    async getOutputLanguageVersionsAsync() {
+        return await DotNet.invokeMethodAsync("SharpScript", "GetOutputLanguageVersions");
+    },
+    async setOutputLanguageVersionAsync(type) {
+        return await DotNet.invokeMethodAsync("SharpScript", "SetOutputLanguageVersion", type);
+    },
+    async invokeMethodAsync(assembly, method, ...args) {
+        return await DotNet.invokeMethodAsync(assembly, method, ...args);
+    },
+    async diagnosticInvokeAsync(index) {
+        const diagnostic = diagnostics[index];
+        if (diagnostic) {
+            return await diagnostic.invokeMethodAsync("InvokeAsync");
+        }
+    },
+    async completionGetDescriptionAsync(index) {
+        const completion = completions[index];
+        if (completion) {
+            return await completion.invokeMethodAsync("GetDescriptionAsync");
+        }
+    },
+    async completionGetChangeAsync(index) {
+        const completion = completions[index];
+        if (completion) {
+            return await completion.invokeMethodAsync("GetChangeAsync");
+        }
     }
 };
 Comlink.expose(dotnet);
