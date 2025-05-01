@@ -8,12 +8,12 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Emit;
 using Microsoft.CodeAnalysis.VisualBasic;
+using Microsoft.Extensions.Logging;
 using Microsoft.VisualBasic;
 using Mobius.ILasm.Core;
 using SharpScript.Common;
 using SharpScript.Helpers;
 using System;
-using System.Buffers;
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -44,7 +44,7 @@ namespace SharpScript.ViewModels
     public partial class EditorViewModel(CoreDispatcher dispatcher) : INotifyPropertyChanged
     {
         private static readonly MetadataReference[] references =
-            GetMetadataReferences(
+            [.. GetMetadataReferences(
                 typeof(object).Assembly,
                 typeof(Console).Assembly,
                 typeof(Regex).Assembly,
@@ -58,8 +58,7 @@ namespace SharpScript.ViewModels
                 typeof(CollectionBase).Assembly,
                 typeof(Binder).Assembly,
                 typeof(VBMath).Assembly,
-                typeof(WebClient).Assembly)
-            .ToArray();
+                typeof(WebClient).Assembly)];
 
         public static LanguageType[] LanguageTypes { get; } = Enum.GetValues<LanguageType>();
         public static OutputType[] OutputTypes { get; } = Enum.GetValues<OutputType>();
@@ -499,7 +498,7 @@ namespace SharpScript.ViewModels
             }
             catch (Exception ex)
             {
-                SettingsHelper.LogManager.GetLogger(nameof(EditorViewModel)).Error(ex.ExceptionToMessage(), ex);
+                SettingsHelper.LoggerFactory.CreateLogger<EditorViewModel>().LogError(ex, "Process failed. {message} (0x{hResult:X})", ex.GetMessage(), ex.HResult);
             }
         }
 

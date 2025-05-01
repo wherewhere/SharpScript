@@ -1,10 +1,13 @@
-﻿using SharpScript.Common;
+﻿using Microsoft.Extensions.Logging;
+using SharpScript.Common;
 using SharpScript.Helpers;
 using SharpScript.Pages;
 using System;
+using System.Threading;
 using Windows.ApplicationModel;
 using Windows.ApplicationModel.Activation;
 using Windows.ApplicationModel.Core;
+using Windows.System;
 using Windows.System.Profile;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
@@ -22,7 +25,7 @@ namespace SharpScript
     public partial class App : Application
     {
         /// <summary>
-        /// Initializes the singleton application object.  This is the first line of authored code
+        /// Initializes the singleton application object. This is the first line of authored code
         /// executed, and as such is the logical equivalent of main() or WinMain().
         /// </summary>
         public App()
@@ -34,8 +37,18 @@ namespace SharpScript
             if (AnalyticsInfo.VersionInfo.DeviceFamily == "Windows.Xbox") { FocusVisualKind = FocusVisualKind.Reveal; }
         }
 
+        protected override void OnWindowCreated(WindowCreatedEventArgs args)
+        {
+            if (SynchronizationContext.Current == null)
+            {
+                DispatcherQueueSynchronizationContext context = new(args.Window.CoreWindow.DispatcherQueue);
+                SynchronizationContext.SetSynchronizationContext(context);
+            }
+            base.OnWindowCreated(args);
+        }
+
         /// <summary>
-        /// Invoked when the application is launched normally by the end user.  Other entry points
+        /// Invoked when the application is launched normally by the end user. Other entry points
         /// will be used such as when the application is launched to open a specific file.
         /// </summary>
         /// <param name="args">Details about the launch request and process.</param>
@@ -44,13 +57,9 @@ namespace SharpScript
             EnsureWindow(args);
         }
 
-        private void EnsureWindow(LaunchActivatedEventArgs e)
+        private static void EnsureWindow(LaunchActivatedEventArgs e)
         {
-            if (!isLoaded)
-            {
-                RegisterExceptionHandlingSynchronizationContext();
-                isLoaded = true;
-            }
+            RegisterExceptionHandlingSynchronizationContext();
 
             if (Window.Current is not Window window) { return; }
             WindowHelper.TrackWindow(window);
@@ -124,15 +133,18 @@ namespace SharpScript
 
         private static void Application_UnhandledException(object sender, Windows.UI.Xaml.UnhandledExceptionEventArgs e)
         {
-            SettingsHelper.LogManager?.GetLogger("Unhandled Exception - Application").Error(e.Exception.ExceptionToMessage(), e.Exception);
+            if (e.Exception is Exception ex)
+            {
+                SettingsHelper.LoggerFactory.CreateLogger("Unhandled Exception - Application").LogError(ex, "Unhandled exception. {message} (0x{hResult:X})", ex.GetMessage(), ex.HResult);
+            }
             e.Handled = true;
         }
 
         private static void CurrentDomain_UnhandledException(object sender, System.UnhandledExceptionEventArgs e)
         {
-            if (e.ExceptionObject is Exception Exception)
+            if (e.ExceptionObject is Exception ex)
             {
-                SettingsHelper.LogManager?.GetLogger("Unhandled Exception - CurrentDomain").Error(Exception.ExceptionToMessage(), Exception);
+                SettingsHelper.LoggerFactory.CreateLogger("Unhandled Exception - CurrentDomain").LogError(ex, "Unhandled exception. {message} (0x{hResult:X})", ex.GetMessage(), ex.HResult);
             }
         }
 
@@ -141,17 +153,19 @@ namespace SharpScript
         /// </summary>
         private static void RegisterExceptionHandlingSynchronizationContext()
         {
-            ExceptionHandlingSynchronizationContext
-                .Register()
-                .UnhandledException += SynchronizationContext_UnhandledException;
+            if (ExceptionHandlingSynchronizationContext.TryRegister(out ExceptionHandlingSynchronizationContext context))
+            {
+                context.UnhandledException += SynchronizationContext_UnhandledException;
+            }
         }
 
         private static void SynchronizationContext_UnhandledException(object sender, Common.UnhandledExceptionEventArgs e)
         {
-            SettingsHelper.LogManager?.GetLogger("Unhandled Exception - SynchronizationContext").Error(e.Exception.ExceptionToMessage(), e.Exception);
+            if (e.Exception is Exception ex)
+            {
+                SettingsHelper.LoggerFactory.CreateLogger("Unhandled Exception - SynchronizationContext").LogError(ex, "Unhandled exception. {message} (0x{hResult:X})", ex.GetMessage(), ex.HResult);
+            }
             e.Handled = true;
         }
-
-        private bool isLoaded;
     }
 }

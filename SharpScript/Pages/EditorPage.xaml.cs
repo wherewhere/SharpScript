@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using SharpScript.Helpers;
 using SharpScript.ViewModels;
 using System;
@@ -83,7 +84,7 @@ namespace SharpScript.Pages
             }
             catch (Exception ex)
             {
-                SettingsHelper.LogManager.GetLogger(nameof(EditorPage)).Error(ex.ExceptionToMessage(), ex);
+                SettingsHelper.LoggerFactory.CreateLogger<EditorPage>().LogError(ex, "Process failed. {message} (0x{hResult:X})", ex.GetMessage(), ex.HResult);
             }
             finally
             {

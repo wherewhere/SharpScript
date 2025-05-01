@@ -19,42 +19,22 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="ICSharpCode.Decompiler" Version="9.0.0.7889" />
-    <PackageReference Include="MetroLog.Net6" Version="2.1.0" />
+    <PackageReference Include="ICSharpCode.Decompiler" Version="9.1.0.7988" />
+    <PackageReference Include="Karambolo.Extensions.Logging.File" Version="3.6.3" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.13.0" />
     <PackageReference Include="Microsoft.CodeAnalysis.VisualBasic" Version="4.13.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.4" />
     <PackageReference Include="Microsoft.UI.Xaml" Version="2.8.7" />
     <PackageReference Include="Microsoft.Windows.CsWinRT" Version="2.2.0" />
     <PackageReference Include="Mobius.ILasm" Version="0.1.0" />
-    <PackageReference Include="System.Security.Permissions" Version="9.0.2" />
-    <PackageReference Include="WinUIEdit.Uwp" Version="0.0.3-prerelease" GeneratePathProperty="True">
-      <ExcludeAssets>build; buildtransitive; compile; runtime</ExcludeAssets>
-    </PackageReference>
+    <PackageReference Include="System.Security.Permissions" Version="9.0.4" />
+    <PackageReference Include="WinUIEdit.Uwp" Version="0.0.4-prerelease" />
     <Manifest Include="$(ApplicationManifest)" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <CsWinRTInputs Include="$(PkgWinUIEdit_Uwp)\lib\uap10.0\*.winmd" />
   </ItemGroup>
 
   <ItemGroup>
     <None Remove="AppPackages\**" />
     <None Remove="BundleArtifacts\**" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Page Include="$(PkgWinUIEdit_Uwp)\lib\uap10.0\**\*.xaml" Visible="False">
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <None Include="$(PkgWinUIEdit_Uwp)\lib\uap10.0\*.winmd" Visible="False">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="$(PkgWinUIEdit_Uwp)\runtimes\win10-$(Platform)\native\*.dll" Visible="False">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="$(PkgWinUIEdit_Uwp)\runtimes\win10-$(Platform)\native\*.pdb" Visible="False">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
   </ItemGroup>
 
   <ItemGroup>

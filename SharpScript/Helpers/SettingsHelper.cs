@@ -1,9 +1,8 @@
-﻿using MetroLog;
-using MetroLog.Targets;
+﻿using Karambolo.Extensions.Logging.File;
+using Microsoft.Extensions.Logging;
 using SharpScript.ViewModels;
 using System;
 using System.Diagnostics.CodeAnalysis;
-using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
@@ -61,19 +60,24 @@ namespace SharpScript.Helpers
 
     public static partial class SettingsHelper
     {
-        public static ILogManager LogManager { get; } = LogManagerFactory.CreateLogManager(GetDefaultReleaseConfiguration());
+        public static ILoggerFactory LoggerFactory { get; } = CreateLoggerFactory();
         public static ApplicationDataContainer LocalObject { get; } = ApplicationData.Current.LocalSettings;
 
         static SettingsHelper() => SetDefaultSettings();
 
-        private static LoggingConfiguration GetDefaultReleaseConfiguration()
-        {
-            string path = Path.Combine(ApplicationData.Current.LocalFolder.Path, "MetroLogs");
-            if (!Directory.Exists(path)) { Directory.CreateDirectory(path); }
-            LoggingConfiguration loggingConfiguration = new();
-            loggingConfiguration.AddTarget(LogLevel.Info, LogLevel.Fatal, new StreamingFileTarget(path, 7));
-            return loggingConfiguration;
-        }
+        public static ILoggerFactory CreateLoggerFactory() =>
+            Microsoft.Extensions.Logging.LoggerFactory.Create(x => _ = x.AddFile(x =>
+            {
+                x.RootPath = ApplicationData.Current.LocalFolder.Path;
+                x.IncludeScopes = true;
+                x.BasePath = "Logs";
+                x.Files = [
+                    new LogFileOptions()
+                    {
+                        Path = "Log - <date>.log"
+                    }
+                ];
+            }).AddDebug());
     }
 
     public static class SystemTextJsonObjectSerializer
