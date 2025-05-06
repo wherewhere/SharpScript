@@ -81,7 +81,7 @@
 <body>
     <div id="vue-app">
         <div class="split-view">
-            <div class="split-content" style="display: flex; flex-direction: column; row-gap: 4px; padding: 4px;">
+            <div class="split-content">
                 <div style="display: flex; justify-content: space-between; column-gap: 4px;">
                     <fluent-select v-model="language" style="min-width: auto;">
                         <fluent-option value="CSharp">C#</fluent-option>
@@ -103,7 +103,7 @@
                 </div>
                 <codemirror class="editor" v-model:value="code" :language="getLauguage()" ref="editor"></codemirror>
             </div>
-            <div class="split-content" style="display: flex; flex-direction: column; row-gap: 4px; padding: 4px;">
+            <div class="split-content">
                 <div style="display: flex; justify-content: space-between; column-gap: 4px;">
                     <fluent-select v-model="output" style="min-width: auto;">
                         <fluent-option value="CSharp">C#</fluent-option>
@@ -124,28 +124,30 @@
                 <div class="editor">
                     <codemirror v-if="results.decompiled" v-model:value="results.decompiled"
                                 :language="getOutputLanguage()" readonly="true"></codemirror>
-                    <div v-if="results.outputs.length" style="font-family: var(--font-monospace); padding: 0 12px;">
-                        <pre class="unset" v-for="item in results.outputs" v-html="renderConsole(item)"></pre>
-                    </div>
-                    <div v-if="results.diagnostics.length" style="font-family: var(--font-monospace); padding: 0 12px;">
-                        <table cellpadding="4">
-                            <thead>
-                                <tr>
-                                    <th style="width: 20px;"></th>
-                                    <th>ID</th>
-                                    <th>Message</th>
-                                    <th>Location</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr v-for="item in results.diagnostics">
-                                    <td :class="item.severity.toLowerCase() + '-icon'"></td>
-                                    <td>{{ item.id }}</td>
-                                    <td>{{ item.message }}</td>
-                                    <td>{{ getLocation(item) }}</td>
-                                </tr>
-                            </tbody>
-                        </table>
+                    <div class="output">
+                        <div v-if="results.outputs.length">
+                            <pre class="unset" v-for="item in results.outputs" v-html="renderConsole(item)"></pre>
+                        </div>
+                        <div v-else-if="results.diagnostics.length">
+                            <table cellpadding="4">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 20px;"></th>
+                                        <th>ID</th>
+                                        <th>Message</th>
+                                        <th>Location</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="item in results.diagnostics">
+                                        <td :class="item.severity.toLowerCase() + '-icon'"></td>
+                                        <td>{{ item.id }}</td>
+                                        <td>{{ item.message }}</td>
+                                        <td>{{ getLocation(item) }}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1130,18 +1132,44 @@
             width: 100%;
             height: 100%;
             display: flex;
+            gap: 8px;
+            padding: 8px;
         }
 
             #vue-app div.split-view .split-content {
                 flex: 1;
                 width: 50%;
                 height: 100%;
+                display: flex;
+                flex-direction: column;
+                row-gap: 8px;
             }
 
                 #vue-app div.split-view .split-content .editor {
                     flex: 1;
+                    display: flex;
                     overflow: auto;
+                    background: var(--neutral-fill-input-rest);
+                    border-radius: calc(var(--layer-corner-radius) * 1px);
                 }
+
+                    #vue-app div.split-view .split-content .editor .cm-editor {
+                        flex: 1;
+                    }
+
+                    #vue-app div.split-view .split-content .editor > div:not([class]) {
+                        display: flex;
+                    }
+
+                    #vue-app div.split-view .split-content .editor > .output {
+                        font-family: var(--font-monospace);
+                        padding: 0 12px;
+                        width: 100%;
+                    }
+
+                        #vue-app div.split-view .split-content .editor > .output > div {
+                            padding: 4px 0;
+                        }
 
         @media (max-width: 767px) {
             #vue-app div.split-view {
