@@ -80,75 +80,94 @@
 
 <body>
     <div id="vue-app">
-        <div class="split-view">
-            <div class="split-content">
-                <div style="display: flex; justify-content: space-between; column-gap: 4px;">
-                    <fluent-select v-model="language" style="min-width: auto;">
-                        <fluent-option value="CSharp">C#</fluent-option>
-                        <fluent-option value="VisualBasic">VB</fluent-option>
-                        <fluent-option value="IL">IL</fluent-option>
-                    </fluent-select>
-                    <div style="display: flex; column-gap: 4px;">
-                        <fluent-button @click="processAsync" :disabled="loading">
-                            <fluent-progress-ring v-if="loading" slot="start"
-                                                  style="width: 12px; height: 12px;"></fluent-progress-ring>
-                            <span>{{ message }}</span>
-                        </fluent-button>
-                        <fluent-select v-if="inputLanguages.length" v-model="inputLanguage" style="min-width: auto;">
-                            <fluent-option v-for="item in inputLanguages" :value="item">
-                                {{ getVersion(item) }}
-                            </fluent-option>
+        <div class="content">
+            <div class="split-view">
+                <div class="split-content">
+                    <div style="display: flex; justify-content: space-between; column-gap: 4px;">
+                        <fluent-select v-model="language" style="min-width: auto;">
+                            <fluent-option value="CSharp">C#</fluent-option>
+                            <fluent-option value="VisualBasic">VB</fluent-option>
+                            <fluent-option value="IL">IL</fluent-option>
                         </fluent-select>
+                        <div style="display: flex; column-gap: 4px;">
+                            <fluent-button :title="loading ? message : 'Process'" @click="processAsync"
+                                           :disabled="loading">
+                                <fluent-progress-ring v-if="loading"
+                                                      style="width: 12px; height: 12px;"></fluent-progress-ring>
+                                <svg v-else width="12" viewBox="0 0 12 12" style="fill: currentColor;">
+                                    <title>TriangleRight</title>
+                                    <path d="M10.54 6.79a.9.9 0 0 0 0-1.58L3.37 1.12A.92.92 0 0 0 2 1.91V10.09c0 .7.76 1.14 1.37.79l7.17-4.1Z">
+                                    </path>
+                                </svg>
+                            </fluent-button>
+                            <fluent-select v-if="inputLanguages.length" v-model="inputLanguage"
+                                           style="min-width: auto;">
+                                <fluent-option v-for="item in inputLanguages" :value="item">
+                                    {{ getVersion(item) }}
+                                </fluent-option>
+                            </fluent-select>
+                        </div>
+                    </div>
+                    <codemirror class="editor" v-model:value="code" :language="getLauguage()" ref="editor"></codemirror>
+                </div>
+                <div class="split-content">
+                    <div style="display: flex; justify-content: space-between; column-gap: 4px;">
+                        <fluent-select v-model="output" style="min-width: auto;">
+                            <fluent-option value="CSharp">C#</fluent-option>
+                            <fluent-option value="IL">IL</fluent-option>
+                            <fluent-option value="Run">Run</fluent-option>
+                        </fluent-select>
+                        <div style="display: flex; column-gap: 4px;">
+                            <fluent-button v-if="!isInitLinter" @click="initLinterAsync" :disabled="loading">
+                                Init Linter
+                            </fluent-button>
+                            <fluent-select v-if="outputLanguages.length" v-model="outputLanguage"
+                                           style="min-width: auto;">
+                                <fluent-option v-for="item in outputLanguages" :value="item">
+                                    {{ getVersion(item) }}
+                                </fluent-option>
+                            </fluent-select>
+                        </div>
+                    </div>
+                    <div class="editor">
+                        <codemirror v-if="results.decompiled" v-model:value="results.decompiled"
+                                    :language="getOutputLanguage()" readonly="true"></codemirror>
+                        <div class="output">
+                            <div v-if="results.outputs.length">
+                                <pre class="unset" v-for="item in results.outputs" v-html="renderConsole(item)"></pre>
+                            </div>
+                            <div v-else-if="results.diagnostics.length">
+                                <table cellpadding="4">
+                                    <thead>
+                                        <tr>
+                                            <th style="width: 20px;"></th>
+                                            <th>ID</th>
+                                            <th>Message</th>
+                                            <th>Location</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr v-for="item in results.diagnostics">
+                                            <td :class="item.severity.toLowerCase() + '-icon'"></td>
+                                            <td>{{ item.id }}</td>
+                                            <td>{{ item.message }}</td>
+                                            <td>{{ getLocation(item) }}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <codemirror class="editor" v-model:value="code" :language="getLauguage()" ref="editor"></codemirror>
             </div>
-            <div class="split-content">
-                <div style="display: flex; justify-content: space-between; column-gap: 4px;">
-                    <fluent-select v-model="output" style="min-width: auto;">
-                        <fluent-option value="CSharp">C#</fluent-option>
-                        <fluent-option value="IL">IL</fluent-option>
-                        <fluent-option value="Run">Run</fluent-option>
-                    </fluent-select>
-                    <div style="display: flex; column-gap: 4px;">
-                        <fluent-button v-if="!isInitDotnet" @click="initLinterAsync" :disabled="loading">
-                            Init Linter
-                        </fluent-button>
-                        <fluent-select v-if="outputLanguages.length" v-model="outputLanguage" style="min-width: auto;">
-                            <fluent-option v-for="item in outputLanguages" :value="item">
-                                {{ getVersion(item) }}
-                            </fluent-option>
-                        </fluent-select>
-                    </div>
-                </div>
-                <div class="editor">
-                    <codemirror v-if="results.decompiled" v-model:value="results.decompiled"
-                                :language="getOutputLanguage()" readonly="true"></codemirror>
-                    <div class="output">
-                        <div v-if="results.outputs.length">
-                            <pre class="unset" v-for="item in results.outputs" v-html="renderConsole(item)"></pre>
-                        </div>
-                        <div v-else-if="results.diagnostics.length">
-                            <table cellpadding="4">
-                                <thead>
-                                    <tr>
-                                        <th style="width: 20px;"></th>
-                                        <th>ID</th>
-                                        <th>Message</th>
-                                        <th>Location</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr v-for="item in results.diagnostics">
-                                        <td :class="item.severity.toLowerCase() + '-icon'"></td>
-                                        <td>{{ item.id }}</td>
-                                        <td>{{ item.message }}</td>
-                                        <td>{{ getLocation(item) }}</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
+            <div class="status-bar">
+                <div style="height: 20px;">
+                    <svg width="16" viewBox="0 0 16 16" style="fill: currentColor; margin: 2px 4px -3px 0;">
+                        <title>Alert</title>
+                        <path d="M8 2a4.5 4.5 0 0 0-4.5 4.5v2.4l-.96 2.41A.5.5 0 0 0 3 12h3a2 2 0 1 0 4 0h3a.5.5 0 0 0 .46-.69l-.96-2.4V6.5A4.5 4.5 0 0 0 8 2Zm1 10a1 1 0 0 1-1 1 1 1 0 0 1-1-1h2ZM4.5 6.5a3.5 3.5 0 1 1 7 0V9c0 .06.01.12.04.18l.72 1.82H3.74l.72-1.82A.5.5 0 0 0 4.5 9V6.5Z">
+                        </path>
+                    </svg>
+                    <span>{{ message }}</span>
                 </div>
             </div>
         </div>
@@ -188,8 +207,9 @@
                     outputLanguage: "CSharp1",
                     isInitDotnet: false,
                     isInitCompiler: false,
+                    isInitLinter: false,
                     loading: false,
-                    message: "Process",
+                    message: '',
                     results: {
                         diagnostics: [],
                         decompiled: null,
@@ -238,7 +258,7 @@
                             throw e;
                         }
                         finally {
-                            this.message = "Process";
+                            this.message = '';
                             this.loading = false;
                         }
                     }
@@ -259,7 +279,7 @@
                             throw e;
                         }
                         finally {
-                            this.message = "Process";
+                            this.message = '';
                             this.loading = false;
                         }
                     }
@@ -281,7 +301,7 @@
                             throw e;
                         }
                         finally {
-                            this.message = "Process";
+                            this.message = '';
                             this.loading = false;
                         }
                     }
@@ -302,7 +322,7 @@
                             throw e;
                         }
                         finally {
-                            this.message = "Process";
+                            this.message = '';
                             this.loading = false;
                         }
                     }
@@ -334,7 +354,7 @@
                         throw e;
                     }
                     finally {
-                        this.message = "Process";
+                        this.message = '';
                         this.loading = false;
                     }
                 },
@@ -430,182 +450,185 @@
                     }
                 },
                 initEditer() {
-                    const editorHost = this.$refs.editor;
-                    const editor = editorHost.editor;
-                    function getIndex(doc, span) {
-                        if (doc.lines <= span.line) {
-                            return doc.length;
-                        }
-                        const index = doc.line(span.line + 1).from + span.character;
-                        if (index > doc.length) {
-                            return doc.length;
-                        }
-                        return index;
-                    }
-                    editor.dispatch({
-                        effects: editorHost.linterSet.reconfigure(linter(async view => {
-                            const diagnostics = await this.getDiagnosticsAsync(view.state.doc.toString());
-                            if (diagnostics instanceof Array) {
-                                const that = this;
-                                return diagnostics.map(diagnostic => {
-                                    return {
-                                        from: getIndex(view.state.doc, diagnostic.location.start),
-                                        to: getIndex(view.state.doc, diagnostic.location.end),
-                                        severity: (() => {
-                                            switch (diagnostic.severity) {
-                                                case "Error":
-                                                    return "error";
-                                                case "Warning":
-                                                    return "warning";
-                                                case "Info":
-                                                case "Hidden":
-                                                default:
-                                                    return "info";
-                                            }
-                                        })(),
-                                        message: `${diagnostic.id ? `${diagnostic.id}: ` : ''}${diagnostic.message}`,
-                                        actions: diagnostic.actions.map(x => {
-                                            return {
-                                                name: x.title,
-                                                async apply(view) {
-                                                    const results = await that.diagnosticInvokeAsync(x.action);
-                                                    if (results instanceof Array) {
-                                                        view.dispatch({
-                                                            changes: results.map(x => {
-                                                                const span = x.span;
-                                                                return { from: span.start, to: span.end, insert: x.newText }
-                                                            })
-                                                        });
-                                                    }
-                                                }
-                                            }
-                                        })
-                                    }
-                                });
+                    if (!this.isInitLinter) {
+                        const editorHost = this.$refs.editor;
+                        const editor = editorHost.editor;
+                        function getIndex(doc, span) {
+                            if (doc.lines <= span.line) {
+                                return doc.length;
                             }
-                            return [];
-                        }))
-                    });
-                    editor.dispatch({
-                        effects: editorHost.lintGutterSet.reconfigure(lintGutter())
-                    });
-                    function mapTextTagsToType(tags) {
-                        switch (tags.length) {
-                            case 0: if (tags.length === 0)
-                                console.warn('No tag found for completion, falling back to "keyword".');
-                                return "keyword";
-                            case 1:
-                                return tags[0].toLowerCase();
-                            default:
-                                return `${tags[0].toLowerCase()}-${tags[1].toLowerCase()}`;
-                        }
-                    }
-                    function renderPartTo(parent, part) {
-                        const span = document.createElement("span");
-                        span.className = `tok-${part.tag.toLowerCase()}`;
-                        span.textContent = part.text;
-                        parent.appendChild(span);
-                    }
-                    function createSection() {
-                        const section = document.createElement("div");
-                        section.className = "mirrorsharp-parts-section";
-                        return section;
-                    }
-                    function renderPartsTo(parent, parts, splitLinesToSections) {
-                        let section = splitLinesToSections ? createSection() : parent;
-                        for (const part of parts) {
-                            if (part.kind === "linebreak" && splitLinesToSections) {
-                                parent.appendChild(section);
-                                section = createSection();
-                                continue;
+                            const index = doc.line(span.line + 1).from + span.character;
+                            if (index > doc.length) {
+                                return doc.length;
                             }
-                            renderPartTo(section, part);
+                            return index;
                         }
-                        if (splitLinesToSections) {
-                            parent.appendChild(section);
-                        }
-                    }
-                    function renderParts(parts, splitLinesToSections) {
-                        const container = document.createElement("div");
-                        renderPartsTo(container, parts, splitLinesToSections);
-                        return container;
-                    }
-                    editor.dispatch({
-                        effects: editorHost.autocompletionSet.reconfigure(autocompletion({
-                            override: [ifNotIn([';', '{', '}'], async context => {
-                                const from = context.pos;
-                                const completions = await this.getCompletionsAsync(context.state.doc.toString(), from);
-                                const matchContext = context.matchBefore(/[\w\d]+/) ?? { from };
-                                const that = this;
-                                return {
-                                    from: matchContext.from ?? from,
-                                    options: completions.map(item => {
+                        editor.dispatch({
+                            effects: editorHost.linterSet.reconfigure(linter(async view => {
+                                const diagnostics = await this.getDiagnosticsAsync(view.state.doc.toString());
+                                if (diagnostics instanceof Array) {
+                                    const that = this;
+                                    return diagnostics.map(diagnostic => {
                                         return {
-                                            label: item.displayText,
-                                            detail: item.inlineDescription,
-                                            type: mapTextTagsToType(item.tags),
-                                            async info() {
-                                                const results = await that.completionGetDescriptionAsync(item.self);
-                                                return renderParts(results, true);
-                                            },
-                                            async apply(view, completion, from, to) {
-                                                const results = await that.completionGetChangeAsync(item.self);
-                                                if (results) {
-                                                    const textChanges = results.textChanges;
-                                                    if (textChanges instanceof Array) {
-                                                        const selection = { anchor: results.newPosition ?? to };
-                                                        const changes = textChanges.map((x, i) => {
-                                                            const span = x.span;
-                                                            if (typeof results.newPosition !== "number") {
-                                                                if (i == 0) {
-                                                                    selection.anchor = from;
-                                                                }
-                                                                selection.anchor += x.newText.length;
-                                                                if (span.start < from) {
-                                                                    selection.anchor -= Math.min(from, span.end) - span.start;
-                                                                }
-                                                            }
-                                                            return { from: span.start, to: span.end, insert: x.newText };
-                                                        });
-                                                        view.dispatch({ changes });
-                                                        if (selection.anchor <= view.state.doc.length) {
-                                                            view.dispatch({ selection });
+                                            from: getIndex(view.state.doc, diagnostic.location.start),
+                                            to: getIndex(view.state.doc, diagnostic.location.end),
+                                            severity: (() => {
+                                                switch (diagnostic.severity) {
+                                                    case "Error":
+                                                        return "error";
+                                                    case "Warning":
+                                                        return "warning";
+                                                    case "Info":
+                                                    case "Hidden":
+                                                    default:
+                                                        return "info";
+                                                }
+                                            })(),
+                                            message: `${diagnostic.id ? `${diagnostic.id}: ` : ''}${diagnostic.message}`,
+                                            actions: diagnostic.actions.map(x => {
+                                                return {
+                                                    name: x.title,
+                                                    async apply(view) {
+                                                        const results = await that.diagnosticInvokeAsync(x.action);
+                                                        if (results instanceof Array) {
+                                                            view.dispatch({
+                                                                changes: results.map(x => {
+                                                                    const span = x.span;
+                                                                    return { from: span.start, to: span.end, insert: x.newText }
+                                                                })
+                                                            });
                                                         }
                                                     }
                                                 }
-                                                else {
-                                                    return view.dispatch({ changes: { from, to, insert: completion.label } });
+                                            })
+                                        }
+                                    });
+                                }
+                                return [];
+                            }))
+                        });
+                        editor.dispatch({
+                            effects: editorHost.lintGutterSet.reconfigure(lintGutter())
+                        });
+                        function mapTextTagsToType(tags) {
+                            switch (tags.length) {
+                                case 0: if (tags.length === 0)
+                                    console.warn('No tag found for completion, falling back to "keyword".');
+                                    return "keyword";
+                                case 1:
+                                    return tags[0].toLowerCase();
+                                default:
+                                    return `${tags[0].toLowerCase()}-${tags[1].toLowerCase()}`;
+                            }
+                        }
+                        function renderPartTo(parent, part) {
+                            const span = document.createElement("span");
+                            span.className = `tok-${part.tag.toLowerCase()}`;
+                            span.textContent = part.text;
+                            parent.appendChild(span);
+                        }
+                        function createSection() {
+                            const section = document.createElement("div");
+                            section.className = "mirrorsharp-parts-section";
+                            return section;
+                        }
+                        function renderPartsTo(parent, parts, splitLinesToSections) {
+                            let section = splitLinesToSections ? createSection() : parent;
+                            for (const part of parts) {
+                                if (part.kind === "linebreak" && splitLinesToSections) {
+                                    parent.appendChild(section);
+                                    section = createSection();
+                                    continue;
+                                }
+                                renderPartTo(section, part);
+                            }
+                            if (splitLinesToSections) {
+                                parent.appendChild(section);
+                            }
+                        }
+                        function renderParts(parts, splitLinesToSections) {
+                            const container = document.createElement("div");
+                            renderPartsTo(container, parts, splitLinesToSections);
+                            return container;
+                        }
+                        editor.dispatch({
+                            effects: editorHost.autocompletionSet.reconfigure(autocompletion({
+                                override: [ifNotIn([';', '{', '}'], async context => {
+                                    const from = context.pos;
+                                    const completions = await this.getCompletionsAsync(context.state.doc.toString(), from);
+                                    const matchContext = context.matchBefore(/[\w\d]+/) ?? { from };
+                                    const that = this;
+                                    return {
+                                        from: matchContext.from ?? from,
+                                        options: completions.map(item => {
+                                            return {
+                                                label: item.displayText,
+                                                detail: item.inlineDescription,
+                                                type: mapTextTagsToType(item.tags),
+                                                async info() {
+                                                    const results = await that.completionGetDescriptionAsync(item.self);
+                                                    return renderParts(results, true);
+                                                },
+                                                async apply(view, completion, from, to) {
+                                                    const results = await that.completionGetChangeAsync(item.self);
+                                                    if (results) {
+                                                        const textChanges = results.textChanges;
+                                                        if (textChanges instanceof Array) {
+                                                            const selection = { anchor: results.newPosition ?? to };
+                                                            const changes = textChanges.map((x, i) => {
+                                                                const span = x.span;
+                                                                if (typeof results.newPosition !== "number") {
+                                                                    if (i == 0) {
+                                                                        selection.anchor = from;
+                                                                    }
+                                                                    selection.anchor += x.newText.length;
+                                                                    if (span.start < from) {
+                                                                        selection.anchor -= Math.min(from, span.end) - span.start;
+                                                                    }
+                                                                }
+                                                                return { from: span.start, to: span.end, insert: x.newText };
+                                                            });
+                                                            view.dispatch({ changes });
+                                                            if (selection.anchor <= view.state.doc.length) {
+                                                                view.dispatch({ selection });
+                                                            }
+                                                        }
+                                                    }
+                                                    else {
+                                                        return view.dispatch({ changes: { from, to, insert: completion.label } });
+                                                    }
                                                 }
                                             }
+                                        }),
+                                        filter: false
+                                    };
+                                })]
+                            }))
+                        });
+                        editorHost.roslynTooltip = () => hoverTooltip(async (view, pos) => {
+                            const tooltip = await this.getInfoTipAsync(view.state.doc.toString(), pos);
+                            return {
+                                pos,
+                                create() {
+                                    const dom = document.createElement("div")
+                                    dom.classList.add("mirrorsharp-infotip");
+                                    tooltip.sections.forEach((section, index) => {
+                                        const element = document.createElement("div");
+                                        element.className = "mirrorsharp-parts-section";
+                                        if (index === 0) {
+                                            const icon = document.createElement("span");
+                                            icon.classList.add("cm-completionIcon", `cm-completionIcon-${mapTextTagsToType(tooltip.tags)}`);
+                                            element.appendChild(icon);
                                         }
-                                    }),
-                                    filter: false
-                                };
-                            })]
-                        }))
-                    });
-                    editorHost.roslynTooltip = () => hoverTooltip(async (view, pos) => {
-                        const tooltip = await this.getInfoTipAsync(view.state.doc.toString(), pos);
-                        return {
-                            pos,
-                            create() {
-                                const dom = document.createElement("div")
-                                dom.classList.add("mirrorsharp-infotip");
-                                tooltip.sections.forEach((section, index) => {
-                                    const element = document.createElement("div");
-                                    element.className = "mirrorsharp-parts-section";
-                                    if (index === 0) {
-                                        const icon = document.createElement("span");
-                                        icon.classList.add("cm-completionIcon", `cm-completionIcon-${mapTextTagsToType(tooltip.tags)}`);
-                                        element.appendChild(icon);
-                                    }
-                                    renderPartsTo(element, section.parts, false);
-                                    dom.appendChild(element);
-                                });
-                                return { dom };
-                            }
-                        };
-                    });
+                                        renderPartsTo(element, section.parts, false);
+                                        dom.appendChild(element);
+                                    });
+                                    return { dom };
+                                }
+                            };
+                        });
+                        this.isInitLinter = true;
+                    }
                 },
                 getLauguage() {
                     switch (this.language) {
@@ -1128,12 +1151,21 @@
             max-height: calc(var(--base-height-multiplier) * 30px);
         }
 
-        #vue-app div.split-view {
-            width: 100%;
+        #vue-app .content {
             height: 100%;
+            padding: 8px 8px 0 8px;
+        }
+
+        #vue-app div.status-bar {
+            height: 30px;
+            padding: 4px 4px 6px 4px;
+            font-family: var(--font-monospace);
+        }
+
+        #vue-app div.split-view {
+            height: calc(100% - 30px);
             display: flex;
             gap: 8px;
-            padding: 8px;
         }
 
             #vue-app div.split-view .split-content {

@@ -13,11 +13,13 @@ using Mobius.ILasm.Core;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json.Serialization;
 using System.Threading;
@@ -119,6 +121,7 @@ namespace SharpScript.Common
             }
         }
 
+        [DynamicDependency(DynamicallyAccessedMemberTypes.All, typeof(RuntimeFeature))]
         public RoslynCodeSession(string code, RoslynOptions options, bool isConsole, ILogger<RoslynCodeSession> logger = null)
         {
             _options = options;
