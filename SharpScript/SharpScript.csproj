@@ -33,23 +33,17 @@
     <TrimmerRootAssembly Include="System.Net.WebClient" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Content Update="wwwroot\**">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-  </ItemGroup>
-
   <Target Name="GetFrameworkXmlDocumentation" AfterTargets="ResolveReferences">
     <ItemGroup>
       <OutputDocuments Include="@(Reference->'%(RootDir)%(Directory)%(Filename).xml')" Condition="Exists('%(RootDir)%(Directory)%(Filename).xml')" />
     </ItemGroup>
   </Target>
 
-  <Target Name="CopyAssembliesToOutputDirectory" AfterTargets="CopyFilesToOutputDirectory" DependsOnTargets="GetFrameworkXmlDocumentation">
+  <Target Name="CopyDocumentationsToOutputDirectory" AfterTargets="CopyFilesToOutputDirectory" DependsOnTargets="GetFrameworkXmlDocumentation">
     <Copy SourceFiles="@(OutputDocuments)" DestinationFolder="$(OutputPath)wwwroot\_framework" />
   </Target>
 
-  <Target Name="CopyAssembliesToPublishDirectory" AfterTargets="CopyFilesToPublishDirectory" DependsOnTargets="GetFrameworkXmlDocumentation">
+  <Target Name="CopyDocumentationsToPublishDirectory" AfterTargets="CopyFilesToPublishDirectory" DependsOnTargets="GetFrameworkXmlDocumentation">
     <Copy SourceFiles="@(OutputDocuments)" DestinationFolder="$(PublishDir)wwwroot\_framework" />
   </Target>
 

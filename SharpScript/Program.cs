@@ -30,13 +30,16 @@ namespace SharpScript
         public static Task<CompileResult> ProcessAsync(string code) => Compiler.ProcessAsync(code).AsTask();
 
         [JSInvokable]
+        public static Task<DotNetStreamReference> GetAssemblyAsync(string code) => Compiler.GetAssemblyAsync(code).AsTask().ContinueWith(x => x.Result == null ? null : new DotNetStreamReference(x.Result));
+
+        [JSInvokable]
         public static Task<List<Diagnostic>> GetDiagnosticsAsync(string code) => Compiler.GetDiagnosticsAsync(code).AsTask();
 
         [JSInvokable]
-        public static Task<IEnumerable<RoslynCompletionItem>> GetCompletionsAsync(string code, int position) => Compiler.GetCompletionsAsync(code, position).AsTask();
+        public static Task<IEnumerable<RoslynCompletionItem>> GetCompletionsAsync(string code, int position) => Compiler.GetCompletionsAsync(code, position);
 
         [JSInvokable]
-        public static Task<InfoTipItem> GetInfoTipAsync(string code, int position) => Compiler.GetInfoTipAsync(code, position).AsTask();
+        public static Task<InfoTipItem> GetInfoTipAsync(string code, int position) => Compiler.GetInfoTipAsync(code, position);
 
         [JSInvokable]
         public static IEnumerable<string> GetLanguageTypes() => Compiler.LanguageTypes.Select(x => x.ToString());

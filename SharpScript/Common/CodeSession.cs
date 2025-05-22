@@ -3,6 +3,7 @@ using Microsoft.CodeAnalysis.CodeActions;
 using Microsoft.CodeAnalysis.CodeFixes;
 using Microsoft.CodeAnalysis.Completion;
 using Microsoft.CodeAnalysis.Diagnostics;
+using Microsoft.CodeAnalysis.Elfie.Diagnostics;
 using Microsoft.CodeAnalysis.Emit;
 using Microsoft.CodeAnalysis.QuickInfo;
 using Microsoft.CodeAnalysis.Text;
@@ -30,7 +31,7 @@ using RoslynDiagnostic = Microsoft.CodeAnalysis.Diagnostic;
 
 namespace SharpScript.Common
 {
-    public sealed partial class RoslynCodeSession : ICodeSession<RoslynCodeSession>
+    public sealed partial class RoslynCodeSession : ICodeSession<ICodeSession>
     {
         private static readonly SourceText EmptySourceText = SourceText.From(string.Empty);
         private static string _baseUrl;
@@ -41,6 +42,8 @@ namespace SharpScript.Common
         private readonly string _language;
         private readonly bool _isConsole;
         private bool _outOfDate;
+        private HashSet<MetadataReference> _addon = [];
+        private AsyncLocker _addonLocker = new();
 
         internal readonly ILogger<RoslynCodeSession> _logger;
 
@@ -186,13 +189,13 @@ namespace SharpScript.Common
             _outOfDate = false;
         }
 
-        public RoslynCodeSession SetSourceText(string code)
+        public async ValueTask<ICodeSession> SetSourceTextAsync(string code, CancellationToken cancellationToken = default)
         {
-            SourceCode = code;
+            SourceCode = await AddReferencesAsync(code, cancellationToken).ConfigureAwait(false);
             return this;
         }
 
-        public async ValueTask<IReadOnlyList<TextChange>> RollbackWorkspaceChangesAsync()
+        public async ValueTask<IReadOnlyList<TextChange>> RollbackWorkspaceChangesAsync(CancellationToken cancellationToken = default)
         {
             Project oldProject = _currentDocument.Project;
             Project newProject = Workspace.CurrentSolution.GetProject(oldProject.Id)!;
@@ -201,7 +204,7 @@ namespace SharpScript.Common
                 return [];
             }
 
-            SourceText newText = await newProject.GetDocument(_currentDocument.Id).GetTextAsync().ConfigureAwait(false);
+            SourceText newText = await newProject.GetDocument(_currentDocument.Id).GetTextAsync(cancellationToken).ConfigureAwait(false);
             Workspace.TryApplyChanges(oldProject.Solution);
             _currentDocument = Workspace.CurrentSolution.GetDocument(_currentDocument.Id);
 
@@ -310,7 +313,7 @@ namespace SharpScript.Common
             return new InfoTipItem(info);
         }
 
-        public async ValueTask<CompilationResults> Compile(ICollection<Diagnostic> results, CancellationToken cancellationToken = default)
+        public async ValueTask<CompilationResults> CompileAsync(ICollection<Diagnostic> results, CancellationToken cancellationToken = default)
         {
             MemoryStream assemblyStream = new();
             MemoryStream symbolStream = new();
@@ -327,7 +330,7 @@ namespace SharpScript.Common
                 if (!_isConsole && _options is CSharpInputOptions { LanguageVersion: >= CSharpLanguageVersion.CSharp9 }
                     && emitResult.Diagnostics.Any(x => x is { Id: "CS8805", Severity: DiagnosticSeverity.Error }))
                 {
-                    return await ConsoleVersion.Compile(results, cancellationToken).ConfigureAwait(false);
+                    return await ConsoleVersion.CompileAsync(results, cancellationToken).ConfigureAwait(false);
                 }
                 results.AddRange(emitResult.Diagnostics.Select(x => new Diagnostic(x)));
                 return null;
@@ -350,12 +353,13 @@ namespace SharpScript.Common
                     {
                         using Stream stream = await client.GetStreamAsync(result.Key).ConfigureAwait(false);
                         byte[] array = await WebcilConverterUtil.ConvertFromWebcilAsync(stream).ConfigureAwait(false);
-                        references.Add(MetadataReference.CreateFromImage(array, documentation: await CreateDocumentation().ConfigureAwait(false)));
-                        async ValueTask<XmlDocumentationProvider> CreateDocumentation()
+                        references.Add(MetadataReference.CreateFromImage(array, documentation: await CreateDocumentation(client, assembly, logger).ConfigureAwait(false), filePath: assembly));
+                        static async ValueTask<XmlDocumentationProvider> CreateDocumentation(HttpClient client, string assembly, ILogger<RoslynCodeSession> logger)
                         {
+                        start:
                             try
                             {
-                                byte[] bytes = await client.GetByteArrayAsync($"{assembly}.xml");
+                                byte[] bytes = await client.GetByteArrayAsync($"{assembly}.xml").ConfigureAwait(false);
                                 if (bytes?.Length > 0)
                                 {
                                     return XmlDocumentationProvider.CreateFromBytes(bytes);
@@ -363,7 +367,34 @@ namespace SharpScript.Common
                             }
                             catch (Exception ex)
                             {
-                                logger.LogTrace(ex, "The documentation for '{assembly}' was not found.", assembly);
+                                switch (assembly)
+                                {
+                                    case "System.Private.CoreLib":
+                                    case "System.Private.Uri":
+                                        assembly = "System.Runtime";
+                                        logger.LogTrace("The documentation for '{assembly}' was not found. Fallback to 'System.Runtime'.", assembly);
+                                        goto start;
+                                    default:
+                                        const string baseUrl = "https://wherewhere.github.io/SharpScript/_framework/";
+                                        if (_baseUrl != baseUrl)
+                                        {
+                                            try
+                                            {
+                                                using HttpClient _client = new() { BaseAddress = new Uri(baseUrl) };
+                                                byte[] bytes = await _client.GetByteArrayAsync($"{assembly}.xml").ConfigureAwait(false);
+                                                if (bytes?.Length > 0)
+                                                {
+                                                    return XmlDocumentationProvider.CreateFromBytes(bytes);
+                                                }
+                                            }
+                                            catch (Exception e)
+                                            {
+                                                logger.LogWarning(e, "The documentation for '{assembly}' was not found.", assembly);
+                                            }
+                                        }
+                                        logger.LogWarning(ex, "The documentation for '{assembly}' was not found.", assembly);
+                                        break;
+                                }
                             }
                             return null;
                         }
@@ -409,41 +440,146 @@ namespace SharpScript.Common
             }
         }
 
-        //private static async ValueTask<(IList<MetadataReference> references, string code)> AddReferencesAsync(string code)
-        //{
-        //    if (code.StartsWith("#r ", StringComparison.OrdinalIgnoreCase))
-        //    {
-        //        using StringReader reader = new(code);
-        //        List<MetadataReference> references = [.. CodeSession.references];
-        //        HttpClient client = null;
-        //        try
-        //        {
-        //            while (reader.Peek() > 0)
-        //            {
-        //                string line = reader.ReadLine();
-        //                if (line.StartsWith("#r ", StringComparison.OrdinalIgnoreCase))
-        //                {
-        //                    string path = line[3..].Trim(' ', '\'', '"');
-        //                    client ??= new() { BaseAddress = new(baseUrl) };
-        //                    using Stream stream = await client.GetStreamAsync($"{path}.wasm").ConfigureAwait(false);
-        //                    references.Add(MetadataReference.CreateFromImage(WebcilConverterUtil.ConvertFromWebcil(stream)));
-        //                }
-        //                else
-        //                {
-        //                    code = line;
-        //                    break;
-        //                }
-        //            }
-        //        }
-        //        finally
-        //        {
-        //            client?.Dispose();
-        //        }
-        //        code += reader.ReadToEnd();
-        //        return (references, code);
-        //    }
-        //    return (references, code);
-        //}
+        private async ValueTask<string> AddReferencesAsync(string code, CancellationToken cancellationToken = default)
+        {
+            if (code.StartsWith("#r ", StringComparison.OrdinalIgnoreCase))
+            {
+                using StringReader reader = new(code);
+                HashSet<MetadataReference> references = [];
+                HttpClient client = null;
+                BlazorBoot boot = null;
+                StringBuilder builder = new();
+                using (_ = await _addonLocker.WaitAsync())
+                {
+                    try
+                    {
+                        while (reader.Peek() > 0)
+                        {
+                            string line = await reader.ReadLineAsync(cancellationToken).ConfigureAwait(false);
+                            if (line.StartsWith("#r ", StringComparison.OrdinalIgnoreCase))
+                            {
+                                ReadOnlySpan<char> temp = line.AsSpan()[3..];
+                                string path = temp.Trim([' ', '\'', '"']).ToString();
+                                _ = builder.AppendLine($"// {temp}");
+                                if (!string.IsNullOrEmpty(path) && !References.Any(x => x.Display.Equals(path, StringComparison.OrdinalIgnoreCase)))
+                                {
+                                    try
+                                    {
+                                        if (_addon.FirstOrDefault(x => x.Display.Equals(path, StringComparison.OrdinalIgnoreCase)) is MetadataReference reference)
+                                        {
+                                            references.Add(reference);
+                                        }
+                                        else
+                                        {
+                                            string fileName = $"{path}.wasm";
+                                            client ??= new() { BaseAddress = new Uri(_baseUrl) };
+                                            boot ??= await client.GetFromJsonAsync("blazor.boot.json", SourceGenerationContext.Default.BlazorBoot, cancellationToken: cancellationToken).ConfigureAwait(false);
+                                            if (boot.Resources.FingerPrinting.FirstOrDefault(x => x.Value.Equals(fileName, StringComparison.OrdinalIgnoreCase)) is { Key.Length: > 0 } result)
+                                            {
+                                                using Stream stream = await client.GetStreamAsync(result.Key, cancellationToken).ConfigureAwait(false);
+                                                byte[] array = await WebcilConverterUtil.ConvertFromWebcilAsync(stream, cancellationToken: cancellationToken).ConfigureAwait(false);
+                                                references.Add(MetadataReference.CreateFromImage(array, documentation: await CreateDocumentationAsync(client, path, _logger, cancellationToken).ConfigureAwait(false), filePath: path));
+                                                static async ValueTask<XmlDocumentationProvider> CreateDocumentationAsync(HttpClient client, string assembly, ILogger<RoslynCodeSession> logger, CancellationToken cancellationToken = default)
+                                                {
+                                                    try
+                                                    {
+                                                        byte[] bytes = await client.GetByteArrayAsync($"{assembly}.xml", cancellationToken);
+                                                        if (bytes?.Length > 0)
+                                                        {
+                                                            return XmlDocumentationProvider.CreateFromBytes(bytes);
+                                                        }
+                                                    }
+                                                    catch (Exception ex)
+                                                    {
+                                                        const string baseUrl = "https://wherewhere.github.io/SharpScript/_framework/";
+                                                        if (_baseUrl != baseUrl)
+                                                        {
+                                                            try
+                                                            {
+                                                                using HttpClient _client = new() { BaseAddress = new Uri(baseUrl) };
+                                                                byte[] bytes = await _client.GetByteArrayAsync($"{assembly}.xml", cancellationToken).ConfigureAwait(false);
+                                                                if (bytes?.Length > 0)
+                                                                {
+                                                                    return XmlDocumentationProvider.CreateFromBytes(bytes);
+                                                                }
+                                                            }
+                                                            catch (Exception e)
+                                                            {
+                                                                logger.LogWarning(e, "The documentation for '{assembly}' was not found.", assembly);
+                                                            }
+                                                        }
+                                                        logger.LogWarning(ex, "The documentation for '{assembly}' was not found.", assembly);
+                                                    }
+                                                    return null;
+                                                }
+                                            }
+                                            else
+                                            {
+                                                _logger.LogWarning("The assembly '{path}' was not found.", path);
+                                            }
+                                        }
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        _logger.LogError(ex, "The reference for '{path}' was not found.", path);
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                _ = builder.AppendLine(line);
+                                break;
+                            }
+                        }
+                    }
+                    finally
+                    {
+                        client?.Dispose();
+                        if (!references.SetEquals(_addon))
+                        {
+                            _addon = references;
+                            Solution solution = Workspace.CurrentSolution.WithProjectMetadataReferences(_currentDocument.Project.Id, [.. References, .. references]);
+                            _ = Workspace.TryApplyChanges(solution);
+                            _currentDocument = Workspace.CurrentSolution.GetDocument(_currentDocument.Id);
+                        }
+                    }
+                }
+                code = builder.Append(await reader.ReadToEndAsync(cancellationToken).ConfigureAwait(false)).ToString();
+            }
+            else if (_addon.Count > 0)
+            {
+                _addon = [];
+                Solution solution = Workspace.CurrentSolution.WithProjectMetadataReferences(_currentDocument.Project.Id, References);
+                _ = Workspace.TryApplyChanges(solution);
+                _currentDocument = Workspace.CurrentSolution.GetDocument(_currentDocument.Id);
+            }
+            return code;
+        }
+
+        public partial class AsyncLocker : IDisposable
+        {
+            public SemaphoreSlim SlimLocker { get; } = new(1, 1);
+
+            public async Task<AsyncLocker> WaitAsync()
+            {
+                await SlimLocker.WaitAsync();
+                return this;
+            }
+
+            protected virtual void Dispose(bool disposing)
+            {
+                if (disposing)
+                {
+                    SlimLocker.Release();
+                }
+            }
+
+            public void Dispose()
+            {
+                Dispose(disposing: true);
+                GC.SuppressFinalize(this);
+            }
+        }
 
         private sealed class BlazorBoot
         {
@@ -461,11 +597,11 @@ namespace SharpScript.Common
         private sealed partial class SourceGenerationContext : JsonSerializerContext;
     }
 
-    public sealed class ILCodeSession(string code, bool isConsole) : ICodeSession<ILCodeSession>
+    public sealed class ILCodeSession(string code, bool isConsole) : ICodeSession<ICodeSession>
     {
         private string _code = code;
 
-        public ValueTask<CompilationResults> Compile(ICollection<Diagnostic> results, CancellationToken cancellationToken = default)
+        public ValueTask<CompilationResults> CompileAsync(ICollection<Diagnostic> results, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             Logger logger = new(results);
@@ -504,10 +640,10 @@ namespace SharpScript.Common
             }
         }
 
-        public ILCodeSession SetSourceText(string code)
+        public ValueTask<ICodeSession> SetSourceTextAsync(string code, CancellationToken cancellationToken = default)
         {
             _code = code;
-            return this;
+            return ValueTask.FromResult<ICodeSession>(this);
         }
 
         private class Logger(ICollection<Diagnostic> results) : Mobius.ILasm.interfaces.ILogger
@@ -529,14 +665,14 @@ namespace SharpScript.Common
         ValueTask<T> GetDiagnosticsAsync<T>(T results, CancellationToken cancellationToken = default) where T : ICollection<Diagnostic>;
         ValueTask<IEnumerable<RoslynCompletionItem>> GetCompletionsAsync(int position, CancellationToken cancellationToken = default) => ValueTask.FromResult<IEnumerable<RoslynCompletionItem>>([]);
         ValueTask<InfoTipItem> GetInfoTipAsync(int position, CancellationToken cancellationToken = default) => ValueTask.FromResult<InfoTipItem>(default);
-        ICodeSession SetSourceText(string code);
-        ValueTask<CompilationResults> Compile(ICollection<Diagnostic> results, CancellationToken cancellationToken = default);
+        ValueTask<ICodeSession> SetSourceTextAsync(string code, CancellationToken cancellationToken = default);
+        ValueTask<CompilationResults> CompileAsync(ICollection<Diagnostic> results, CancellationToken cancellationToken = default);
     }
 
-    public interface ICodeSession<out TSelf> : ICodeSession where TSelf : ICodeSession
+    public interface ICodeSession<TSelf> : ICodeSession where TSelf : ICodeSession
     {
-        new TSelf SetSourceText(string code);
-        ICodeSession ICodeSession.SetSourceText(string code) => SetSourceText(code);
+        new ValueTask<TSelf> SetSourceTextAsync(string code, CancellationToken cancellationToken = default);
+        async ValueTask<ICodeSession> ICodeSession.SetSourceTextAsync(string code, CancellationToken cancellationToken) => await SetSourceTextAsync(code, cancellationToken).ConfigureAwait(false);
     }
 
     public enum CharacterOperation
