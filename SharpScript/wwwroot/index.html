@@ -133,13 +133,14 @@
             <div class="split-view">
                 <div class="split-content">
                     <div style="display: flex; justify-content: space-between; column-gap: 4px;">
-                        <fluent-select v-model="language" style="min-width: auto;">
-                            <fluent-option value="CSharp">C#</fluent-option>
-                            <fluent-option value="VisualBasic">VB</fluent-option>
-                            <fluent-option value="IL">IL</fluent-option>
+                        <fluent-select :title="$t('input.language.title')"
+                                       :placeholder="$t('input.language.placeholder')" v-model="language" style="min-width: auto;">
+                            <fluent-option title="CSharp" value="CSharp">C#</fluent-option>
+                            <fluent-option title="VisualBasic" value="VisualBasic">VB</fluent-option>
+                            <fluent-option title="IL" value="IL">IL</fluent-option>
                         </fluent-select>
                         <div style="display: flex; column-gap: 4px;">
-                            <fluent-button :title="loading ? message : $t('input.process')" @click="processAsync"
+                            <fluent-button :title="loading ? message : $t('input.process.title')" @click="processAsync"
                                            :disabled="loading">
                                 <fluent-progress-ring v-if="loading"
                                                       style="width: 12px; height: 12px;"></fluent-progress-ring>
@@ -149,8 +150,9 @@
                                 </svg>
                             </fluent-button>
                             <fluent-select v-if="inputLanguages.length" v-model="inputLanguage"
-                                           style="min-width: auto;">
-                                <fluent-option v-for="item in inputLanguages" :value="item">
+                                           style="min-width: 105px;" :title="$t('input.version.title')"
+                                           :placeholder="$t('input.version.placeholder')">
+                                <fluent-option v-for="item in inputLanguages" :title="item" :value="item">
                                     {{ getVersion(item) }}
                                 </fluent-option>
                             </fluent-select>
@@ -160,18 +162,31 @@
                 </div>
                 <div class="split-content">
                     <div style="display: flex; justify-content: space-between; column-gap: 4px;">
-                        <fluent-select v-model="output" style="min-width: auto;">
-                            <fluent-option value="CSharp">C#</fluent-option>
-                            <fluent-option value="IL">IL</fluent-option>
-                            <fluent-option value="Run">Run</fluent-option>
+                        <fluent-select :title="$t('output.language.title')"
+                                       :placeholder="$t('output.language.placeholder')" v-model="output" style="min-width: auto;">
+                            <fluent-option title="CSharp" value="CSharp">C#</fluent-option>
+                            <fluent-option title="IL" value="IL">IL</fluent-option>
+                            <fluent-option title="Run" value="Run">{{ $t("output.language.run") }}</fluent-option>
                         </fluent-select>
                         <div style="display: flex; column-gap: 4px;">
-                            <fluent-button v-if="!isInitLinter" @click="initLinterAsync" :disabled="loading">
-                                {{ $t("output.linter") }}
+                            <fluent-button v-if="isInitLinter && !diagnostics.errors.length"
+                                           :title="$t('output.download.title')" @click="downloadAssemblyAsync" :disabled="loading">
+                                <svg width="16" viewBox="0 0 16 16" style="fill: currentColor;">
+                                    <path d="M3.5 13h9a.5.5 0 0 1 .09 1H3.5a.5.5 0 0 1-.09-1h9.09-9ZM7.91 1H8a.5.5 0 0 1 .5.41v8.89l2.68-2.69a.5.5 0 0 1 .64-.06l.07.06c.17.17.2.44.06.64l-.06.07-3.54 3.53a.5.5 0 0 1-.63.06l-.07-.06L4.1 8.32a.5.5 0 0 1 .64-.77l.07.06L7.5 10.3V1.5a.5.5 0 0 1 .41-.5H8h-.09Z">
+                                    </path>
+                                </svg>
+                            </fluent-button>
+                            <fluent-button v-if="!isInitLinter" :title="$t('output.linter.title')"
+                                           @click="initLinterAsync" :disabled="loading">
+                                <svg width="16" viewBox="0 0 20 20" style="fill: currentColor;">
+                                    <path d="M7.4 12.8a1.04 1.04 0 0 0 1.59-.51l.45-1.37a2.34 2.34 0 0 1 1.47-1.48l1.4-.45A1.04 1.04 0 0 0 12.25 7l-1.37-.45A2.34 2.34 0 0 1 9.4 5.08L8.95 3.7a1.03 1.03 0 0 0-.82-.68 1.04 1.04 0 0 0-1.15.7l-.46 1.4a2.34 2.34 0 0 1-1.44 1.45L3.7 7a1.04 1.04 0 0 0 .02 1.97l1.37.45a2.33 2.33 0 0 1 1.48 1.48l.46 1.4c.07.2.2.37.38.5Zm.08-7.4.53-1.38.44 1.37a3.33 3.33 0 0 0 2.12 2.12l1.4.53-1.38.45a3.34 3.34 0 0 0-2.11 2.11l-.53 1.38-.45-1.38a3.34 3.34 0 0 0-2.1-2.12L4 7.96 5.4 7.5a3.36 3.36 0 0 0 2.08-2.12Zm6.06 11.45a.8.8 0 0 0 1.22-.4l.25-.76a1.09 1.09 0 0 1 .68-.68l.77-.25a.8.8 0 0 0-.02-1.52l-.77-.25a1.08 1.08 0 0 1-.68-.68l-.25-.77a.8.8 0 0 0-1.52.01l-.24.76a1.1 1.1 0 0 1-.67.68l-.77.25a.8.8 0 0 0 0 1.52l.77.25a1.09 1.09 0 0 1 .68.68l.25.77c.06.16.16.3.3.4Zm-.92-2.8-.18-.05.19-.06a2.09 2.09 0 0 0 1.3-1.32l.06-.18.05.18a2.08 2.08 0 0 0 1.32 1.32l.2.06-.18.06a2.08 2.08 0 0 0-1.32 1.32l-.06.18-.06-.18a2.07 2.07 0 0 0-1.32-1.32Z">
+                                    </path>
+                                </svg>
                             </fluent-button>
                             <fluent-select v-if="outputLanguages.length" v-model="outputLanguage"
-                                           style="min-width: auto;">
-                                <fluent-option v-for="item in outputLanguages" :value="item">
+                                           style="min-width: 92px;" :title="$t('output.version.title')"
+                                           :placeholder="$t('output.version.placeholder')">
+                                <fluent-option v-for="item in outputLanguages" :title="item" :value="item">
                                     {{ getVersion(item) }}
                                 </fluent-option>
                             </fluent-select>
@@ -330,6 +345,7 @@
                             }
                         }
                     },
+                    assemblies: null,
                     dotnet: Comlink.wrap(new Worker("worker.js"))
                 }
             },
@@ -349,9 +365,8 @@
                             this.message = message;
                         }
                         catch (e) {
-                            this.message = this.$t("message.error");
-                            this.results.diagnostics.push(e.message);
-                            throw e;
+                            this.message = this.$t("message.error", e.message);
+                            console.error(e);
                         }
                         finally {
                             this.message = '';
@@ -370,9 +385,8 @@
                             this.message = message;
                         }
                         catch (e) {
-                            this.message = this.$t("message.error");
-                            this.results.diagnostics.push(e.message);
-                            throw e;
+                            this.message = this.$t("message.error", e.message);
+                            console.error(e);
                         }
                         finally {
                             this.message = '';
@@ -392,9 +406,8 @@
                             this.message = message;
                         }
                         catch (e) {
-                            this.message = this.$t("message.error");
-                            this.results.diagnostics.push(e.message);
-                            throw e;
+                            this.message = this.$t("message.error", e.message);
+                            console.error(e);
                         }
                         finally {
                             this.message = '';
@@ -413,9 +426,8 @@
                             this.message = message;
                         }
                         catch (e) {
-                            this.message = this.$t("message.error");
-                            this.results.diagnostics.push(e.message);
-                            throw e;
+                            this.message = this.$t("message.error", e.message);
+                            console.error(e);
                         }
                         finally {
                             this.message = '';
@@ -438,7 +450,7 @@
                         this.message = message;
                     }
                     catch (e) {
-                        this.message = this.$t("message.error");
+                        this.message = this.$t("message.error", e.message);
                         this.results.diagnostics.push({
                             location: {
                                 start: { line: 0, character: 0 },
@@ -447,7 +459,7 @@
                             message: e.message,
                             severity: "Error"
                         });
-                        throw e;
+                        console.error(e);
                     }
                     finally {
                         this.message = '';
@@ -500,6 +512,27 @@
                     }
                     catch (e) {
                         console.warn(e);
+                    }
+                },
+                async downloadAssemblyAsync() {
+                    try {
+                        this.loading = true;
+                        const message = this.message;
+                        this.message = this.$t("message.compiling");
+                        const href = await this.dotnet.getAssemblyLinkAsync(this.code);
+                        const link = document.createElement('a');
+                        link.href = href;
+                        link.download = "SharpScript.dll";
+                        link.click();
+                        this.message = message;
+                    }
+                    catch (e) {
+                        this.message = this.$t("message.error", e.message);
+                        console.error(e);
+                    }
+                    finally {
+                        this.message = '';
+                        this.loading = false;
                     }
                 },
                 async initLinterAsync() {
@@ -559,11 +592,11 @@
                             }
                             return index;
                         }
+                        const that = this;
                         editor.dispatch({
                             effects: editorHost.linterSet.reconfigure(linter(async view => {
                                 const diagnostics = await this.getDiagnosticsAsync(view.state.doc.toString());
                                 if (diagnostics instanceof Array) {
-                                    const that = this;
                                     this.diagnostics = {
                                         errors: [],
                                         warnings: [],
@@ -655,16 +688,62 @@
                             renderPartsTo(container, parts, splitLinesToSections);
                             return container;
                         }
+                        async function customCompletionAsync(context) {
+                            if (that.language !== "IL") {
+                                const pos = context.pos;
+                                const line = context.state.doc.lineAt(pos);
+                                const text = line.text;
+                                if (text.startsWith("#r ") || text.startsWith("#R ")) {
+                                    async function getAssemblyAsync() {
+                                        if (that.assemblies) {
+                                            return that.assemblies;
+                                        }
+                                        else {
+                                            const boot = await fetch("_framework/blazor.boot.json").then(x => x.json());
+                                            const fingerprinting = boot.resources.fingerprinting;
+                                            const assemblies = [];
+                                            for (const key in fingerprinting) {
+                                                const value = fingerprinting[key];
+                                                const assembly = value.substring(0, value.lastIndexOf("."));
+                                                assemblies.push(assembly);
+                                            }
+                                            that.assemblies = assemblies;
+                                            return assemblies;
+                                        }
+                                    }
+                                    const path = text.substring(3).trim();
+                                    const from = line.from + 3;
+                                    const assemblies = await getAssemblyAsync();
+                                    const results = [];
+                                    for (const assembly of assemblies) {
+                                        if (assembly.startsWith(path)) {
+                                            results.push({
+                                                label: assembly,
+                                                type: "assembly",
+                                                apply(view, completion) {
+                                                    const label = completion.label;
+                                                    view.dispatch({
+                                                        changes: { from, to: line.to, insert: label },
+                                                        selection: { anchor: from + label.length }
+                                                    });
+                                                }
+                                            });
+                                        }
+                                    }
+                                    return results;
+                                }
+                            }
+                            return [];
+                        }
                         editor.dispatch({
                             effects: editorHost.autocompletionSet.reconfigure(autocompletion({
                                 override: [ifNotIn([';', '{', '}'], async context => {
                                     const from = context.pos;
                                     const completions = await this.getCompletionsAsync(context.state.doc.toString(), from);
                                     const matchContext = context.matchBefore(/[\w\d]+/) ?? { from };
-                                    const that = this;
                                     return {
                                         from: matchContext.from ?? from,
-                                        options: completions.map(item => {
+                                        options: [...completions.map(item => {
                                             return {
                                                 label: item.displayText,
                                                 detail: item.inlineDescription,
@@ -699,11 +778,16 @@
                                                         }
                                                     }
                                                     else {
-                                                        return view.dispatch({ changes: { from, to, insert: completion.label } });
+                                                        const label = completion.label;
+                                                        return view.dispatch({
+                                                            changes: { from, to, insert: label },
+                                                            selection: { anchor: from + label.length }
+                                                        });
                                                     }
                                                 }
                                             }
                                         }),
+                                        ...await customCompletionAsync(context)],
                                         filter: false
                                     };
                                 })]
@@ -1249,13 +1333,37 @@
                 "en-US": {
                     description: ".NET language playground on WASM",
                     input: {
-                        process: "Process"
+                        language: {
+                            title: "Change Language",
+                            placeholder: "Select a language"
+                        },
+                        process: {
+                            title: "Process"
+                        },
+                        version: {
+                            title: "Change Version",
+                            placeholder: "Select a version"
+                        }
                     },
                     output: {
-                        linter: "Init Linter",
+                        language: {
+                            title: "Change Output",
+                            placeholder: "Select an output",
+                            run: "Run"
+                        },
+                        download: {
+                            title: "Download Assembly"
+                        },
+                        linter: {
+                            title: "Init Linter"
+                        },
                         diagnostic: {
                             message: "Message",
                             location: "Location"
+                        },
+                        version: {
+                            title: "Change Output Version",
+                            placeholder: "Select a version"
                         }
                     },
                     status: {
@@ -1264,7 +1372,7 @@
                         warnings: "Warnings: {0}"
                     },
                     message: {
-                        error: "Error",
+                        error: "Error: {0}",
                         changingLanguage: "Changing language...",
                         changingVersion: "Changing version...",
                         changingOutput: "Changing output...",
@@ -1278,13 +1386,37 @@
                 "zh-CN": {
                     description: ".NET 语言在线编译器",
                     input: {
-                        process: "执行"
+                        language: {
+                            title: "选择语言",
+                            placeholder: "请选择语言"
+                        },
+                        process: {
+                            title: "执行"
+                        },
+                        version: {
+                            title: "选择版本",
+                            placeholder: "请选择版本"
+                        }
                     },
                     output: {
-                        linter: "启动分析器",
+                        language: {
+                            title: "选择输出",
+                            placeholder: "请选择输出",
+                            run: "运行"
+                        },
+                        download: {
+                            title: "下载程序集"
+                        },
+                        linter: {
+                            title: "启动分析器"
+                        },
                         diagnostic: {
                             message: "消息",
                             location: "位置"
+                        },
+                        version: {
+                            title: "选择输出版本",
+                            placeholder: "请选择版本"
                         }
                     },
                     status: {
@@ -1293,7 +1425,7 @@
                         warnings: "警告: {0}"
                     },
                     message: {
-                        error: "错误",
+                        error: "错误: {0}",
                         changingLanguage: "正在切换语言...",
                         changingVersion: "正在切换版本...",
                         changingOutput: "正在切换输出...",

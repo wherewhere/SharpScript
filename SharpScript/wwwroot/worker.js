@@ -37,6 +37,9 @@ const dotnet = {
     async processAsync(code) {
         return await DotNet.invokeMethodAsync("SharpScript", "ProcessAsync", code);
     },
+    async getAssemblyAsync(code) {
+        return await DotNet.invokeMethodAsync("SharpScript", "GetAssemblyAsync", code);
+    },
     async getDiagnosticsAsync(code) {
         const result = await DotNet.invokeMethodAsync("SharpScript", "GetDiagnosticsAsync", code);
         if (result instanceof Array) {
@@ -113,6 +116,11 @@ const dotnet = {
         if (completion) {
             return await completion.invokeMethodAsync("GetChangeAsync");
         }
+    },
+    async getAssemblyLinkAsync(code) {
+        const assembly = await this.getAssemblyAsync(code);
+        const file = new File([await assembly.arrayBuffer()], "SharpScript.dll");
+        return URL.createObjectURL(file);
     }
 };
 Comlink.expose(dotnet);

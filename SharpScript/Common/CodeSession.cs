@@ -3,7 +3,6 @@ using Microsoft.CodeAnalysis.CodeActions;
 using Microsoft.CodeAnalysis.CodeFixes;
 using Microsoft.CodeAnalysis.Completion;
 using Microsoft.CodeAnalysis.Diagnostics;
-using Microsoft.CodeAnalysis.Elfie.Diagnostics;
 using Microsoft.CodeAnalysis.Emit;
 using Microsoft.CodeAnalysis.QuickInfo;
 using Microsoft.CodeAnalysis.Text;
@@ -34,6 +33,7 @@ namespace SharpScript.Common
     public sealed partial class RoslynCodeSession : ICodeSession<ICodeSession>
     {
         private static readonly SourceText EmptySourceText = SourceText.From(string.Empty);
+        private static BlazorBoot _boot;
         private static string _baseUrl;
 
         private readonly Dictionary<string, List<CodeFixProvider>> _providers;
@@ -41,9 +41,9 @@ namespace SharpScript.Common
         private readonly RoslynOptions _options;
         private readonly string _language;
         private readonly bool _isConsole;
+        private readonly AsyncLocker _addonLocker = new();
         private bool _outOfDate;
         private HashSet<MetadataReference> _addon = [];
-        private AsyncLocker _addonLocker = new();
 
         internal readonly ILogger<RoslynCodeSession> _logger;
 
@@ -158,25 +158,23 @@ namespace SharpScript.Common
         public static async ValueTask InitAsync(string baseUrl, ILogger<RoslynCodeSession> logger)
         {
             _baseUrl = baseUrl;
-            if (References?.Count is not > 0)
+            if (References is not { Count: > 0 })
             {
                 References = await GetMetadataReferencesAsync(
                     logger,
-                    "System.Runtime",
-                    "System.Private.CoreLib",
-                    "System.Console",
-                    "System.Text.RegularExpressions",
-                    "System.Linq",
-                    "System.Linq.Expressions",
-                    "System.Net.Primitives",
-                    "System.Net.Http",
-                    "System.Private.Uri",
-                    "System.ComponentModel.Primitives",
-                    "System.Collections.Concurrent",
-                    "System.Collections.NonGeneric",
                     "Microsoft.CSharp",
                     "Microsoft.VisualBasic.Core",
-                    "System.Net.WebClient").ConfigureAwait(false);
+                    "System.ComponentModel.Primitives",
+                    "System.Console",
+                    "System.Linq",
+                    "System.Linq.Expressions",
+                    "System.Net.Http",
+                    "System.Net.Primitives",
+                    "System.Private.CoreLib",
+                    "System.Private.Uri",
+                    "System.Runtime",
+                    "System.Text.Json",
+                    "System.Text.RegularExpressions").ConfigureAwait(false);
             }
         }
 
@@ -343,13 +341,13 @@ namespace SharpScript.Common
         {
             List<MetadataReference> references = [];
             using HttpClient client = new() { BaseAddress = new Uri(_baseUrl) };
-            BlazorBoot boot = await client.GetFromJsonAsync("blazor.boot.json", SourceGenerationContext.Default.BlazorBoot).ConfigureAwait(false);
+            _boot ??= await client.GetFromJsonAsync("blazor.boot.json", SourceGenerationContext.Default.BlazorBoot).ConfigureAwait(false);
             foreach (string assembly in assemblies)
             {
                 try
                 {
                     string fileName = $"{assembly}.wasm";
-                    if (boot.Resources.FingerPrinting.FirstOrDefault(x => x.Value.Equals(fileName, StringComparison.OrdinalIgnoreCase)) is { Key.Length: > 0 } result)
+                    if (_boot.Resources.FingerPrinting.FirstOrDefault(x => x.Value.Equals(fileName, StringComparison.OrdinalIgnoreCase)) is { Key.Length: > 0 } result)
                     {
                         using Stream stream = await client.GetStreamAsync(result.Key).ConfigureAwait(false);
                         byte[] array = await WebcilConverterUtil.ConvertFromWebcilAsync(stream).ConfigureAwait(false);
@@ -447,7 +445,6 @@ namespace SharpScript.Common
                 using StringReader reader = new(code);
                 HashSet<MetadataReference> references = [];
                 HttpClient client = null;
-                BlazorBoot boot = null;
                 StringBuilder builder = new();
                 using (_ = await _addonLocker.WaitAsync())
                 {
@@ -473,8 +470,8 @@ namespace SharpScript.Common
                                         {
                                             string fileName = $"{path}.wasm";
                                             client ??= new() { BaseAddress = new Uri(_baseUrl) };
-                                            boot ??= await client.GetFromJsonAsync("blazor.boot.json", SourceGenerationContext.Default.BlazorBoot, cancellationToken: cancellationToken).ConfigureAwait(false);
-                                            if (boot.Resources.FingerPrinting.FirstOrDefault(x => x.Value.Equals(fileName, StringComparison.OrdinalIgnoreCase)) is { Key.Length: > 0 } result)
+                                            _boot ??= await client.GetFromJsonAsync("blazor.boot.json", SourceGenerationContext.Default.BlazorBoot, cancellationToken: cancellationToken).ConfigureAwait(false);
+                                            if (_boot.Resources.FingerPrinting.FirstOrDefault(x => x.Value.Equals(fileName, StringComparison.OrdinalIgnoreCase)) is { Key.Length: > 0 } result)
                                             {
                                                 using Stream stream = await client.GetStreamAsync(result.Key, cancellationToken).ConfigureAwait(false);
                                                 byte[] array = await WebcilConverterUtil.ConvertFromWebcilAsync(stream, cancellationToken: cancellationToken).ConfigureAwait(false);
