@@ -1647,6 +1647,58 @@
             }
         }
 
+        #vue-app .cm-editor .cm-panels {
+            background: var(--neutral-fill-stealth-rest);
+        }
+
+        #vue-app .cm-editor .cm-button {
+            border: calc(var(--stroke-width) * 1px) solid transparent;
+            background: padding-box linear-gradient(var(--neutral-fill-rest), var(--neutral-fill-rest)), border-box var(--neutral-stroke-control-rest);
+            font-family: var(--body-font);
+            color: var(--neutral-foreground-rest);
+            border-radius: calc(var(--control-corner-radius) * 1px);
+            fill: currentcolor;
+        }
+
+            #vue-app .cm-editor .cm-button:not(:disabled):active {
+                background: padding-box linear-gradient(var(--neutral-fill-active), var(--neutral-fill-active)), border-box var(--neutral-stroke-control-active);
+            }
+
+            #vue-app .cm-editor .cm-button:not(:disabled):hover {
+                background: padding-box linear-gradient(var(--neutral-fill-hover), var(--neutral-fill-hover)), border-box var(--neutral-stroke-control-hover);
+            }
+
+            #vue-app .cm-editor .cm-button:disabled {
+                background: padding-box linear-gradient(var(--neutral-fill-rest), var(--neutral-fill-rest)), border-box var(--neutral-stroke-rest);
+                opacity: var(--disabled-opacity);
+                cursor: not-allowed;
+            }
+
+        #vue-app .cm-editor .cm-textfield {
+            background: padding-box linear-gradient(var(--neutral-fill-input-rest), var(--neutral-fill-input-rest)), border-box var(--neutral-stroke-input-rest);
+            border: calc(var(--stroke-width) * 1px) solid transparent;
+            border-radius: calc(var(--control-corner-radius) * 1px);
+            font-family: var(--body-font);
+            color: var(--neutral-foreground-rest);
+            fill: currentcolor;
+            position: relative;
+            outline: none;
+        }
+
+        @media (forced-colors: none) {
+
+            #vue-app .cm-editor .cm-textfield:not(:disabled):active,
+            #vue-app .cm-editor .cm-textfield:not(:disabled):focus-within {
+                border-bottom: calc(var(--stroke-width) * 1px) solid var(--accent-fill-rest);
+            }
+        }
+
+        #vue-app .cm-editor .cm-panel.cm-search label {
+            display: inline-flex;
+            vertical-align: middle;
+            align-items: center;
+        }
+
         #vue-app .cm-editor .cm-completionIcon {
             width: 1em;
             margin-bottom: -2px;
