@@ -17,7 +17,7 @@ namespace SharpScript.Common
     {
         public static async ValueTask<string> CSharpDecompileAsync(CompilationResults streams, CSharpOutputOptions options)
         {
-            using PEFile assemblyFile = new("", streams.AssemblyStream);
+            using PEFile assemblyFile = new(string.Empty, streams.AssemblyStream);
             PortablePdbDebugInfoProvider debugInfo = null;
             try
             {
@@ -26,7 +26,7 @@ namespace SharpScript.Common
 
                 CSharpDecompiler decompiler =
                     new(assemblyFile,
-                        new PreCachedAssemblyResolver(RoslynCodeSession.References),
+                        new PreCachedAssemblyResolver(),
                         new DecompilerSettings(options.LanguageVersion))
                     {
                         DebugInfoProvider = debugInfo
@@ -80,7 +80,7 @@ namespace SharpScript.Common
 
         public static async ValueTask<string> ILDecompileAsync(CompilationResults streams)
         {
-            using PEFile assemblyFile = new("", streams.AssemblyStream);
+            using PEFile assemblyFile = new(string.Empty, streams.AssemblyStream);
             PortablePdbDebugInfoProvider debugInfo = null;
             try
             {

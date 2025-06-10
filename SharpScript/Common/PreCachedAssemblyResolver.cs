@@ -1,9 +1,8 @@
 ﻿using ICSharpCode.Decompiler.Metadata;
-using Microsoft.CodeAnalysis;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Linq;
+using System.IO;
 using System.Threading.Tasks;
 
 namespace SharpScript.Common
@@ -14,16 +13,16 @@ namespace SharpScript.Common
 
         private readonly ConcurrentDictionary<string, (PEFile file, Task<MetadataFile> task)> _peFileCache = new();
 
-        public PreCachedAssemblyResolver(IEnumerable<MetadataReference> references)
+        public PreCachedAssemblyResolver(params IEnumerable<(string name, byte[] bytes)> references)
         {
-            AddToCaches(references.OfType<PortableExecutableReference>().Select(x => x.FilePath).OfType<string>());
+            AddToCaches(references);
         }
 
-        private void AddToCaches(IEnumerable<string> assemblyPaths)
+        private void AddToCaches(params IEnumerable<(string name, byte[] bytes)> assemblyPaths)
         {
-            foreach (string path in assemblyPaths)
+            foreach ((string name, byte[] bytes) in assemblyPaths)
             {
-                PEFile file = new(path);
+                PEFile file = new(name, new MemoryStream(bytes));
                 _ = _peFileCache.TryAdd(file.Name, (file, Task.FromResult<MetadataFile>(file)));
             }
         }
