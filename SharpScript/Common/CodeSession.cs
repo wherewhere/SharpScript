@@ -42,6 +42,7 @@ namespace SharpScript.Common
         private readonly string _language;
         private readonly bool _isConsole;
         private readonly AsyncLocker _addonLocker = new();
+        private readonly string _comment;
         private bool _outOfDate;
         private HashSet<MetadataReference> _addon = [];
 
@@ -146,12 +147,21 @@ namespace SharpScript.Common
             _ = Workspace.TryApplyChanges(solution);
             Workspace.OpenDocument(docId);
             _currentDocument = Workspace.CurrentSolution.GetDocument(docId);
-            GetAnalyzers(_language switch
+            string assemblyName;
+            switch (_language)
             {
-                LanguageNames.CSharp => "Microsoft.CodeAnalysis.CSharp.Features",
-                LanguageNames.VisualBasic => "Microsoft.CodeAnalysis.VisualBasic.Features",
-                _ => throw new NotSupportedException($"Language '{_language}' is not supported.")
-            }, _language, out IEnumerable<DiagnosticAnalyzer> analyzers, out _providers);
+                case LanguageNames.CSharp:
+                    _comment = "//";
+                    assemblyName = "Microsoft.CodeAnalysis.CSharp.Features";
+                    break;
+                case LanguageNames.VisualBasic:
+                    _comment = "' ";
+                    assemblyName = "Microsoft.CodeAnalysis.VisualBasic.Features";
+                    break;
+                default:
+                    throw new NotSupportedException($"Language '{_language}' is not supported.");
+            }
+            GetAnalyzers(assemblyName, _language, out IEnumerable<DiagnosticAnalyzer> analyzers, out _providers);
             _analyzers = [.. analyzers];
         }
 
@@ -457,7 +467,7 @@ namespace SharpScript.Common
                             {
                                 ReadOnlySpan<char> temp = line.AsSpan()[3..];
                                 string path = temp.Trim([' ', '\'', '"']).ToString();
-                                _ = builder.AppendLine($"// {temp}");
+                                _ = builder.AppendLine($"{_comment} {temp}");
                                 if (!string.IsNullOrEmpty(path) && !References.Any(x => x.Display.Equals(path, StringComparison.OrdinalIgnoreCase)))
                                 {
                                     try

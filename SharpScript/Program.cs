@@ -66,6 +66,9 @@ namespace SharpScript
         }
 
         [JSInvokable]
+        public static string GetInputLanguageVersion() => ((IInputOptions)Compiler.InputOptions).LanguageVersion?.ToString() ?? string.Empty;
+
+        [JSInvokable]
         public static void SetInputLanguageVersion(string type)
         {
             if (((IInputOptions)Compiler.InputOptions).LanguageVersion?.GetType() is Type @enum)
@@ -85,6 +88,9 @@ namespace SharpScript
                 }
             }
         }
+
+        [JSInvokable]
+        public static string GetOutputLanguageVersion() => ((IOutputOptions)Compiler.OutputOptions).LanguageVersion?.ToString() ?? string.Empty;
 
         [JSInvokable]
         public static void SetOutputLanguageVersion(string type)

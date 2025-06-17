@@ -193,9 +193,9 @@
                         </div>
                     </div>
                     <div class="editor">
-                        <codemirror v-if="results.decompiled" v-model:value="results.decompiled"
-                                    :language="getOutputLanguage()" readonly="true"></codemirror>
-                        <div class="output">
+                        <codemirror v-if="results.decompiled && !diagnostics.errors.length" v-model:value="results.decompiled"
+                                    :language="getOutputLanguage()" readonly="true" style="flex: 1;"></codemirror>
+                        <div class="output" v-else>
                             <div v-if="results.outputs.length && !diagnostics.errors.length">
                                 <pre class="unset" v-for="item in results.outputs" v-html="renderConsole(item)"></pre>
                             </div>
@@ -346,7 +346,8 @@
                         }
                     },
                     assemblies: null,
-                    dotnet: Comlink.wrap(new Worker("worker.js"))
+                    dotnet: Comlink.wrap(new Worker("worker.js")),
+                    hashChanged: false
                 }
             },
             watch: {
@@ -362,6 +363,7 @@
                             await this.initDotNetAsync();
                             await this.dotnet.setLanguageTypeAsync(newValue);
                             this.inputLanguages = await this.dotnet.getInputLanguageVersionsAsync();
+                            this.inputLanguage = await this.dotnet.getInputLanguageVersionAsync();
                             this.message = message;
                         }
                         catch (e) {
@@ -403,6 +405,7 @@
                             await this.initDotNetAsync();
                             await this.dotnet.setOutputTypeAsync(newValue);
                             this.outputLanguages = await this.dotnet.getOutputLanguageVersionsAsync();
+                            this.outputLanguage = await this.dotnet.getOutputLanguageVersionAsync();
                             this.message = message;
                         }
                         catch (e) {
@@ -595,13 +598,16 @@
                         const that = this;
                         editor.dispatch({
                             effects: editorHost.linterSet.reconfigure(linter(async view => {
-                                const diagnostics = await this.getDiagnosticsAsync(view.state.doc.toString());
+                                let diagnostics = await this.getDiagnosticsAsync(view.state.doc.toString());
                                 if (diagnostics instanceof Array) {
                                     this.diagnostics = {
                                         errors: [],
                                         warnings: [],
                                         infos: []
                                     };
+                                    if (that.language === "IL") {
+                                        diagnostics = diagnostics.filter(x => x.severity !== "Info" || x.message !== "Operation completed successfully");
+                                    }
                                     return diagnostics.map(diagnostic => {
                                         return {
                                             from: getIndex(view.state.doc, diagnostic.location.start),
@@ -850,7 +856,7 @@
                         case "VisualBasic":
                             return 'Imports System\nPublic Module Program\n    Public Sub Main()\n        Console.WriteLine("Hello, World!")\n    End Sub\nEnd Module';
                         case "IL":
-                            return `.assembly ' ' {\n}\n.method static void Main() {\n    .entrypoint\n    ldstr "Hello, World!"\n    call void [System.Console]System.Console::WriteLine(string)\n    ret\n}`;
+                            return `.assembly ' ' {\n}\n.assembly extern System.Console {\n}\n.method static void Main() {\n    .entrypoint\n    ldstr "Hello, World!"\n    call void [System.Console]System.Console::WriteLine(string)\n    ret\n}`;
                         default:
                             return '';
                     }
@@ -859,6 +865,10 @@
                     return `[${item.location.start.line + 1}, ${item.location.start.character}] - [${item.location.end.line + 1}, ${item.location.end.character}]`;
                 },
                 loadSettings() {
+                    if (this.hashChanged) {
+                        this.hashChanged = false;
+                        return; 
+                    }
                     const hash = location.hash.substring(1);
                     if (hash) {
                         const params = new URLSearchParams(hash);
@@ -899,6 +909,7 @@
                         settings.code = LZString.compressToBase64(code);
                     }
                     location.hash = new URLSearchParams(settings);
+                    this.hashChanged = true;
                 },
                 renderConsole(output) {
                     const ansi_up = new AnsiUp();
@@ -908,6 +919,7 @@
             },
             mounted() {
                 this.loadSettings();
+                addEventListener("hashchange", this.loadSettings);
             }
         }).component("codemirror", {
             template: "#empty-template",

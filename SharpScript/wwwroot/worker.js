@@ -87,11 +87,17 @@ const dotnet = {
     async getInputLanguageVersionsAsync() {
         return await DotNet.invokeMethodAsync("SharpScript", "GetInputLanguageVersions");
     },
+    async getInputLanguageVersionAsync() {
+        return await DotNet.invokeMethodAsync("SharpScript", "GetInputLanguageVersion");
+    },
     async setInputLanguageVersionAsync(type) {
         return await DotNet.invokeMethodAsync("SharpScript", "SetInputLanguageVersion", type);
     },
     async getOutputLanguageVersionsAsync() {
         return await DotNet.invokeMethodAsync("SharpScript", "GetOutputLanguageVersions");
+    },
+    async getOutputLanguageVersionAsync() {
+        return await DotNet.invokeMethodAsync("SharpScript", "GetOutputLanguageVersion");
     },
     async setOutputLanguageVersionAsync(type) {
         return await DotNet.invokeMethodAsync("SharpScript", "SetOutputLanguageVersion", type);
