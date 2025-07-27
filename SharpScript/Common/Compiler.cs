@@ -84,7 +84,7 @@ namespace SharpScript.Common
                         _ => throw new Exception("Invalid output type."),
                     };
                     bool isConsole = value == OutputType.Run;
-                    if (isConsole ^ (value == OutputType.Run))
+                    if (isConsole ^ (outputType == OutputType.Run))
                     {
                         UpdateCodeSession(isConsole);
                     }
@@ -94,6 +94,8 @@ namespace SharpScript.Common
         }
 
         public OutputOptions OutputOptions { get; set; } = new RunOutputOptions();
+
+        public void UpdateCodeSession() => UpdateCodeSession(OutputType == OutputType.Run);
 
         private void UpdateCodeSession(bool isConsole)
         {
@@ -322,13 +324,17 @@ namespace SharpScript.Common
             switch (this)
             {
                 case CSharpInputOptions csharp:
+                    CSharpLanguageVersion version = csharp.LanguageVersion;
+                    NullableContextOptions nullable = version >= CSharpLanguageVersion.CSharp8
+                        ? NullableContextOptions.Enable
+                        : NullableContextOptions.Disable;
                     compilation = new CSharpCompilationOptions(
                         isConsole ? OutputKind.ConsoleApplication : OutputKind.DynamicallyLinkedLibrary,
                         optimizationLevel: OptimizationLevel.Release,
                         allowUnsafe: true,
-                        nullableContextOptions: NullableContextOptions.Enable);
+                        nullableContextOptions: nullable);
                     parse = new CSharpParseOptions(
-                        csharp.LanguageVersion,
+                        version,
                         DocumentationMode.Parse,
                         SourceCodeKind.Regular);
                     break;

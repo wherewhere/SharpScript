@@ -74,6 +74,7 @@ namespace SharpScript
             if (((IInputOptions)Compiler.InputOptions).LanguageVersion?.GetType() is Type @enum)
             {
                 ((IInputOptions)Compiler.InputOptions).LanguageVersion = (Enum)Enum.Parse(@enum, type, true);
+                Compiler.UpdateCodeSession();
             }
         }
 
