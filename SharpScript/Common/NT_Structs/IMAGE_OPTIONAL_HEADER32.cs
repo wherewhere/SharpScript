@@ -82,7 +82,6 @@ namespace SharpScript.Common.NT_Structs
         /// </summary>
         public uint NumberOfRvaAndSizes;
 
-        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 0x10)]
-        public IMAGE_DATA_DIRECTORY[] DataDirectory;
+        public Object16<IMAGE_DATA_DIRECTORY> DataDirectory;
     }
 }

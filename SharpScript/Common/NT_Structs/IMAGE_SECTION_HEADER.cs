@@ -14,8 +14,7 @@ namespace SharpScript.Common.NT_Structs
         /// For longer names, this member contains a forward slash (/) followed by an ASCII representation of a decimal number that is an offset into the string table.
         /// Executable images do not use a string table and do not support section names longer than eight characters.
         /// </summary>
-        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 8)]
-        public byte[] Name;
+        public Object8<byte> Name;
 
         public UnionType Misc;
 

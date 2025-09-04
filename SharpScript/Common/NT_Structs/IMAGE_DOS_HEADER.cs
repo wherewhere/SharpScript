@@ -23,14 +23,12 @@ namespace SharpScript.Common.NT_Structs
         public ushort AddressOfRelocationTable; // e_lfarlc - File address of relocation table
         public ushort OverlayNumber;            // e_ovno - Overlay number
 
-        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 4)]
-        public ushort[] ReservedWords1;         // e_res - Reserved words
+        public Object4<ushort> ReservedWords1;  // e_res - Reserved words
 
         public ushort OEMIdentifier;            // e_oemid - OEM identifier (for e_oeminfo)
         public ushort OEMInformation;           // e_oeminfo - OEM information; e_oemid specific
 
-        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 10)]
-        public ushort[] ReservedWords2;         // e_res2 - Reserved words
+        public Object10<ushort> ReservedWords2; // e_res2 - Reserved words
 
         public int FileAddressOfNewExeHeader;   // e_lfanew - File address of new exe header
     }
