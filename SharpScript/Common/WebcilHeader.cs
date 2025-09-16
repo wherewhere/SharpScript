@@ -16,13 +16,13 @@ namespace SharpScript.Common
                                         // 8 bytes
 
         public ushort coff_sections;
-        public ushort reserved0;    // 0
-                                    // 12 bytes
+        public ushort reserved0;        // 0
+                                        // 12 bytes
         public uint pe_cli_header_rva;
         public uint pe_cli_header_size;
-        // 20 bytes
+                                        // 20 bytes
         public uint pe_debug_rva;
         public uint pe_debug_size;
-        // 28 bytes
+                                        // 28 bytes
     }
 }

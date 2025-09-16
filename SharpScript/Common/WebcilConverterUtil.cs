@@ -1,10 +1,8 @@
 ﻿using SharpScript.Common.NT_Structs;
 using System;
 using System.Buffers.Binary;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -60,8 +58,8 @@ namespace SharpScript.Common
 
             // These are Webcil variables
             WebcilHeader webcilHeader = await ReadHeaderAsync(webcilStream, cancellationToken).ConfigureAwait(false);
-            List<WebcilSectionHeader> webcilSectionHeaders = await ReadSectionHeadersAsync(webcilStream, webcilHeader.coff_sections, cancellationToken).ConfigureAwait(false);
-            int webcilSectionHeadersCount = webcilSectionHeaders.Count;
+            WebcilSectionHeader[] webcilSectionHeaders = await ReadSectionHeadersAsync(webcilStream, webcilHeader.coff_sections, cancellationToken).ConfigureAwait(false);
+            int webcilSectionHeadersCount = webcilSectionHeaders.Length;
             uint webcilSectionHeadersSizeOfRawData = (uint)webcilSectionHeaders.Sum(x => x.SizeOfRawData);
 
             // These are PE (Portable Executable) variables
@@ -173,7 +171,7 @@ namespace SharpScript.Common
                 Misc = new IMAGE_SECTION_HEADER.UnionType { VirtualSize = (uint)webcilSectionHeaders[0].VirtualSize },
                 VirtualAddress = (uint)webcilSectionHeaders[0].VirtualAddress,
                 SizeOfRawData = (uint)webcilSectionHeaders[0].SizeOfRawData,
-                PointerToRawData = webcilSectionHeaders[0].GetCorrectedPointerToRawData(pointerToRawDataOffsetBetweenWebcilAndPE),
+                PointerToRawData = (uint)(webcilSectionHeaders[0].PointerToRawData + pointerToRawDataOffsetBetweenWebcilAndPE),
                 Characteristics = 0x60000020
             };
             await peStream.WriteStructAsync(textSectionHeader, cancellationToken).ConfigureAwait(false);
@@ -184,7 +182,7 @@ namespace SharpScript.Common
                 Misc = new IMAGE_SECTION_HEADER.UnionType { VirtualSize = (uint)webcilSectionHeaders[1].VirtualSize },
                 VirtualAddress = (uint)webcilSectionHeaders[1].VirtualAddress,
                 SizeOfRawData = (uint)webcilSectionHeaders[1].SizeOfRawData,
-                PointerToRawData = webcilSectionHeaders[1].GetCorrectedPointerToRawData(pointerToRawDataOffsetBetweenWebcilAndPE),
+                PointerToRawData = (uint)(webcilSectionHeaders[1].PointerToRawData + pointerToRawDataOffsetBetweenWebcilAndPE),
                 Characteristics = 0x40000040
             };
             await peStream.WriteStructAsync(rsrcSectionHeader, cancellationToken).ConfigureAwait(false);
@@ -195,27 +193,27 @@ namespace SharpScript.Common
                 Misc = new IMAGE_SECTION_HEADER.UnionType { VirtualSize = (uint)webcilSectionHeaders[2].VirtualSize },
                 VirtualAddress = (uint)webcilSectionHeaders[2].VirtualAddress,
                 SizeOfRawData = (uint)webcilSectionHeaders[2].SizeOfRawData,
-                PointerToRawData = webcilSectionHeaders[2].GetCorrectedPointerToRawData(pointerToRawDataOffsetBetweenWebcilAndPE),
+                PointerToRawData = (uint)(webcilSectionHeaders[2].PointerToRawData + pointerToRawDataOffsetBetweenWebcilAndPE),
                 Characteristics = 0x42000040
             };
             await peStream.WriteStructAsync(relocSectionHeader, cancellationToken).ConfigureAwait(false);
 
             if (extraBytesAfterSections.Length > 0)
             {
-                peStream.Write(extraBytesAfterSections);
+                await peStream.WriteAsync(extraBytesAfterSections, cancellationToken).ConfigureAwait(false);
             }
 
             // Just copy all data
             foreach (WebcilSectionHeader webcilSectionHeader in webcilSectionHeaders)
             {
-                byte[] buffer = new byte[webcilSectionHeader.SizeOfRawData];
+                Memory<byte> buffer = new byte[webcilSectionHeader.SizeOfRawData];
                 _ = webcilStream.Seek(webcilSectionHeader.PointerToRawData, SeekOrigin.Begin);
-                webcilStream.ReadExactly(buffer);
+                await webcilStream.ReadExactlyAsync(buffer, cancellationToken).ConfigureAwait(false);
 
-                peStream.Write(buffer, 0, buffer.Length);
+                await peStream.WriteAsync(buffer, cancellationToken).ConfigureAwait(false);
             }
 
-            peStream.Flush();
+            await peStream.FlushAsync(cancellationToken).ConfigureAwait(false);
             _ = peStream.Seek(0, SeekOrigin.Begin);
 
             return peStream.ToArray();
@@ -239,12 +237,12 @@ namespace SharpScript.Common
             return webcilHeader;
         }
 
-        private static async ValueTask<List<WebcilSectionHeader>> ReadSectionHeadersAsync(Stream webcilStream, int sectionsHeaders, CancellationToken cancellationToken = default)
+        private static async ValueTask<WebcilSectionHeader[]> ReadSectionHeadersAsync(Stream webcilStream, int sectionsHeaders, CancellationToken cancellationToken = default)
         {
-            List<WebcilSectionHeader> result = new(sectionsHeaders);
+            WebcilSectionHeader[] result = new WebcilSectionHeader[sectionsHeaders];
             for (int i = 0; i < sectionsHeaders; i++)
             {
-                result.Add(await ReadSectionHeaderAsync(webcilStream, cancellationToken).ConfigureAwait(false));
+                result[i] = await ReadSectionHeaderAsync(webcilStream, cancellationToken).ConfigureAwait(false);
             }
             return result;
         }
@@ -267,7 +265,7 @@ namespace SharpScript.Common
             return sectionHeader;
         }
 
-        private static uint GetSizeOfHeaders(IMAGE_DOS_HEADER IMAGE_DOS_HEADER, int numSectionHeaders)
+        private static uint GetSizeOfHeaders(in IMAGE_DOS_HEADER IMAGE_DOS_HEADER, int numSectionHeaders)
         {
             int soh = IMAGE_DOS_HEADER.FileAddressOfNewExeHeader + // e_lfanew member of IMAGE_DOS_HEADER
                       sizeof(uint) + // 4 byte signature
@@ -336,11 +334,6 @@ namespace SharpScript.Common
         {
             T* ptr = &structData;
             return new ReadOnlySpan<byte>(ptr, sizeof(T)).ToArray();
-        }
-
-        internal static uint GetCorrectedPointerToRawData(this WebcilSectionHeader webcilSectionHeader, int offset)
-        {
-            return (uint)(webcilSectionHeader.PointerToRawData + offset);
         }
     }
 }
