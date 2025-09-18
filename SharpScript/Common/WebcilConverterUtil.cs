@@ -36,7 +36,19 @@ namespace SharpScript.Common
         /// <summary>
         /// Convert a Webcil stream into a Portable Executable which can be used to create a valid <see cref="MetadataReference"/>.
         /// </summary>
-        /// <param name="inputStream">The input sStream.</param>
+        /// <param name="inputArray">The input array.</param>
+        /// <param name="wrappedInWebAssembly">The Webcil is wrapped in Wasm [default value is <c>true</c>].</param>
+        /// <returns>A byte[] Portable Executable</returns>
+        public static async ValueTask<byte[]> ConvertFromWebcilAsync(byte[] inputArray, bool wrappedInWebAssembly = true, CancellationToken cancellationToken = default)
+        {
+            await using MemoryStream stream = new(inputArray);
+            return await ConvertFromWebcilAsync(stream, wrappedInWebAssembly, cancellationToken).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Convert a Webcil stream into a Portable Executable which can be used to create a valid <see cref="MetadataReference"/>.
+        /// </summary>
+        /// <param name="inputStream">The input stream.</param>
         /// <param name="wrappedInWebAssembly">The Webcil is wrapped in Wasm [default value is <c>true</c>].</param>
         /// <returns>A byte[] Portable Executable</returns>
         public static async ValueTask<byte[]> ConvertFromWebcilAsync(Stream inputStream, bool wrappedInWebAssembly = true, CancellationToken cancellationToken = default)

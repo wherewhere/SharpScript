@@ -24,7 +24,7 @@ namespace SharpScript
         }
 
         [JSInvokable]
-        public static Task InitAsync(string baseUrl) => RoslynCodeSession.InitAsync(baseUrl, Current.Services.GetRequiredService<ILogger<RoslynCodeSession>>()).AsTask();
+        public static Task InitAsync(string baseUrl, IDictionary<string, string> fingerprinting) => RoslynCodeSession.InitAsync(baseUrl, fingerprinting, Current.Services.GetRequiredService<ILogger<RoslynCodeSession>>()).AsTask();
 
         [JSInvokable]
         public static Task<CompileResult> ProcessAsync(string code) => Compiler.ProcessAsync(code).AsTask();

@@ -17,11 +17,10 @@ using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
-using System.Net.Http.Json;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Runtime.Versioning;
 using System.Text;
-using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using CSharpLanguageVersion = Microsoft.CodeAnalysis.CSharp.LanguageVersion;
@@ -33,7 +32,7 @@ namespace SharpScript.Common
     public sealed partial class RoslynCodeSession : ICodeSession<ICodeSession>
     {
         private static readonly SourceText EmptySourceText = SourceText.From(string.Empty);
-        private static BlazorBoot _boot;
+        private static IDictionary<string, string> _fingerprinting;
         private static string _baseUrl;
 
         private readonly Dictionary<string, List<CodeFixProvider>> _providers;
@@ -124,7 +123,7 @@ namespace SharpScript.Common
                 return _quickInfoService;
             }
         }
-
+        
         [DynamicDependency(DynamicallyAccessedMemberTypes.All, typeof(RuntimeFeature))]
         public RoslynCodeSession(string code, RoslynOptions options, bool isConsole, ILogger<RoslynCodeSession> logger = null)
         {
@@ -165,13 +164,15 @@ namespace SharpScript.Common
             _analyzers = [.. analyzers];
         }
 
-        public static async ValueTask InitAsync(string baseUrl, ILogger<RoslynCodeSession> logger)
+        public static async ValueTask InitAsync(string baseUrl, IDictionary<string, string> fingerprinting, ILogger<RoslynCodeSession> logger)
         {
             _baseUrl = baseUrl;
+            _fingerprinting = fingerprinting;
             if (References is not { Count: > 0 })
             {
                 References = await GetMetadataReferencesAsync(
                     logger,
+                    fingerprinting,
                     "Microsoft.CSharp",
                     "Microsoft.VisualBasic.Core",
                     "System.ComponentModel.Primitives",
@@ -347,19 +348,18 @@ namespace SharpScript.Common
 
         public RoslynCodeSession WithIsConsole(bool isConsole) => new(_code, _options, isConsole, _logger);
 
-        private static async ValueTask<List<MetadataReference>> GetMetadataReferencesAsync(ILogger<RoslynCodeSession> logger, params string[] assemblies)
+        private static async ValueTask<List<MetadataReference>> GetMetadataReferencesAsync(ILogger<RoslynCodeSession> logger, IDictionary<string, string> fingerprinting, params string[] assemblies)
         {
             List<MetadataReference> references = [];
             using HttpClient client = new() { BaseAddress = new Uri(_baseUrl) };
-            _boot ??= await client.GetFromJsonAsync("blazor.boot.json", SourceGenerationContext.Default.BlazorBoot).ConfigureAwait(false);
             foreach (string assembly in assemblies)
             {
                 try
                 {
                     string fileName = $"{assembly}.wasm";
-                    if (_boot.Resources.FingerPrinting.FirstOrDefault(x => x.Value.Equals(fileName, StringComparison.OrdinalIgnoreCase)) is { Key.Length: > 0 } result)
+                    if (fingerprinting.FirstOrDefault(x => x.Value.Equals(fileName, StringComparison.OrdinalIgnoreCase)) is { Key.Length: > 0 } result)
                     {
-                        using Stream stream = await client.GetStreamAsync(result.Key).ConfigureAwait(false);
+                        byte[] stream = await client.GetByteArrayAsync(result.Key).ConfigureAwait(false);
                         byte[] array = await WebcilConverterUtil.ConvertFromWebcilAsync(stream).ConfigureAwait(false);
                         references.Add(MetadataReference.CreateFromImage(array, documentation: await CreateDocumentation(client, assembly, logger).ConfigureAwait(false), filePath: assembly));
                         static async ValueTask<XmlDocumentationProvider> CreateDocumentation(HttpClient client, string assembly, ILogger<RoslynCodeSession> logger)
@@ -480,10 +480,9 @@ namespace SharpScript.Common
                                         {
                                             string fileName = $"{path}.wasm";
                                             client ??= new() { BaseAddress = new Uri(_baseUrl) };
-                                            _boot ??= await client.GetFromJsonAsync("blazor.boot.json", SourceGenerationContext.Default.BlazorBoot, cancellationToken: cancellationToken).ConfigureAwait(false);
-                                            if (_boot.Resources.FingerPrinting.FirstOrDefault(x => x.Value.Equals(fileName, StringComparison.OrdinalIgnoreCase)) is { Key.Length: > 0 } result)
+                                            if (_fingerprinting.FirstOrDefault(x => x.Value.Equals(fileName, StringComparison.OrdinalIgnoreCase)) is { Key.Length: > 0 } result)
                                             {
-                                                using Stream stream = await client.GetStreamAsync(result.Key, cancellationToken).ConfigureAwait(false);
+                                                byte[] stream = await client.GetByteArrayAsync(result.Key, cancellationToken).ConfigureAwait(false);
                                                 byte[] array = await WebcilConverterUtil.ConvertFromWebcilAsync(stream, cancellationToken: cancellationToken).ConfigureAwait(false);
                                                 references.Add(MetadataReference.CreateFromImage(array, documentation: await CreateDocumentationAsync(client, path, _logger, cancellationToken).ConfigureAwait(false), filePath: path));
                                                 static async ValueTask<XmlDocumentationProvider> CreateDocumentationAsync(HttpClient client, string assembly, ILogger<RoslynCodeSession> logger, CancellationToken cancellationToken = default)
@@ -587,21 +586,6 @@ namespace SharpScript.Common
                 GC.SuppressFinalize(this);
             }
         }
-
-        private sealed class BlazorBoot
-        {
-            [JsonPropertyName("resources")]
-            public Resources Resources { get; init; }
-        }
-
-        private sealed class Resources
-        {
-            [JsonPropertyName("fingerprinting")]
-            public Dictionary<string, string> FingerPrinting { get; init; }
-        }
-
-        [JsonSerializable(typeof(BlazorBoot))]
-        private sealed partial class SourceGenerationContext : JsonSerializerContext;
     }
 
     public sealed class ILCodeSession(string code, bool isConsole) : ICodeSession<ICodeSession>
@@ -652,7 +636,7 @@ namespace SharpScript.Common
             _code = code;
             return ValueTask.FromResult<ICodeSession>(this);
         }
-
+        
         private class Logger(ICollection<Diagnostic> results) : Mobius.ILasm.interfaces.ILogger
         {
             public void Info(string message) => results.Add(new Diagnostic(DiagnosticSeverity.Info, message));

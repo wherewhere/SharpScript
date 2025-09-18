@@ -58,11 +58,11 @@ namespace SharpScript.Common
         private static byte[] ReadDataSection(BinaryReader reader)
         {
             // Skip until we find the data section, which contains the Webcil payload.
-            byte[] buffer = new byte[1];
+            Span<byte> buffer = stackalloc byte[1];
             while (true)
             {
                 // Read the Data section
-                int dataRead = reader.Read(buffer, 0, 1);
+                int dataRead = reader.Read(buffer);
                 if (dataRead == 0)
                 {
                     throw new InvalidOperationException("Unable to read Data Section.");
@@ -87,7 +87,7 @@ namespace SharpScript.Common
             for (int segmentIndex = 0; segmentIndex < segmentsCount; segmentIndex++)
             {
                 // Ignore segmentType (1 = passive segment)
-                int segmentType = reader.Read(buffer, 0, 1);
+                int segmentType = reader.Read(buffer);
                 if (segmentType != 1)
                 {
                     throw new InvalidOperationException($"Unexpected segment code for segment {segmentIndex}.");

@@ -31,8 +31,18 @@ const dotnet = {
         importScripts("_framework/blazor.webassembly.js");
         await Blazor.start();
     },
-    async initAsync(baseUrl) {
-        return await DotNet.invokeMethodAsync("SharpScript", "InitAsync", baseUrl);
+    async initAsync() {
+        let fingerprinting = Blazor.runtime.config.resources.fingerprinting;
+        if (!fingerprinting) {
+            fingerprinting = {};
+            for (const x of Blazor.runtime.config.resources.coreAssembly) {
+                fingerprinting[x.name] = x.virtualPath;
+            }
+            for (const x of Blazor.runtime.config.resources.assembly) {
+                fingerprinting[x.name] = x.virtualPath;
+            }
+        }
+        return await DotNet.invokeMethodAsync("SharpScript", "InitAsync", new URL("_framework/", document.baseURI).toString(), fingerprinting);
     },
     async processAsync(code) {
         return await DotNet.invokeMethodAsync("SharpScript", "ProcessAsync", code);

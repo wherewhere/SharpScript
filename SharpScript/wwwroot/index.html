@@ -576,7 +576,7 @@
                         await this.initDotNetAsync();
                         const message = this.message;
                         this.message = this.$t("message.downloadReferences");
-                        await this.dotnet.initAsync(new URL("_framework/", document.baseURI).toString());
+                        await this.dotnet.initAsync();
                         this.message = message;
                         this.isInitCompiler = true;
                     }
