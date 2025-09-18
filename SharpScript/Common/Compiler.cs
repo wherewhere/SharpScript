@@ -30,7 +30,7 @@ namespace SharpScript.Common
             {
                 if (_codeSession == null)
                 {
-                    bool isConsole = OutputType == OutputType.Run;
+                    bool isConsole = outputType == OutputType.Run;
                     switch (InputOptions)
                     {
                         case RoslynOptions options:
@@ -45,13 +45,12 @@ namespace SharpScript.Common
             }
         }
 
-        private LanguageType languageType = LanguageType.CSharp;
         public LanguageType LanguageType
         {
-            get => languageType;
+            get;
             set
             {
-                if (languageType != value)
+                if (field != value)
                 {
                     InputOptions = value switch
                     {
@@ -60,11 +59,11 @@ namespace SharpScript.Common
                         LanguageType.IL => new ILInputOptions(),
                         _ => throw new Exception("Invalid language type."),
                     };
-                    languageType = value;
+                    field = value;
                     UpdateCodeSession(outputType == OutputType.Run);
                 }
             }
-        }
+        } = LanguageType.CSharp;
 
         public InputOptions InputOptions { get; set; } = new CSharpInputOptions();
 

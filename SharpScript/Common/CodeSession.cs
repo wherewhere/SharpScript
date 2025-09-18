@@ -49,14 +49,13 @@ namespace SharpScript.Common
 
         public static List<MetadataReference> References { get; private set; } = [];
 
-        private RoslynCodeSession _consoleVersion;
         private RoslynCodeSession ConsoleVersion
         {
             get
             {
                 if (_isConsole) { return this; }
-                _consoleVersion ??= WithIsConsole(true);
-                return _consoleVersion;
+                field ??= WithIsConsole(true);
+                return field;
             }
         }
 
@@ -107,20 +106,19 @@ namespace SharpScript.Common
             }
         }
 
-        private QuickInfoService _quickInfoService;
         public QuickInfoService QuickInfoService
         {
             get
             {
                 EnsureUpToDate();
-                _quickInfoService ??= QuickInfoService.GetService(CurrentDocument);
+                field ??= QuickInfoService.GetService(CurrentDocument);
 
-                if (_quickInfoService == null)
+                if (field == null)
                 {
                     _logger.LogWarning("Could not find quick info service for document '{name}'.", CurrentDocument.Name);
                 }
 
-                return _quickInfoService;
+                return field;
             }
         }
         
