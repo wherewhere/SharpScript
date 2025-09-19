@@ -306,7 +306,7 @@
                 return {
                     code: 'using System;\nConsole.WriteLine("Hello, World!");',
                     language: "CSharp",
-                    inputLanguages: ["Default", "CSharp1", "CSharp2", "CSharp3", "CSharp4", "CSharp5", "CSharp6", "CSharp7", "CSharp7_1", "CSharp7_2", "CSharp7_3", "CSharp8", "CSharp9", "CSharp10", "CSharp11", "CSharp12", "CSharp13", "LatestMajor", "Preview", "Latest"],
+                    inputLanguages: ["Default", "CSharp1", "CSharp2", "CSharp3", "CSharp4", "CSharp5", "CSharp6", "CSharp7", "CSharp7_1", "CSharp7_2", "CSharp7_3", "CSharp8", "CSharp9", "CSharp10", "CSharp11", "CSharp12", "CSharp13", "CSharp14", "LatestMajor", "Preview", "Latest"],
                     inputLanguage: "Preview",
                     output: "Run",
                     outputLanguages: [],
@@ -705,8 +705,7 @@
                                             return that.assemblies;
                                         }
                                         else {
-                                            const boot = await fetch("_framework/blazor.boot.json").then(x => x.json());
-                                            const fingerprinting = boot.resources.fingerprinting;
+                                            const fingerprinting = await that.dotnet.fingerprinting;
                                             const assemblies = [];
                                             for (const key in fingerprinting) {
                                                 const value = fingerprinting[key];

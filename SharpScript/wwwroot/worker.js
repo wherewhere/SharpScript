@@ -22,27 +22,34 @@ const document = {
 const Node = { COMMENT_NODE: 8 };
 const history = { state: {} };
 let diagnostics = [], completions = [];
+function getFingerprinting() {
+    let fingerprinting = Blazor.runtime.config.resources.fingerprinting;
+    if (!fingerprinting) {
+        fingerprinting = {};
+        for (const x of Blazor.runtime.config.resources.coreAssembly) {
+            fingerprinting[x.name] = x.virtualPath;
+        }
+        for (const x of Blazor.runtime.config.resources.assembly) {
+            fingerprinting[x.name] = x.virtualPath;
+        }
+        Blazor.runtime.config.resources.fingerprinting = fingerprinting;
+    }
+    return fingerprinting;
+}
 const dotnet = {
     init(baseURI, onDownloadResourceProgress) {
         document.baseURI = baseURI;
         document.documentElement.style.setProperty = (x, y) => onDownloadResourceProgress(x, y);
+    },
+    get fingerprinting() {
+        return getFingerprinting();
     },
     async startAsync() {
         importScripts("_framework/blazor.webassembly.js");
         await Blazor.start();
     },
     async initAsync() {
-        let fingerprinting = Blazor.runtime.config.resources.fingerprinting;
-        if (!fingerprinting) {
-            fingerprinting = {};
-            for (const x of Blazor.runtime.config.resources.coreAssembly) {
-                fingerprinting[x.name] = x.virtualPath;
-            }
-            for (const x of Blazor.runtime.config.resources.assembly) {
-                fingerprinting[x.name] = x.virtualPath;
-            }
-        }
-        return await DotNet.invokeMethodAsync("SharpScript", "InitAsync", new URL("_framework/", document.baseURI).toString(), fingerprinting);
+        return await DotNet.invokeMethodAsync("SharpScript", "InitAsync", new URL("_framework/", document.baseURI).toString(), getFingerprinting());
     },
     async processAsync(code) {
         return await DotNet.invokeMethodAsync("SharpScript", "ProcessAsync", code);

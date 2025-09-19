@@ -228,7 +228,7 @@ namespace SharpScript.Common
                 {
                     results.Add(output.ToString());
                 }
-                results.Add(ex.Message);
+                results.Add(ex.ToString());
             }
             finally
             {
