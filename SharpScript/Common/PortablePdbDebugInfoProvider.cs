@@ -20,7 +20,7 @@ namespace SharpScript.Common
         }
 
         public string SourceFileName => "_";
-        public string Description => "";
+        public string Description => string.Empty;
 
         public IList<ICSharpCode.Decompiler.DebugInfo.SequencePoint> GetSequencePoints(MethodDefinitionHandle method)
         {

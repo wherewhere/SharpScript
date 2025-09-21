@@ -89,6 +89,9 @@ const dotnet = {
     async getInfoTipAsync(code, position) {
         return await DotNet.invokeMethodAsync("SharpScript", "GetInfoTipAsync", code, position);
     },
+    async getCSharpInfoTipLiteAsync(code, position) {
+        return await DotNet.invokeMethodAsync("SharpScript", "GetCSharpInfoTipLiteAsync", code, position);
+    },
     async getLanguageTypesAsync() {
         return await DotNet.invokeMethodAsync("SharpScript", "GetLanguageTypes");
     },
@@ -142,7 +145,7 @@ const dotnet = {
     },
     async getAssemblyLinkAsync(code) {
         const assembly = await this.getAssemblyAsync(code);
-        const file = new File([await assembly.arrayBuffer()], "SharpScript.dll");
+        const file = new File([await assembly.arrayBuffer()], "SharpScript.zip");
         return URL.createObjectURL(file);
     }
 };

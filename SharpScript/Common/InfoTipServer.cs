@@ -1,0 +1,96 @@
+﻿using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.QuickInfo;
+using Microsoft.CodeAnalysis.Text;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace SharpScript.Common
+{
+    public static class InfoTipServer
+    {
+        private static bool _outOfDate;
+
+        public static AdhocWorkspace Workspace { get; }
+
+        private static string _code;
+        public static string SourceCode
+        {
+            get => _code;
+            set
+            {
+                if (_code != value)
+                {
+                    _code = value;
+                    SourceText = SourceText.From(value, Encoding.Default);
+                    _outOfDate = true;
+                    EnsureUpToDate();
+                }
+            }
+        }
+
+        public static SourceText SourceText { get; private set; }
+
+        private static Document _currentDocument;
+        public static Document CurrentDocument
+        {
+            get
+            {
+                EnsureUpToDate();
+                return _currentDocument;
+            }
+        }
+
+        public static QuickInfoService QuickInfoService
+        {
+            get
+            {
+                EnsureUpToDate();
+                field ??= QuickInfoService.GetService(CurrentDocument);
+                return field;
+            }
+        }
+
+        static InfoTipServer()
+        {
+            SourceText = SourceText.From(string.Empty);
+            Workspace = new AdhocWorkspace();
+            ProjectId projectId = ProjectId.CreateNewId();
+            DocumentId docId = DocumentId.CreateNewId(projectId, "SharpScript.CodeSession");
+            Solution solution = Workspace.CurrentSolution
+                .AddProject(projectId, "SharpScript.Project.CodeSession", "SharpScript", LanguageNames.CSharp)
+                .AddMetadataReferences(projectId, RoslynCodeSession.References)
+                .WithProjectParseOptions(projectId,
+                    new CSharpParseOptions(
+                        LanguageVersion.Preview,
+                        DocumentationMode.Parse,
+                        SourceCodeKind.Regular))
+                .AddDocument(docId, "SharpScript.CodeSession.Document", SourceText);
+            _ = Workspace.TryApplyChanges(solution);
+            Workspace.OpenDocument(docId);
+            _currentDocument = Workspace.CurrentSolution.GetDocument(docId);
+        }
+
+        private static void EnsureUpToDate()
+        {
+            if (!_outOfDate) { return; }
+            Document document = _currentDocument.WithText(SourceText);
+            _ = Workspace.TryApplyChanges(document.Project.Solution);
+            _currentDocument = Workspace.CurrentSolution.GetDocument(_currentDocument.Id);
+            _outOfDate = false;
+        }
+
+        public static async ValueTask<InfoTipItem> GetInfoTipAsync(int position, CancellationToken cancellationToken = default)
+        {
+            QuickInfoItem info = await QuickInfoService.GetQuickInfoAsync(CurrentDocument, position, cancellationToken).ConfigureAwait(false);
+            return info is null or { Sections.IsEmpty: true } ? default : new InfoTipItem(info);
+        }
+
+        public static Task<InfoTipItem> GetInfoTipAsync(string code, int position, CancellationToken cancellationToken = default)
+        {
+            SourceCode = code;
+            return GetInfoTipAsync(position, cancellationToken).AsTask();
+        }
+    }
+}

@@ -8,6 +8,7 @@ using Microsoft.CodeAnalysis.QuickInfo;
 using Microsoft.CodeAnalysis.Text;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Microsoft.JSInterop;
 using Mobius.ILasm.Core;
 using System;
@@ -19,7 +20,6 @@ using System.Linq;
 using System.Net.Http;
 using System.Reflection;
 using System.Runtime.CompilerServices;
-using System.Runtime.Versioning;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -43,23 +43,16 @@ namespace SharpScript.Common
         private readonly AsyncLocker _addonLocker = new();
         private readonly string _comment;
         private bool _outOfDate;
-        private HashSet<MetadataReference> _addon = [];
+        private MetadataReferenceCollection _addon = [];
         private Dictionary<string, string> _features = [];
 
         internal readonly ILogger<RoslynCodeSession> _logger;
 
-        public static List<MetadataReference> References { get; private set; } = [];
+        public static MetadataReferenceCollection References { get; private set; } = [];
 
-        private RoslynCodeSession ConsoleVersion
-        {
-            get
-            {
-                if (_isConsole) { return this; }
-                return WithIsConsole(true);
-            }
-        }
+        public AdhocWorkspace Workspace { get; private set; }
 
-        public AdhocWorkspace Workspace { get; }
+        public string AssemblyName => _currentDocument.Project.AssemblyName;
 
         private string _code;
         public string SourceCode
@@ -136,7 +129,7 @@ namespace SharpScript.Common
             options.GetOptions(isConsole, out CompilationOptions compilation, out ParseOptions parse);
             _language = compilation.Language;
             Solution solution = Workspace.CurrentSolution
-                .AddProject(projectId, "SharpScript.Project.CodeSession", "SharpScript", _language)
+                .AddProject(projectId, "SharpScript.Project.CodeSession", nameof(SharpScript), _language)
                 .AddMetadataReferences(projectId, References)
                 .WithProjectCompilationOptions(projectId, compilation)
                 .WithProjectParseOptions(projectId, parse)
@@ -308,29 +301,30 @@ namespace SharpScript.Common
         }
 
         public Task<ImmutableArray<TaggedText>> GetCompletionDescriptionAsync(CompletionItem item, CancellationToken cancellationToken = default) =>
-            _completionService.GetDescriptionAsync(_currentDocument, item, cancellationToken).ContinueWith(x => x.Result.TaggedParts);
+            _completionService.GetDescriptionAsync(_currentDocument, item, cancellationToken).ContinueWith(x => x.Result.TaggedParts, TaskScheduler.Default);
 
         public Task<CompletionChange> GetCompletionChangeAsync(CompletionItem item, CancellationToken cancellationToken = default) =>
-            _completionService.GetChangeAsync(_currentDocument, item, cancellationToken: cancellationToken).ContinueWith(x => new CompletionChange(x.Result));
+            _completionService.GetChangeAsync(_currentDocument, item, cancellationToken: cancellationToken).ContinueWith(x => new CompletionChange(x.Result), TaskScheduler.Default);
 
         public async ValueTask<InfoTipItem> GetInfoTipAsync(int position, CancellationToken cancellationToken = default)
         {
             QuickInfoItem info = await QuickInfoService.GetQuickInfoAsync(CurrentDocument, position, cancellationToken).ConfigureAwait(false);
-            if (info is null or { Sections.IsEmpty: true }) { return default; }
-            return new InfoTipItem(info);
+            return info is null or { Sections.IsEmpty: true } ? default : new InfoTipItem(info);
         }
 
         public async ValueTask<CompilationResults> CompileAsync(ICollection<Diagnostic> results, CancellationToken cancellationToken = default)
         {
             MemoryStream assemblyStream = new();
             MemoryStream symbolStream = new();
+            MemoryStream documentationStream = new();
             Compilation compilation = await CurrentDocument.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false);
-            EmitResult emitResult = compilation.Emit(assemblyStream, symbolStream, cancellationToken: cancellationToken);
+            EmitResult emitResult = compilation.Emit(assemblyStream, symbolStream, documentationStream, cancellationToken: cancellationToken);
             if (emitResult.Success)
             {
                 _ = assemblyStream.Seek(0, SeekOrigin.Begin);
                 _ = symbolStream.Seek(0, SeekOrigin.Begin);
-                return new CompilationResults(assemblyStream, symbolStream);
+                _ = documentationStream.Seek(0, SeekOrigin.Begin);
+                return new CompilationResults(AssemblyName, assemblyStream, symbolStream, documentationStream, References + _addon);
             }
             else
             {
@@ -341,15 +335,20 @@ namespace SharpScript.Common
                     {
                         Solution solution = Workspace.CurrentSolution.WithProjectCompilationOptions(_currentDocument.Project.Id, options.WithOutputKind(OutputKind.ConsoleApplication));
                         Document currentDocument = solution.GetDocument(_currentDocument.Id);
-                        _ = assemblyStream.Seek(0, SeekOrigin.Begin);
-                        _ = symbolStream.Seek(0, SeekOrigin.Begin);
+                        await assemblyStream.DisposeAsync().ConfigureAwait(false);
+                        await symbolStream.DisposeAsync().ConfigureAwait(false);
+                        await documentationStream.DisposeAsync().ConfigureAwait(false);
+                        assemblyStream = new();
+                        symbolStream = new();
+                        documentationStream = new();
                         compilation = await currentDocument.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false);
-                        emitResult = compilation.Emit(assemblyStream, symbolStream, cancellationToken: cancellationToken);
+                        emitResult = compilation.Emit(assemblyStream, symbolStream, documentationStream, cancellationToken: cancellationToken);
                         if (emitResult.Success)
                         {
                             _ = assemblyStream.Seek(0, SeekOrigin.Begin);
                             _ = symbolStream.Seek(0, SeekOrigin.Begin);
-                            return new CompilationResults(assemblyStream, symbolStream);
+                            _ = documentationStream.Seek(0, SeekOrigin.Begin);
+                            return new CompilationResults(AssemblyName, assemblyStream, symbolStream, documentationStream, References + _addon);
                         }
                     }
                 }
@@ -358,11 +357,9 @@ namespace SharpScript.Common
             }
         }
 
-        public RoslynCodeSession WithIsConsole(bool isConsole) => new(_code, _options, isConsole, _logger);
-
-        private static async ValueTask<List<MetadataReference>> GetMetadataReferencesAsync(ILogger<RoslynCodeSession> logger, IDictionary<string, string> fingerprinting, params string[] assemblies)
+        private static async ValueTask<MetadataReferenceCollection> GetMetadataReferencesAsync(ILogger<RoslynCodeSession> logger, IDictionary<string, string> fingerprinting, params string[] assemblies)
         {
-            List<MetadataReference> references = [];
+            MetadataReferenceCollection references = [];
             using HttpClient client = new() { BaseAddress = new Uri(_baseUrl) };
             foreach (string assembly in assemblies)
             {
@@ -372,8 +369,8 @@ namespace SharpScript.Common
                     if (fingerprinting.FirstOrDefault(x => x.Value.Equals(fileName, StringComparison.OrdinalIgnoreCase)) is { Key.Length: > 0 } result)
                     {
                         byte[] stream = await client.GetByteArrayAsync(result.Key).ConfigureAwait(false);
-                        byte[] array = await WebcilConverterUtil.ConvertFromWebcilAsync(stream).ConfigureAwait(false);
-                        references.Add(MetadataReference.CreateFromImage(array, documentation: await CreateDocumentation(client, assembly, logger).ConfigureAwait(false), filePath: assembly));
+                        await using MemoryStream array = await WebcilConverterUtil.ConvertFromWebcilAsync(stream).ConfigureAwait(false);
+                        references.Add(array, documentation: await CreateDocumentation(client, assembly, logger).ConfigureAwait(false), filePath: assembly);
                         static async ValueTask<XmlDocumentationProvider> CreateDocumentation(HttpClient client, string assembly, ILogger<RoslynCodeSession> logger)
                         {
                         start:
@@ -465,8 +462,9 @@ namespace SharpScript.Common
             if (code.StartsWith('#'))
             {
                 using StringReader reader = new(code);
-                HashSet<MetadataReference> references = [];
+                MetadataReferenceCollection references = [];
                 Dictionary<string, string> features = [];
+                string assemblyName = null;
                 HttpClient client = null;
                 StringBuilder builder = new();
                 using (_ = await _addonLocker.WaitAsync())
@@ -492,7 +490,13 @@ namespace SharpScript.Common
                                     features[key.Trim([' ', '\'', '"'])] = value.Trim([' ', '\'', '"']);
                                 }
                             }
-                            else if (!line.StartsWith('#'))
+                            else if (line.StartsWith("#assembly ", StringComparison.OrdinalIgnoreCase))
+                            {
+                                string assembly = line[10..];
+                                _ = builder.AppendLine($"{_comment}ssembly {assembly}");
+                                assemblyName = assembly.Trim([' ', '\'', '"']);
+                            }
+                            else
                             {
                                 _ = builder.AppendLine(line);
                                 break;
@@ -502,10 +506,27 @@ namespace SharpScript.Common
                     finally
                     {
                         client?.Dispose();
-                        if (!references.SetEquals(_addon))
+                        if (assemblyName != null && assemblyName != AssemblyName)
+                        {
+                            Workspace = new AdhocWorkspace();
+                            ProjectId projectId = ProjectId.CreateNewId();
+                            DocumentId docId = DocumentId.CreateNewId(projectId, "SharpScript.CodeSession");
+                            Project oldProject = _currentDocument.Project;
+                            Solution solution = Workspace.CurrentSolution
+                                .AddProject(projectId, oldProject.Name, assemblyName, oldProject.Language)
+                                .AddMetadataReferences(projectId, oldProject.MetadataReferences)
+                                .WithProjectCompilationOptions(projectId, oldProject.CompilationOptions)
+                                .WithProjectParseOptions(projectId, oldProject.ParseOptions)
+                                .AddDocument(docId, "SharpScript.CodeSession.Document", SourceText);
+                            _ = Workspace.TryApplyChanges(solution);
+                            Workspace.OpenDocument(docId);
+                            _currentDocument = Workspace.CurrentSolution.GetDocument(docId);
+                            Console.WriteLine(AssemblyName);
+                        }
+                        if (!references.SequenceEqual(_addon))
                         {
                             _addon = references;
-                            Solution solution = Workspace.CurrentSolution.WithProjectMetadataReferences(_currentDocument.Project.Id, [.. References, .. references]);
+                            Solution solution = Workspace.CurrentSolution.WithProjectMetadataReferences(_currentDocument.Project.Id, References.Concat(references));
                             _ = Workspace.TryApplyChanges(solution);
                             _currentDocument = Workspace.CurrentSolution.GetDocument(_currentDocument.Id);
                         }
@@ -546,15 +567,16 @@ namespace SharpScript.Common
             return code;
         }
 
-        private async ValueTask AddReferenceAsync(string path, HashSet<MetadataReference> references, CancellationToken cancellationToken = default)
+        private async ValueTask AddReferenceAsync(string path, MetadataReferenceCollection references, CancellationToken cancellationToken = default)
         {
             if (!string.IsNullOrEmpty(path) && !References.Any(x => x.Display.Equals(path, StringComparison.OrdinalIgnoreCase)))
             {
                 try
                 {
-                    if (_addon.FirstOrDefault(x => x.Display.Equals(path, StringComparison.OrdinalIgnoreCase)) is MetadataReference reference)
+                    int index = _addon.FindIndex(x => x.Display.Equals(path, StringComparison.OrdinalIgnoreCase));
+                    if (index != -1)
                     {
-                        references.Add(reference);
+                        references.Add(_addon[index]);
                     }
                     else
                     {
@@ -563,8 +585,8 @@ namespace SharpScript.Common
                         if (_fingerprinting.FirstOrDefault(x => x.Value.Equals(fileName, StringComparison.OrdinalIgnoreCase)) is { Key.Length: > 0 } result)
                         {
                             byte[] stream = await client.GetByteArrayAsync(result.Key, cancellationToken).ConfigureAwait(false);
-                            byte[] array = await WebcilConverterUtil.ConvertFromWebcilAsync(stream, cancellationToken: cancellationToken).ConfigureAwait(false);
-                            references.Add(MetadataReference.CreateFromImage(array, documentation: await CreateDocumentationAsync(client, path, _logger, cancellationToken).ConfigureAwait(false), filePath: path));
+                            await using MemoryStream array = await WebcilConverterUtil.ConvertFromWebcilAsync(stream, cancellationToken: cancellationToken).ConfigureAwait(false);
+                            references.Add(array, documentation: await CreateDocumentationAsync(client, path, _logger, cancellationToken).ConfigureAwait(false), filePath: path);
                             static async ValueTask<XmlDocumentationProvider> CreateDocumentationAsync(HttpClient client, string assembly, ILogger<RoslynCodeSession> logger, CancellationToken cancellationToken = default)
                             {
                                 try
@@ -653,7 +675,7 @@ namespace SharpScript.Common
                 if (driver.Assemble([_code], assemblyStream))
                 {
                     _ = assemblyStream.Seek(0, SeekOrigin.Begin);
-                    return ValueTask.FromResult(new CompilationResults(assemblyStream, null));
+                    return ValueTask.FromResult(new CompilationResults(nameof(SharpScript), assemblyStream, null));
                 }
             }
             catch (Exception ex) when (ex.GetType().Name.StartsWith("yy"))
@@ -781,12 +803,34 @@ namespace SharpScript.Common
         }
     }
 
-    public sealed record CompilationResults(MemoryStream AssemblyStream, MemoryStream SymbolStream) : IDisposable
+    public sealed record CompilationResults(string AssemblyName, MemoryStream AssemblyStream, MemoryStream SymbolStream = null, MemoryStream DocumentationStream = null) : IDisposable
     {
+        public MetadataReferenceCollection References { get; init; }
+
+        public long Position
+        {
+            set
+            {
+                AssemblyStream?.Position = value;
+                SymbolStream?.Position = value;
+                DocumentationStream?.Position = value;
+            }
+        }
+
+        public CompilationResults(string AssemblyName, MemoryStream AssemblyStream, MemoryStream SymbolStream, MemoryStream DocumentationStream, MetadataReferenceCollection references) : this(AssemblyName, AssemblyStream, SymbolStream, DocumentationStream) => References = references;
+
+        public void Seek(long offset, SeekOrigin loc)
+        {
+            AssemblyStream?.Seek(offset, loc);
+            SymbolStream?.Seek(offset, loc);
+            DocumentationStream?.Seek(offset, loc);
+        }
+
         public void Dispose()
         {
             AssemblyStream?.Dispose();
             SymbolStream?.Dispose();
+            DocumentationStream?.Dispose();
             GC.SuppressFinalize(this);
         }
     }

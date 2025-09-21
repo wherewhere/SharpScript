@@ -158,7 +158,8 @@
                             </fluent-select>
                         </div>
                     </div>
-                    <codemirror class="editor" v-model:value="code" :language="getLauguage()" ref="editor"></codemirror>
+                    <codemirror class="editor" v-model:value="code" :language="getLauguage()"
+                                :roslyn-tooltip="roslynTooltip.input" ref="editor"></codemirror>
                 </div>
                 <div class="split-content">
                     <div style="display: flex; justify-content: space-between; column-gap: 4px;">
@@ -193,8 +194,9 @@
                         </div>
                     </div>
                     <div class="editor">
-                        <codemirror v-if="results.decompiled && !diagnostics.errors.length" v-model:value="results.decompiled"
-                                    :language="getOutputLanguage()" readonly="true" style="flex: 1;"></codemirror>
+                        <codemirror v-if="results.decompiled && !diagnostics.errors.length"
+                                    v-model:value="results.decompiled" :language="getOutputLanguage()"
+                                    :roslyn-tooltip="roslynTooltip.output" readonly="true" style="flex: 1;"></codemirror>
                         <div class="output" v-else>
                             <div v-if="results.outputs.length && !diagnostics.errors.length">
                                 <pre class="unset" v-for="item in results.outputs" v-html="renderConsole(item)"></pre>
@@ -347,7 +349,11 @@
                     },
                     assemblies: null,
                     dotnet: Comlink.wrap(new Worker("worker.js")),
-                    hashChanged: false
+                    hashChanged: false,
+                    roslynTooltip: {
+                        input: null,
+                        output: null
+                    }
                 }
             },
             watch: {
@@ -493,6 +499,14 @@
                         console.warn(e);
                     }
                 },
+                async getCSharpInfoTipLiteAsync(code, position) {
+                    try {
+                        return await this.dotnet.getCSharpInfoTipLiteAsync(code, position);
+                    }
+                    catch (e) {
+                        console.warn(e);
+                    }
+                },
                 async diagnosticInvokeAsync(index) {
                     try {
                         return await this.dotnet.diagnosticInvokeAsync(index);
@@ -525,7 +539,7 @@
                         const href = await this.dotnet.getAssemblyLinkAsync(this.code);
                         const link = document.createElement('a');
                         link.href = href;
-                        link.download = "SharpScript.dll";
+                        link.download = "SharpScript.zip";
                         link.click();
                         this.message = message;
                     }
@@ -798,8 +812,7 @@
                                 })]
                             }))
                         });
-                        editorHost.roslynTooltip = () => hoverTooltip(async (view, pos) => {
-                            const tooltip = await this.getInfoTipAsync(view.state.doc.toString(), pos);
+                        function createTooltip(tooltip, pos) {
                             return {
                                 pos,
                                 create() {
@@ -819,6 +832,14 @@
                                     return { dom };
                                 }
                             };
+                        }
+                        this.roslynTooltip.input = () => hoverTooltip(async (view, pos) => {
+                            const tooltip = await this.getInfoTipAsync(view.state.doc.toString(), pos);
+                            return createTooltip(tooltip, pos);
+                        });
+                        this.roslynTooltip.output = () => hoverTooltip(async (view, pos) => {
+                            const tooltip = await this.getCSharpInfoTipLiteAsync(view.state.doc.toString(), pos);
+                            return createTooltip(tooltip, pos);
                         });
                         this.isInitLinter = true;
                     }
@@ -841,6 +862,8 @@
                             return "il";
                         case "CSharp":
                             return "csharp";
+                        case "VisualBasic":
+                            return "vb";
                         default:
                             return "plaintext";
                     }
@@ -866,7 +889,7 @@
                 loadSettings() {
                     if (this.hashChanged) {
                         this.hashChanged = false;
-                        return; 
+                        return;
                     }
                     const hash = location.hash.substring(1);
                     if (hash) {
@@ -925,7 +948,8 @@
             props: {
                 language: String,
                 value: String,
-                readonly: false
+                readonly: false,
+                roslynTooltip: Function
             },
             emits: ['update:value'],
             data() {
@@ -938,8 +962,7 @@
                     linterSet: new Compartment(),
                     lintGutterSet: new Compartment(),
                     tooltipSet: new Compartment(),
-                    autocompletionSet: new Compartment(),
-                    roslynTooltip: null
+                    autocompletionSet: new Compartment()
                 }
             },
             watch: {
@@ -1270,7 +1293,7 @@
                         this.autocompletionSet.of(empty),
                         this.linterSet.of(empty),
                         this.lintGutterSet.of(empty),
-                        this.tooltipSet.of(this.language === "il" ? this.getILTooltip() : empty),
+                        this.tooltipSet.of(this.language === "il" ? this.getILTooltip() : this.roslynTooltip ? this.roslynTooltip() : empty),
                         this.languageSet.of(this.getLauguage(this.language || "csharp")),
                         this.readonlySet.of(EditorState.readOnly.of(!!this.readonly)),
                         EditorView.updateListener.of(e => {
@@ -1537,13 +1560,20 @@
 
                     #vue-app div.split-view .split-content .editor .cm-editor {
                         flex: 1;
+                        overflow: inherit;
                     }
 
-                    #vue-app div.split-view .split-content .editor > div:not([class]) {
+                    #vue-app div.split-view .split-content .editor > div {
                         display: flex;
+                        overflow: inherit;
                     }
+
+                        #vue-app div.split-view .split-content .editor > div:not([class]) {
+                            display: flex;
+                        }
 
                     #vue-app div.split-view .split-content .editor > .output {
+                        display: flex;
                         font-family: var(--font-monospace);
                         padding: 0 12px;
                         width: 100%;

@@ -13,9 +13,12 @@ namespace SharpScript.Common
 
         private readonly ConcurrentDictionary<string, (PEFile file, Task<MetadataFile> task)> _peFileCache = new();
 
-        public PreCachedAssemblyResolver(params IEnumerable<(string name, byte[] bytes)> references)
+        public PreCachedAssemblyResolver(params MetadataReferenceCollection references)
         {
-            AddToCaches(references);
+            foreach (MetadataReferenceHost host in references ?? RoslynCodeSession.References ?? [])
+            {
+                AddToCaches((host.Reference.Display, host.Image));
+            }
         }
 
         private void AddToCaches(params IEnumerable<(string name, byte[] bytes)> assemblyPaths)

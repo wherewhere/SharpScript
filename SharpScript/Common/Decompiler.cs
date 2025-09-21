@@ -9,27 +9,33 @@ using System.Linq;
 using System.Reflection.Metadata;
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace SharpScript.Common
 {
     public static class Decompiler
     {
-        public static async ValueTask<string> CSharpDecompileAsync(CompilationResults streams, CSharpOutputOptions options)
+        public static async ValueTask<string> CSharpDecompileAsync(CompilationResults streams, CSharpOutputOptions options, CancellationToken cancellationToken = default)
         {
+            streams.Position = 0;
             using PEFile assemblyFile = new(string.Empty, streams.AssemblyStream);
             PortablePdbDebugInfoProvider debugInfo = null;
             try
             {
-                //try { debugInfo = streams.SymbolStream != null ? new PortablePdbDebugInfoProvider(streams.SymbolStream) : null; }
-                //catch { }
+                if (streams.SymbolStream is MemoryStream symbol)
+                {
+                    debugInfo = new PortablePdbDebugInfoProvider(symbol);
+                }
 
                 CSharpDecompiler decompiler =
                     new(assemblyFile,
-                        new PreCachedAssemblyResolver(),
+                        new PreCachedAssemblyResolver(streams.References),
                         new DecompilerSettings(options.LanguageVersion))
                     {
-                        DebugInfoProvider = debugInfo
+                        DebugInfoProvider = debugInfo,
+                        CancellationToken = cancellationToken,
+                        DocumentationProvider = ContentBasedXmlDocumentationProvider.CreateFromBytes(streams.DocumentationStream?.ToArray())
                     };
                 SyntaxTree syntaxTree = decompiler.DecompileWholeModuleAsSingleFile();
 
@@ -80,12 +86,15 @@ namespace SharpScript.Common
 
         public static async ValueTask<string> ILDecompileAsync(CompilationResults streams)
         {
+            streams.Position = 0;
             using PEFile assemblyFile = new(string.Empty, streams.AssemblyStream);
             PortablePdbDebugInfoProvider debugInfo = null;
             try
             {
-                //try { debugInfo = streams.SymbolStream != null ? new PortablePdbDebugInfoProvider(streams.SymbolStream) : null; }
-                //catch { }
+                if (streams.SymbolStream is MemoryStream symbol)
+                {
+                    debugInfo = new PortablePdbDebugInfoProvider(symbol);
+                }
 
                 StringBuilder code = new();
                 await using StringWriter codeWriter = new(code);

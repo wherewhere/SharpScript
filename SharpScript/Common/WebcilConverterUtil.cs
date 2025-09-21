@@ -39,7 +39,7 @@ namespace SharpScript.Common
         /// <param name="inputArray">The input array.</param>
         /// <param name="wrappedInWebAssembly">The Webcil is wrapped in Wasm [default value is <c>true</c>].</param>
         /// <returns>A byte[] Portable Executable</returns>
-        public static async ValueTask<byte[]> ConvertFromWebcilAsync(byte[] inputArray, bool wrappedInWebAssembly = true, CancellationToken cancellationToken = default)
+        public static async ValueTask<MemoryStream> ConvertFromWebcilAsync(byte[] inputArray, bool wrappedInWebAssembly = true, CancellationToken cancellationToken = default)
         {
             await using MemoryStream stream = new(inputArray);
             return await ConvertFromWebcilAsync(stream, wrappedInWebAssembly, cancellationToken).ConfigureAwait(false);
@@ -51,7 +51,7 @@ namespace SharpScript.Common
         /// <param name="inputStream">The input stream.</param>
         /// <param name="wrappedInWebAssembly">The Webcil is wrapped in Wasm [default value is <c>true</c>].</param>
         /// <returns>A byte[] Portable Executable</returns>
-        public static async ValueTask<byte[]> ConvertFromWebcilAsync(Stream inputStream, bool wrappedInWebAssembly = true, CancellationToken cancellationToken = default)
+        public static async ValueTask<MemoryStream> ConvertFromWebcilAsync(Stream inputStream, bool wrappedInWebAssembly = true, CancellationToken cancellationToken = default)
         {
             Stream webcilStream;
             if (wrappedInWebAssembly)
@@ -81,7 +81,7 @@ namespace SharpScript.Common
             int pointerToRawDataFirstSectionHeader = webcilSectionHeaders[0].PointerToRawData;
             int pointerToRawDataOffsetBetweenWebcilAndPE = sectionStartRounded - pointerToRawDataFirstSectionHeader;
 
-            await using MemoryStream peStream = new();
+            MemoryStream peStream = new();
 
             IMAGE_DOS_HEADER DOSHeader = new()
             {
@@ -228,7 +228,7 @@ namespace SharpScript.Common
             await peStream.FlushAsync(cancellationToken).ConfigureAwait(false);
             _ = peStream.Seek(0, SeekOrigin.Begin);
 
-            return peStream.ToArray();
+            return peStream;
         }
 
         private static async ValueTask<WebcilHeader> ReadHeaderAsync(Stream webcilStream, CancellationToken cancellationToken = default)

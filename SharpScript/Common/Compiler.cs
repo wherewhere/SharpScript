@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Compression;
 using System.Reflection;
 using System.Runtime.Loader;
 using System.Text;
@@ -117,7 +118,7 @@ namespace SharpScript.Common
             List<Diagnostic> results = [];
             try
             {
-                CompilationResults streams = await CodeSession.SetSourceTextAsync(code, cancellationToken).AsTask().ContinueWith(x => x.Result.CompileAsync(results, cancellationToken).AsTask()).Unwrap().ConfigureAwait(false);
+                CompilationResults streams = await CodeSession.SetSourceTextAsync(code, cancellationToken).AsTask().ContinueWith(x => x.Result.CompileAsync(results, cancellationToken).AsTask(), TaskScheduler.Default).Unwrap().ConfigureAwait(false);
                 return (streams, results);
             }
             catch (AggregateException aex) when (aex.InnerExceptions?.Count > 1)
@@ -148,7 +149,7 @@ namespace SharpScript.Common
             try
             {
                 bool isConsole = OutputType == OutputType.Run;
-                results = await CodeSession.SetSourceTextAsync(code, cancellationToken).AsTask().ContinueWith(x => x.Result.GetDiagnosticsAsync(results, cancellationToken).AsTask()).Unwrap().ConfigureAwait(false);
+                results = await CodeSession.SetSourceTextAsync(code, cancellationToken).AsTask().ContinueWith(x => x.Result.GetDiagnosticsAsync(results, cancellationToken).AsTask(), TaskScheduler.Default).Unwrap().ConfigureAwait(false);
                 return results;
             }
             catch (AggregateException aex) when (aex.InnerExceptions?.Count > 1)
@@ -172,20 +173,20 @@ namespace SharpScript.Common
         public Task<IEnumerable<RoslynCompletionItem>> GetCompletionsAsync(string code, int position, CancellationToken cancellationToken = default)
         {
             return InputOptions is RoslynOptions
-                ? CodeSession.SetSourceTextAsync(code, cancellationToken).AsTask().ContinueWith(x => x.Result.GetCompletionsAsync(position, cancellationToken).AsTask()).Unwrap()
+                ? CodeSession.SetSourceTextAsync(code, cancellationToken).AsTask().ContinueWith(x => x.Result.GetCompletionsAsync(position, cancellationToken).AsTask(), TaskScheduler.Default).Unwrap()
                 : Task.FromResult<IEnumerable<RoslynCompletionItem>>([]);
         }
 
         public Task<InfoTipItem> GetInfoTipAsync(string code, int position, CancellationToken cancellationToken = default)
         {
             return InputOptions is RoslynOptions
-                ? CodeSession.SetSourceTextAsync(code, cancellationToken).AsTask().ContinueWith(x => x.Result.GetInfoTipAsync(position, cancellationToken).AsTask()).Unwrap()
+                ? CodeSession.SetSourceTextAsync(code, cancellationToken).AsTask().ContinueWith(x => x.Result.GetInfoTipAsync(position, cancellationToken).AsTask(), TaskScheduler.Default).Unwrap()
                 : Task.FromResult<InfoTipItem>(default);
         }
 
-        private ValueTask<string> DecompileAsync(CompilationResults streams) => OutputOptions switch
+        private ValueTask<string> DecompileAsync(CompilationResults streams, CancellationToken cancellationToken = default) => OutputOptions switch
         {
-            CSharpOutputOptions csharp => Decompiler.CSharpDecompileAsync(streams, csharp),
+            CSharpOutputOptions csharp => Decompiler.CSharpDecompileAsync(streams, csharp, cancellationToken),
             ILOutputOptions => Decompiler.ILDecompileAsync(streams),
             _ => throw new Exception("Invalid output type.")
         };
@@ -202,6 +203,7 @@ namespace SharpScript.Common
                 try
                 {
                     MemoryStream assemblyStream = streams.AssemblyStream;
+                    assemblyStream.Position = 0;
                     Assembly assembly = context.LoadFromStream(assemblyStream);
                     if (assembly.EntryPoint is MethodInfo main)
                     {
@@ -228,7 +230,7 @@ namespace SharpScript.Common
                 {
                     results.Add(output.ToString());
                 }
-                results.Add(ex.ToString());
+                results.Add($"\x1B[1;31m{ex}\x1B[0m");
             }
             finally
             {
@@ -247,8 +249,9 @@ namespace SharpScript.Common
                     switch (OutputType)
                     {
                         case OutputType.CSharp
+                            or OutputType.VisualBasic
                             or OutputType.IL:
-                            string results = await DecompileAsync(assemblyStream).ConfigureAwait(false);
+                            string results = await DecompileAsync(assemblyStream, cancellationToken).ConfigureAwait(false);
                             return new CompileResult(diagnostics, results);
                         case OutputType.Run:
                             List<string> outputs = await ExecuteAsync(assemblyStream).ConfigureAwait(false);
@@ -268,10 +271,33 @@ namespace SharpScript.Common
         {
             try
             {
-                (CompilationResults assemblyStream, _) = await CompilateAsync(code, cancellationToken).ConfigureAwait(false);
-                if (assemblyStream is { AssemblyStream: not null })
+                (CompilationResults results, _) = await CompilateAsync(code, cancellationToken).ConfigureAwait(false);
+                if (results is { AssemblyStream: MemoryStream assemblyStream })
                 {
-                    return assemblyStream.AssemblyStream;
+                    results.Position = 0;
+                    MemoryStream result = results.AssemblyStream;
+                    await using (ZipArchive archive = new(result, ZipArchiveMode.Create, leaveOpen: true) { Comment = "SharpScript Assembly" })
+                    {
+                        ZipArchiveEntry assemblyEntry = archive.CreateEntry($"{results.AssemblyName}.dll", CompressionLevel.Fastest);
+                        await using (Stream entryStream = assemblyEntry.Open())
+                        {
+                            await assemblyStream.CopyToAsync(entryStream, cancellationToken).ConfigureAwait(false);
+                        }
+                        if (results.SymbolStream is MemoryStream symbol)
+                        {
+                            ZipArchiveEntry symbolEntry = archive.CreateEntry($"{results.AssemblyName}.pdb", CompressionLevel.Fastest);
+                            await using Stream entryStream = symbolEntry.Open();
+                            await symbol.CopyToAsync(entryStream, cancellationToken).ConfigureAwait(false);
+                        }
+                        if (results.DocumentationStream is MemoryStream document)
+                        {
+                            ZipArchiveEntry documentEntry = archive.CreateEntry($"{results.AssemblyName}.xml", CompressionLevel.Fastest);
+                            await using Stream entryStream = documentEntry.Open();
+                            await document.CopyToAsync(entryStream, cancellationToken).ConfigureAwait(false);
+                        }
+                    }
+                    result.Seek(0, SeekOrigin.Begin);
+                    return result;
                 }
             }
             catch (Exception ex)
@@ -295,9 +321,10 @@ namespace SharpScript.Common
     [Flags]
     public enum OutputType
     {
-        CSharp = 0b011,
-        IL = 0b001,
-        Run = 0b100
+        CSharp = 0b0011,
+        VisualBasic = 0b0111,
+        IL = 0b0001,
+        Run = 0b1000
     }
 
     public interface IInputOptions
