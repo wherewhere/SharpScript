@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Reflection;
+using System.Reflection.Metadata;
 using System.Runtime.Loader;
 using System.Text;
 using System.Threading;
@@ -193,9 +194,7 @@ namespace SharpScript.Common
 
         private static async ValueTask<List<string>> ExecuteAsync(CompilationResults streams)
         {
-            bool finished = false;
             List<string> results = [];
-            StringBuilder output = new();
             try
             {
                 await Task.Yield();
@@ -207,15 +206,74 @@ namespace SharpScript.Common
                     Assembly assembly = context.LoadFromStream(assemblyStream);
                     if (assembly.EntryPoint is MethodInfo main)
                     {
+                        main = GetEntryPoint(main);
                         string[][] args = main.GetParameters().Length > 0 ? [[]] : null;
                         TextWriter temp = Console.Out;
+                        StringBuilder output = new();
                         await using StringWriter writer = new(output);
-                        Console.SetOut(writer);
-                        object @return = main.Invoke(null, args);
-                        Console.SetOut(temp);
-                        results.Add(output.ToString());
-                        finished = true;
+                        object @return;
+                        try
+                        {
+                            Console.SetOut(writer);
+                            @return = main.Invoke(null, args);
+                            switch (@return)
+                            {
+                                case Task<int> taskInt:
+                                    @return = await taskInt.ConfigureAwait(false);
+                                    break;
+                                case Task task:
+                                    await task.ConfigureAwait(false);
+                                    @return = 0;
+                                    break;
+                                case ValueTask<int> valueTaskInt:
+                                    @return = await valueTaskInt.ConfigureAwait(false);
+                                    break;
+                                case ValueTask valueTask:
+                                    await valueTask.ConfigureAwait(false);
+                                    @return = 0;
+                                    break;
+                            }
+                        }
+                        finally
+                        {
+                            Console.SetOut(temp);
+                            results.Add(output.ToString());
+                        }
                         results.Add($"Exits with code {@return ?? 0}.");
+                        static MethodInfo GetEntryPoint(MethodInfo main)
+                        {
+                            try
+                            {
+                                byte[] bytes = main.GetMethodBody()?.GetILAsByteArray();
+                                MethodBase method = main.GetMethodBody()?.GetILAsByteArray() switch
+                                {
+                                    [
+                                        (byte)ILOpCode.Ldarg_0,
+                                        (byte)ILOpCode.Call, _, _, _, _,
+                                        (byte)ILOpCode.Callvirt, _, _, _, _,
+                                        (byte)ILOpCode.Stloc_0,
+                                        (byte)ILOpCode.Ldloca_s, 0,
+                                        (byte)ILOpCode.Call, _, _, _, _,
+                                        (byte)ILOpCode.Ret
+                                    ] => main.Module.ResolveMethod(BitConverter.ToInt32(bytes.AsSpan(2, 4))),
+                                    [
+                                        (byte)ILOpCode.Call, _, _, _, _,
+                                        (byte)ILOpCode.Callvirt, _, _, _, _,
+                                        (byte)ILOpCode.Stloc_0,
+                                        (byte)ILOpCode.Ldloca_s, 0,
+                                        (byte)ILOpCode.Call, _, _, _, _,
+                                        (byte)ILOpCode.Ret
+                                    ] => main.Module.ResolveMethod(BitConverter.ToInt32(bytes.AsSpan(1, 4))),
+                                    _ => null,
+                                };
+                                if (method is MethodInfo { ReturnType: Type type } info && (type == typeof(Task) || type.IsSubclassOf(typeof(Task))))
+                                {
+                                    return info;
+                                }
+                            }
+                            catch { }
+                            return main;
+                        }
                     }
                 }
                 finally
@@ -226,10 +284,6 @@ namespace SharpScript.Common
             }
             catch (Exception ex)
             {
-                if (!finished)
-                {
-                    results.Add(output.ToString());
-                }
                 results.Add($"\x1B[1;31m{ex}\x1B[0m");
             }
             finally

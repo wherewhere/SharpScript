@@ -8,7 +8,6 @@ using Microsoft.CodeAnalysis.QuickInfo;
 using Microsoft.CodeAnalysis.Text;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 using Microsoft.JSInterop;
 using Mobius.ILasm.Core;
 using System;
@@ -521,7 +520,6 @@ namespace SharpScript.Common
                             _ = Workspace.TryApplyChanges(solution);
                             Workspace.OpenDocument(docId);
                             _currentDocument = Workspace.CurrentSolution.GetDocument(docId);
-                            Console.WriteLine(AssemblyName);
                         }
                         if (!references.SequenceEqual(_addon))
                         {
