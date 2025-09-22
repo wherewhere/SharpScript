@@ -245,7 +245,7 @@ namespace SharpScript.Common
                             try
                             {
                                 byte[] bytes = main.GetMethodBody()?.GetILAsByteArray();
-                                MethodBase method = main.GetMethodBody()?.GetILAsByteArray() switch
+                                MethodBase method = bytes switch
                                 {
                                     [
                                         (byte)ILOpCode.Ldarg_0,
