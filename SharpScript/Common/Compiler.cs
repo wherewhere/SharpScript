@@ -4,6 +4,7 @@ using Microsoft.CodeAnalysis.VisualBasic;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Reflection;
@@ -192,12 +193,12 @@ namespace SharpScript.Common
             _ => throw new Exception("Invalid output type.")
         };
 
+        [StackTraceHidden]
         private static async ValueTask<List<string>> ExecuteAsync(CompilationResults streams)
         {
             List<string> results = [];
             try
             {
-                await Task.Yield();
                 AssemblyLoadContext context = new("ExecutorContext", isCollectible: true);
                 try
                 {
@@ -281,6 +282,10 @@ namespace SharpScript.Common
                     context.Unload();
                     streams.Dispose();
                 }
+            }
+            catch (TargetInvocationException ex) when (ex.InnerException is Exception e)
+            {
+                results.Add($"\x1B[1;31m{e}\x1B[0m");
             }
             catch (Exception ex)
             {
