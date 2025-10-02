@@ -186,6 +186,13 @@ namespace SharpScript.Common
                 : Task.FromResult<InfoTipItem>(default);
         }
 
+        public Task<AstNodeItem> GetAstAsync(string code, CancellationToken cancellationToken = default)
+        {
+            return InputOptions is RoslynOptions
+                ? CodeSession.SetSourceTextAsync(code, cancellationToken).AsTask().ContinueWith(x => x.Result.GetAstAsync(cancellationToken).AsTask(), TaskScheduler.Default).Unwrap()
+                : Task.FromResult<AstNodeItem>(default);
+        }
+
         private ValueTask<string> DecompileAsync(CompilationResults streams, CancellationToken cancellationToken = default) => OutputOptions switch
         {
             CSharpOutputOptions csharp => Decompiler.CSharpDecompileAsync(streams, csharp, cancellationToken),

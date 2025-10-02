@@ -89,6 +89,9 @@ const dotnet = {
     async getInfoTipAsync(code, position) {
         return await DotNet.invokeMethodAsync("SharpScript", "GetInfoTipAsync", code, position);
     },
+    async getAstAsync(code) {
+        return await DotNet.invokeMethodAsync("SharpScript", "GetAstAsync", code);
+    },
     async getCSharpInfoTipLiteAsync(code, position) {
         return await DotNet.invokeMethodAsync("SharpScript", "GetCSharpInfoTipLiteAsync", code, position);
     },

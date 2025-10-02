@@ -499,6 +499,14 @@
                         console.warn(e);
                     }
                 },
+                async getAstAsync(code) {
+                    try {
+                        return await this.dotnet.getAstAsync(code);
+                    }
+                    catch (e) {
+                        console.warn(e);
+                    }
+                },
                 async getCSharpInfoTipLiteAsync(code, position) {
                     try {
                         return await this.dotnet.getCSharpInfoTipLiteAsync(code, position);

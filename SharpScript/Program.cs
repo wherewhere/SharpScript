@@ -42,6 +42,9 @@ namespace SharpScript
         public static Task<InfoTipItem> GetInfoTipAsync(string code, int position) => Compiler.GetInfoTipAsync(code, position);
 
         [JSInvokable]
+        public static Task<AstNodeItem> GetAstAsync(string code) => Compiler.GetAstAsync(code);
+
+        [JSInvokable]
         public static Task<InfoTipItem> GetCSharpInfoTipLiteAsync(string code, int position) => InfoTipServer.GetInfoTipAsync(code, position);
 
         [JSInvokable]
