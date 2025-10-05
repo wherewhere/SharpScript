@@ -60,6 +60,8 @@
             fluentOption,
             fluentSelect,
             fluentProgressRing,
+            fluentTreeItem,
+            fluentTreeView,
             baseLayerLuminance,
             StandardLuminance
         } from "@fluentui/web-components";
@@ -68,7 +70,9 @@
                 fluentButton(),
                 fluentOption(),
                 fluentSelect(),
-                fluentProgressRing()
+                fluentProgressRing(),
+                fluentTreeItem(),
+                fluentTreeView()
             );
         const scheme = matchMedia("(prefers-color-scheme: dark)");
         if (typeof scheme !== "undefined") {
@@ -141,7 +145,7 @@
                         </fluent-select>
                         <div style="display: flex; column-gap: 4px;">
                             <fluent-button :title="loading ? message : $t('input.process.title')" @click="processAsync"
-                                           :disabled="loading">
+                                           :disabled="loading || isSyntaxTree">
                                 <fluent-progress-ring v-if="loading"
                                                       style="width: 12px; height: 12px;"></fluent-progress-ring>
                                 <svg v-else width="12" viewBox="0 0 12 12" style="fill: currentColor;">
@@ -168,6 +172,9 @@
                             <fluent-option title="CSharp" value="CSharp">C#</fluent-option>
                             <fluent-option title="IL" value="IL">IL</fluent-option>
                             <fluent-option title="Run" value="Run">{{ $t("output.language.run") }}</fluent-option>
+                            <fluent-option title="SyntaxTree" value="SyntaxTree" :disabled="language === 'IL'">
+                                {{ $t("output.language.syntaxTree") }}
+                            </fluent-option>
                         </fluent-select>
                         <div style="display: flex; column-gap: 4px;">
                             <fluent-button v-if="isInitLinter && !diagnostics.errors.length"
@@ -194,11 +201,15 @@
                         </div>
                     </div>
                     <div class="editor">
-                        <codemirror v-if="results.decompiled && !diagnostics.errors.length"
+                        <codemirror v-if="isDecompile && results.decompiled && !diagnostics.errors.length"
                                     v-model:value="results.decompiled" :language="getOutputLanguage()"
                                     :roslyn-tooltip="roslynTooltip.output" readonly="true" style="flex: 1;"></codemirror>
                         <div class="output" v-else>
-                            <div v-if="results.outputs.length && !diagnostics.errors.length">
+                            <fluent-tree-view class="no-selected-indicator" v-if="isSyntaxTree && syntaxTree"
+                                              style="flex: 1; margin: 12 0;">
+                                <syntax-tree-item :item="syntaxTree"></syntax-tree-item>
+                            </fluent-tree-view>
+                            <div v-else-if="isRun && results.outputs.length && !diagnostics.errors.length">
                                 <pre class="unset" v-for="item in results.outputs" v-html="renderConsole(item)"></pre>
                             </div>
                             <div v-else-if="diagnostics.errors.length || diagnostics.warnings.length || diagnostics.infos.length">
@@ -285,6 +296,19 @@
         <div></div>
     </template>
 
+    <template id="syntax-tree-item-template">
+        <fluent-tree-item>
+            <span :class="`ast-item-wrap ast-item-${item.type}`" ref="titleElementRef">
+                <span class="ast-item-type" :title="item.type"></span>
+                <span v-if="item.property" class="ast-item-property">{{ item.property }}:</span>
+                <span v-if="item.value" class="ast-inline-value" v-html="renderValue(item.value, item.type)"></span>
+                <span class="ast-item-kind">{{ item.kind }}</span>
+            </span>
+            <syntax-tree-item v-if="item.children && item.children.length" v-for="child in item.children"
+                              :item="child"></syntax-tree-item>
+        </fluent-tree-item>
+    </template>
+
     <script type="module">
         import LZString from "lz-string";
         import * as Comlink from "comlink";
@@ -328,6 +352,7 @@
                         warnings: [],
                         infos: []
                     },
+                    syntaxTree: null,
                     locker: {
                         resolves: [],
                         reference: 0,
@@ -354,6 +379,17 @@
                         input: null,
                         output: null
                     }
+                }
+            },
+            computed: {
+                isRun() {
+                    return this.output === "Run";
+                },
+                isSyntaxTree() {
+                    return this.output === "SyntaxTree";
+                },
+                isDecompile() {
+                    return !this.isRun && !this.isSyntaxTree;
                 }
             },
             watch: {
@@ -409,9 +445,15 @@
                             const message = this.message;
                             this.message = this.$t("message.changingOutput");
                             await this.initDotNetAsync();
-                            await this.dotnet.setOutputTypeAsync(newValue);
-                            this.outputLanguages = await this.dotnet.getOutputLanguageVersionsAsync();
-                            this.outputLanguage = await this.dotnet.getOutputLanguageVersionAsync();
+                            if (newValue === "SyntaxTree") {
+                                this.outputLanguages = [];
+                                await this.initLinterAsync();
+                            }
+                            else {
+                                await this.dotnet.setOutputTypeAsync(newValue);
+                                this.outputLanguages = await this.dotnet.getOutputLanguageVersionsAsync();
+                                this.outputLanguage = await this.dotnet.getOutputLanguageVersionAsync();
+                            }
                             this.message = message;
                         }
                         catch (e) {
@@ -620,6 +662,9 @@
                         const that = this;
                         editor.dispatch({
                             effects: editorHost.linterSet.reconfigure(linter(async view => {
+                                if (that.isSyntaxTree) {
+                                    this.getAstAsync(view.state.doc.toString()).then(x => that.syntaxTree = x);
+                                }
                                 let diagnostics = await this.getDiagnosticsAsync(view.state.doc.toString());
                                 if (diagnostics instanceof Array) {
                                     this.diagnostics = {
@@ -1352,6 +1397,28 @@
                 this.setLang(this.lang);
                 this.setDescription(this.description);
             }
+        }).component("syntax-tree-item", {
+            template: "#syntax-tree-item-template",
+            props: {
+                item: Object
+            },
+            methods: {
+                escapeCommon(value) {
+                    return value
+                        .replace('\r', '\\r')
+                        .replace('\n', '\\n')
+                        .replace('\t', '\\t');
+                },
+                escapeTrivia(value) {
+                    return escapeCommon(value)
+                        .replace(/(^ +| +$)/g, (_, $1) => $1.length > 1 ? `<space:${$1.length}>` : '<space>');
+                },
+                renderValue(value, type) {
+                    if (typeof value !== "string") { return value.toString(); }
+                    else if (type === "trivia") { return this.escapeTrivia(value); }
+                    else { return this.escapeCommon(value); }
+                }
+            }
         }).use(createI18n({
             locale: (() => {
                 const supportLanguages = ["en-US", "zh-CN"];
@@ -1391,7 +1458,8 @@
                         language: {
                             title: "Change Output",
                             placeholder: "Select an output",
-                            run: "Run"
+                            run: "Run",
+                            syntaxTree: "Syntax Tree"
                         },
                         download: {
                             title: "Download Assembly"
@@ -1444,7 +1512,8 @@
                         language: {
                             title: "选择输出",
                             placeholder: "请选择输出",
-                            run: "运行"
+                            run: "运行",
+                            syntaxTree: "语法树"
                         },
                         download: {
                             title: "下载程序集"
@@ -1522,13 +1591,23 @@
             position: absolute;
         }
 
-        #vue-app fluent-select::part(listbox) {
-            max-height: calc(var(--base-height-multiplier) * 30px);
+        .no-selected-indicator fluent-tree-item[selected]::after {
+            display: none;
         }
 
+        #vue-app fluent-select::part(listbox),
         #vue-app fluent-select .listbox {
             max-height: calc(var(--base-height-multiplier) * 30px);
         }
+
+        #vue-app fluent-tree-item {
+            cursor: inherit;
+        }
+
+            #vue-app fluent-tree-item::part(positioning-region),
+            #vue-app fluent-tree-item .positioning-region {
+                background: none;
+            }
 
         #vue-app .content {
             height: 100%;
@@ -1600,6 +1679,65 @@
                     width: 100%;
                     height: 50%;
                 }
+        }
+
+        .ast-item-wrap {
+            display: flex;
+            align-items: center;
+            padding-top: 2px;
+            padding-bottom: 2px;
+            padding-right: 6px;
+        }
+
+        .ast-item-property {
+            margin-right: 5px;
+        }
+
+        .ast-item-type {
+            display: block;
+            width: 20px;
+            height: 20px;
+            margin-right: 5px;
+        }
+
+        .ast-item-node .ast-item-type {
+            background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0.5%200.5%2020%2020'%3E%3Cpath%20fill='%234684ee'%20stroke='%23f6f6f6'%20d='M4%204h12v4H4zm0%204h12v4H4zm0%204h12v4H4z'/%3E%3C/svg%3E");
+        }
+
+        .ast-item-token .ast-item-type {
+            background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0.5%200.5%2020%2020'%3E%3Cpath%20fill='%23eeb046'%20stroke='%23f6f6f6'%20d='M4%208h12v4H4z'/%3E%3C/svg%3E");
+        }
+
+        .ast-item-trivia .ast-item-type {
+            background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0.5%200.5%2020%2020'%3E%3Cpath%20d='M5.5%207.1V11h9V7.1'%20stroke='%23f6f6f6'%20stroke-width='4'%20fill='none'/%3E%3Cpath%20d='M5.5%208v3h9V8'%20stroke='%23666'%20stroke-width='2'%20fill='none'/%3E%3C/svg%3E");
+        }
+
+        .ast-item-value .ast-item-type {
+            background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0.5%200.5%2020%2020'%3E%3Cpath%20fill='%23eeb046'%20stroke='%23f6f6f6'%20d='M8%208h4v4H8z'/%3E%3C/svg%3E");
+        }
+
+        .ast-item-operation .ast-item-type {
+            background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0.5%200.5%2020%2020'%3E%3Ccircle%20cx='10'%20cy='10'%20r='4.23'%20stroke='%23f6f6f6'%20stroke-width='4.5'%20fill='none'/%3E%3Ccircle%20cx='10'%20cy='10'%20r='4.23'%20stroke='%23888'%20stroke-width='2.5'%20fill='none'/%3E%3C/svg%3E");
+        }
+
+        .ast-item-property-only .ast-item-type {
+            background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0.5%200.5%2020%2020'%3E%3Ccircle%20cx='10'%20cy='10'%20r='2'%20fill='%23888'%20stroke='%23f6f6f6'%20stroke-width='1.1'/%3E%3C/svg%3E");
+        }
+
+        .ast-item-trivia .ast-inline-value {
+            display: inline-block;
+            min-width: 5em;
+        }
+
+        .ast-inline-value + .ast-item-kind {
+            display: inline-block;
+            color: var(--neutral-foreground-hint);
+            font-style: italic;
+            margin-left: 5px;
+        }
+
+        .ast-item-operation {
+            font-style: italic;
         }
 
         #vue-app .hidden-icon::after,
