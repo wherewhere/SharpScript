@@ -770,6 +770,7 @@ namespace SharpScript.Common
         public LinePositionSpan Location { get; }
         public string Message => message;
         public string Severity => severity.ToString();
+        public string[] Tags { get; } = [];
         public ICodeAction[] Actions { get; } = [];
 
         public Diagnostic(Exception exception) : this(DiagnosticSeverity.Error, exception.Message) { }
@@ -778,6 +779,7 @@ namespace SharpScript.Common
         {
             ID = diagnostic.Id;
             Location = diagnostic.Location.GetLineSpan().Span;
+            Tags = [.. diagnostic.Descriptor.CustomTags];
             Actions = actions;
         }
 

@@ -690,10 +690,16 @@
                                                     case "Info":
                                                     case "Hidden":
                                                     default:
-                                                        that.diagnostics.infos.push(diagnostic);
-                                                        return "info";
+                                                        if (diagnostic.tags.some(x => x.startsWith("EnforceOnBuild"))) {
+                                                            return "hint";
+                                                        }
+                                                        else {
+                                                            that.diagnostics.infos.push(diagnostic);
+                                                            return "info";
+                                                        }
                                                 }
                                             })(),
+                                            markClass: diagnostic.tags.includes("Unnecessary") ? "cm-lintRange-unnecessary" : undefined,
                                             message: `${diagnostic.id ? `${diagnostic.id}: ` : ''}${diagnostic.message}`,
                                             actions: diagnostic.actions.map(x => {
                                                 return {
@@ -1804,6 +1810,10 @@
                 color: #2b91af;
             }
 
+            #vue-app .cm-editor .cm-lintRange-unnecessary {
+                opacity: 0.66;
+            }
+
         @media (prefers-color-scheme: dark) {
 
             #vue-app .cm-editor .tok-keyword,
@@ -1831,6 +1841,10 @@
             #vue-app .cm-editor .tok-enum,
             #vue-app .cm-editor .tok-delegate {
                 color: #4ec9b0;
+            }
+
+            #vue-app .cm-editor .cm-lintRange-unnecessary {
+                opacity: 0.73;
             }
         }
 
