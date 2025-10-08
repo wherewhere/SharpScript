@@ -15,6 +15,20 @@
 [![Contributors](https://contrib.rocks/image?repo=wherewhere/SharpScript)](https://github.com/wherewhere/SharpScript/graphs/contributors "Contributors")
 
 ## References
-- [Roslyn](https://github.com/dotnet/roslyn "Roslyn")
-- [ICSharpCode](https://github.com/icsharpcode/ILSpy "ILSpy")
-- [Mobius.ILasm](https://github.com/kkokosa/Mobius.ILasm "Mobius.ILasm")
+- .NET
+  - [Roslyn](https://github.com/dotnet/roslyn "Roslyn")
+  - [ICSharpCode](https://github.com/icsharpcode/ILSpy "ILSpy")
+  - [Mobius.ILasm](https://github.com/kkokosa/Mobius.ILasm "Mobius.ILasm")
+- HTML
+  - [Vue](https://github.com/vuejs/core "Vue.JS")
+  - [ANSI Up](https://github.com/drudru/ansi_up "ansi_up")
+  - [Comlink](https://github.com/GoogleChromeLabs/comlink "comlink")
+  - [LZ String](https://github.com/pieroxy/lz-string "lz-string")
+  - [Fluent UI](https://github.com/microsoft/fluentui "FluentUI")
+  - [CodeMirror](https://github.com/codemirror/dev "CodeMirror")
+  - [MirrorSharp](https://github.com/ashmind/mirrorsharp "MirrorSharp")
+  - [Codemirror Lang CSharp](https://github.com/replit/codemirror-lang-csharp "codemirror-lang-csharp")
+  - [Codemirror Theme VSCode](https://github.com/uiwjs/react-codemirror "react-codemirror")
+- Projects
+  - [SharpLab](https://github.com/ashmind/SharpLab "SharpLab")
+  - [WasmSharp](https://github.com/JakeYallop/WasmSharp "WasmSharp")
