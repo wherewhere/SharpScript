@@ -70,6 +70,32 @@ namespace SharpScript.Common
 
         public InputOptions InputOptions { get; set; } = new CSharpInputOptions();
 
+        public string InputLanguageVersion
+        {
+            get => ((IInputOptions)InputOptions).LanguageVersion?.ToString();
+            set
+            {
+                if (((IInputOptions)InputOptions).LanguageVersion?.GetType() is Type @enum)
+                {
+                    ((IInputOptions)InputOptions).LanguageVersion = (Enum)Enum.Parse(@enum, value, true);
+                    UpdateCodeSession(outputType == OutputType.Run);
+                }
+            }
+        }
+
+        public SourceCodeKind SourceCodeKind
+        {
+            get => RoslynOptions.SourceCodeKind;
+            set
+            {
+                if (RoslynOptions.SourceCodeKind != value)
+                {
+                    RoslynOptions.SourceCodeKind = value;
+                    UpdateCodeSession(outputType == OutputType.Run);
+                }
+            }
+        }
+
         private OutputType outputType = OutputType.Run;
         public OutputType OutputType
         {
@@ -96,6 +122,18 @@ namespace SharpScript.Common
         }
 
         public OutputOptions OutputOptions { get; set; } = new RunOutputOptions();
+
+        public string OutputLanguageVersion
+        {
+            get => ((IOutputOptions)OutputOptions).LanguageVersion?.ToString();
+            set
+            {
+                if (((IOutputOptions)OutputOptions).LanguageVersion?.GetType() is Type @enum)
+                {
+                    ((IOutputOptions)OutputOptions).LanguageVersion = (Enum)Enum.Parse(@enum, value, true);
+                }
+            }
+        }
 
         public void UpdateCodeSession() => UpdateCodeSession(OutputType == OutputType.Run);
 
@@ -404,6 +442,8 @@ namespace SharpScript.Common
 
     public abstract class RoslynOptions : InputOptions, IInputOptions
     {
+        public static SourceCodeKind SourceCodeKind { get; set; } = SourceCodeKind.Regular;
+
         public virtual string LanguageName => this switch
         {
             CSharpInputOptions => LanguageNames.CSharp,
@@ -428,7 +468,7 @@ namespace SharpScript.Common
                     parse = new CSharpParseOptions(
                         version,
                         DocumentationMode.Parse,
-                        SourceCodeKind.Regular);
+                        SourceCodeKind);
                     break;
                 case VisualBasicInputOptions vb:
                     compilation = new VisualBasicCompilationOptions(
@@ -436,7 +476,7 @@ namespace SharpScript.Common
                     parse = new VisualBasicParseOptions(
                         vb.LanguageVersion,
                         DocumentationMode.Parse,
-                        SourceCodeKind.Regular);
+                        SourceCodeKind);
                     break;
                 default:
                     throw new Exception("Invalid language type.");

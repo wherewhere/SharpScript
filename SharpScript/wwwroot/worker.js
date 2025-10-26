@@ -101,6 +101,12 @@ const dotnet = {
     async setLanguageTypeAsync(type) {
         return await DotNet.invokeMethodAsync("SharpScript", "SetLanguageType", type);
     },
+    async getSourceCodeKind() {
+        return await DotNet.invokeMethodAsync("SharpScript", "GetSourceCodeKind");
+    },
+    async setSourceCodeKind(kind) {
+        return await DotNet.invokeMethodAsync("SharpScript", "SetSourceCodeKind", kind);
+    },
     async getOutputTypesAsync() {
         return await DotNet.invokeMethodAsync("SharpScript", "GetOutputTypes");
     },
@@ -113,8 +119,8 @@ const dotnet = {
     async getInputLanguageVersionAsync() {
         return await DotNet.invokeMethodAsync("SharpScript", "GetInputLanguageVersion");
     },
-    async setInputLanguageVersionAsync(type) {
-        return await DotNet.invokeMethodAsync("SharpScript", "SetInputLanguageVersion", type);
+    async setInputLanguageVersionAsync(version) {
+        return await DotNet.invokeMethodAsync("SharpScript", "SetInputLanguageVersion", version);
     },
     async getOutputLanguageVersionsAsync() {
         return await DotNet.invokeMethodAsync("SharpScript", "GetOutputLanguageVersions");
@@ -122,8 +128,8 @@ const dotnet = {
     async getOutputLanguageVersionAsync() {
         return await DotNet.invokeMethodAsync("SharpScript", "GetOutputLanguageVersion");
     },
-    async setOutputLanguageVersionAsync(type) {
-        return await DotNet.invokeMethodAsync("SharpScript", "SetOutputLanguageVersion", type);
+    async setOutputLanguageVersionAsync(version) {
+        return await DotNet.invokeMethodAsync("SharpScript", "SetOutputLanguageVersion", version);
     },
     async invokeMethodAsync(assembly, method, ...args) {
         return await DotNet.invokeMethodAsync(assembly, method, ...args);

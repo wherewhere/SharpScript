@@ -58,8 +58,8 @@
             provideFluentDesignSystem,
             fluentButton,
             fluentOption,
-            fluentSelect,
             fluentProgressRing,
+            fluentSelect,
             fluentTreeItem,
             fluentTreeView,
             baseLayerLuminance,
@@ -69,8 +69,8 @@
             .register(
                 fluentButton(),
                 fluentOption(),
-                fluentSelect(),
                 fluentProgressRing(),
+                fluentSelect(),
                 fluentTreeItem(),
                 fluentTreeView()
             );
@@ -137,12 +137,16 @@
             <div class="split-view">
                 <div class="split-content">
                     <div style="display: flex; justify-content: space-between; column-gap: 4px;">
-                        <fluent-select :title="$t('input.language.title')"
-                                       :placeholder="$t('input.language.placeholder')" v-model="language" style="min-width: auto;">
-                            <fluent-option title="CSharp" value="CSharp">C#</fluent-option>
-                            <fluent-option title="VisualBasic" value="VisualBasic">VB</fluent-option>
-                            <fluent-option title="IL" value="IL">IL</fluent-option>
-                        </fluent-select>
+                        <div style="display: flex; column-gap: 4px;">
+                            <fluent-select :title="$t('input.language.title')"
+                                           :placeholder="$t('input.language.placeholder')" v-model="language"
+                                           style="min-width: auto;">
+                                <fluent-option title="CSharp" value="CSharp">C#</fluent-option>
+                                <fluent-option title="VisualBasic" value="VisualBasic">VB</fluent-option>
+                                <fluent-option title="IL" value="IL">IL</fluent-option>
+                            </fluent-select>
+                            <toggle-button v-model="isScript">{{ $t("input.language.script") }}</toggle-button>
+                        </div>
                         <div style="display: flex; column-gap: 4px;">
                             <fluent-button :title="loading ? message : $t('input.process.title')" @click="processAsync"
                                            :disabled="loading || isSyntaxTree">
@@ -296,6 +300,12 @@
         <div></div>
     </template>
 
+    <template id="toggle-button-template">
+        <fluent-button :appearance="appearance" @click="onclick">
+            <slot></slot>
+        </fluent-button>
+    </template>
+
     <template id="syntax-tree-item-template">
         <fluent-tree-item>
             <span :class="`ast-item-wrap ast-item-${item.type}`" ref="titleElementRef">
@@ -334,6 +344,7 @@
                     language: "CSharp",
                     inputLanguages: ["Default", "CSharp1", "CSharp2", "CSharp3", "CSharp4", "CSharp5", "CSharp6", "CSharp7", "CSharp7_1", "CSharp7_2", "CSharp7_3", "CSharp8", "CSharp9", "CSharp10", "CSharp11", "CSharp12", "CSharp13", "CSharp14", "LatestMajor", "Preview", "Latest"],
                     inputLanguage: "Preview",
+                    isScript: false,
                     output: "Run",
                     outputLanguages: [],
                     outputLanguage: "CSharp1",
@@ -426,6 +437,26 @@
                             this.message = this.$t("message.changingVersion");
                             await this.initDotNetAsync();
                             await this.dotnet.setInputLanguageVersionAsync(newValue);
+                            this.message = message;
+                        }
+                        catch (e) {
+                            this.message = this.$t("message.error", e.message);
+                            console.error(e);
+                        }
+                        finally {
+                            this.message = '';
+                            this.loading = false;
+                        }
+                    }
+                },
+                async isScript(newValue, oldValue) {
+                    if (newValue !== oldValue) {
+                        try {
+                            this.loading = true;
+                            const message = this.message;
+                            this.message = this.$t("message.changingOutput");
+                            await this.initDotNetAsync();
+                            await this.dotnet.setSourceCodeKind(newValue ? "Script" : "Regular");
                             this.message = message;
                         }
                         catch (e) {
@@ -969,25 +1000,44 @@
                                 this.outputLanguage = params.get("csversion");
                             }
                         }
+                        if (params.has("script")) {
+                            this.isScript = params.get("script") !== "false";
+                        }
                         if (params.has("code")) {
                             this.code = LZString.decompressFromBase64(params.get("code"));
                         }
                     }
                 },
                 setSettings() {
-                    const settings = {
-                        language: this.language,
-                        output: this.output
-                    };
-                    if (this.language !== "IL") {
-                        settings.version = this.inputLanguage;
+                    const settings = {};
+                    if (this.language !== "CSharp") {
+                        settings.language = this.language;
                     }
-                    if (this.outputLanguage === "CSharp") {
-                        settings.csversion = this.outputLanguage;
+                    if (this.output !== "Run") {
+                        settings.output = this.output;
                     }
-                    const code = this.code;
-                    if (code) {
-                        settings.code = LZString.compressToBase64(code);
+                    if (this.isScript) {
+                        settings.script = true;
+                    }
+                    if (settings.language !== "IL") {
+                        if (settings.language === "VisualBasic") {
+                            if (this.inputLanguage !== "Latest") {
+                                settings.version = this.inputLanguage;
+                            }
+                        }
+                        else {
+                            if (this.inputLanguage !== "Preview") {
+                                settings.version = this.inputLanguage;
+                            }
+                        }
+                    }
+                    if (settings.output === "CSharp") {
+                        if (this.outputLanguage !== "CSharp1") {
+                            settings.csversion = this.outputLanguage;
+                        }
+                    }
+                    if (this.code) {
+                        settings.code = LZString.compressToBase64(this.code);
                     }
                     location.hash = new URLSearchParams(settings);
                     this.hashChanged = true;
@@ -1010,7 +1060,7 @@
                 readonly: false,
                 roslynTooltip: Function
             },
-            emits: ['update:value'],
+            emits: ["update:value"],
             data() {
                 return {
                     editor: null,
@@ -1371,6 +1421,22 @@
                 }
                 this.editor.destroy();
             }
+        }).component("toggle-button", {
+            template: "#toggle-button-template",
+            props: {
+                modelValue: undefined
+            },
+            computed: {
+                appearance() {
+                    return this.modelValue ? "accent" : "neutral";
+                }
+            },
+            emits: ["update:modelValue"],
+            methods: {
+                onclick(valueName) {
+                    this.$emit("update:modelValue", !this.modelValue);
+                }
+            }
         }).component("meta-setter", {
             props: {
                 lang: String,
@@ -1450,7 +1516,8 @@
                     input: {
                         language: {
                             title: "Change Language",
-                            placeholder: "Select a language"
+                            placeholder: "Select a language",
+                            script: "Script Mode"
                         },
                         process: {
                             title: "Process"
@@ -1504,7 +1571,8 @@
                     input: {
                         language: {
                             title: "选择语言",
-                            placeholder: "请选择语言"
+                            placeholder: "请选择语言",
+                            script: "脚本模式"
                         },
                         process: {
                             title: "执行"

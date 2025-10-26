@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using SourceCodeKind = Microsoft.CodeAnalysis.SourceCodeKind;
 
 namespace SharpScript
 {
@@ -54,6 +55,12 @@ namespace SharpScript
         public static void SetLanguageType(string type) => Compiler.LanguageType = Enum.Parse<LanguageType>(type, true);
 
         [JSInvokable]
+        public static string GetSourceCodeKind() => Compiler.SourceCodeKind.ToString();
+
+        [JSInvokable]
+        public static void SetSourceCodeKind(string kind) => Compiler.SourceCodeKind = Enum.Parse<SourceCodeKind>(kind, true);
+
+        [JSInvokable]
         public static IEnumerable<string> GetOutputTypes() => Compiler.OutputTypes.Select(x => x.ToString());
 
         [JSInvokable]
@@ -72,17 +79,10 @@ namespace SharpScript
         }
 
         [JSInvokable]
-        public static string GetInputLanguageVersion() => ((IInputOptions)Compiler.InputOptions).LanguageVersion?.ToString() ?? string.Empty;
+        public static string GetInputLanguageVersion() => Compiler.InputLanguageVersion;
 
         [JSInvokable]
-        public static void SetInputLanguageVersion(string type)
-        {
-            if (((IInputOptions)Compiler.InputOptions).LanguageVersion?.GetType() is Type @enum)
-            {
-                ((IInputOptions)Compiler.InputOptions).LanguageVersion = (Enum)Enum.Parse(@enum, type, true);
-                Compiler.UpdateCodeSession();
-            }
-        }
+        public static void SetInputLanguageVersion(string version) => Compiler.InputLanguageVersion = version;
 
         [JSInvokable]
         public static IEnumerable<string> GetOutputLanguageVersions()
@@ -97,15 +97,9 @@ namespace SharpScript
         }
 
         [JSInvokable]
-        public static string GetOutputLanguageVersion() => ((IOutputOptions)Compiler.OutputOptions).LanguageVersion?.ToString() ?? string.Empty;
+        public static string GetOutputLanguageVersion() => Compiler.OutputLanguageVersion;
 
         [JSInvokable]
-        public static void SetOutputLanguageVersion(string type)
-        {
-            if (((IOutputOptions)Compiler.OutputOptions).LanguageVersion?.GetType() is Type @enum)
-            {
-                ((IOutputOptions)Compiler.OutputOptions).LanguageVersion = (Enum)Enum.Parse(@enum, type, true);
-            }
-        }
+        public static void SetOutputLanguageVersion(string version) => Compiler.OutputLanguageVersion = version;
     }
 }
