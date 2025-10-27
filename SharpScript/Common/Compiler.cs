@@ -8,6 +8,7 @@ using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Reflection;
+using System.Reflection.Emit;
 using System.Reflection.Metadata;
 using System.Runtime.Loader;
 using System.Text;
@@ -267,6 +268,9 @@ namespace SharpScript.Common
                                 case Task<int> taskInt:
                                     @return = await taskInt.ConfigureAwait(false);
                                     break;
+                                case Task<object> taskObject:
+                                    @return = await taskObject.ConfigureAwait(false);
+                                    break;
                                 case Task task:
                                     await task.ConfigureAwait(false);
                                     @return = 0;
@@ -310,8 +314,37 @@ namespace SharpScript.Common
                                         (byte)ILOpCode.Call, _, _, _, _,
                                         (byte)ILOpCode.Ret
                                     ] => main.Module.ResolveMethod(BitConverter.ToInt32(bytes.AsSpan(1, 4))),
+                                    [
+                                        (byte)ILOpCode.Newobj, _, _, _, _,
+                                        (byte)ILOpCode.Callvirt, _, _, _, _,
+                                        (byte)ILOpCode.Callvirt, _, _, _, _,
+                                        (byte)ILOpCode.Stloc_0,
+                                        (byte)ILOpCode.Ldloca_s, 0,
+                                        (byte)ILOpCode.Call, _, _, _, _,
+                                        (byte)ILOpCode.Pop,
+                                        (byte)ILOpCode.Ret
+                                    ] or [
+                                        (byte)ILOpCode.Newobj, _, _, _, _,
+                                        (byte)ILOpCode.Callvirt, _, _, _, _,
+                                        (byte)ILOpCode.Callvirt, _, _, _, _,
+                                        (byte)ILOpCode.Stloc_0,
+                                        (byte)ILOpCode.Ldloca_s, 0,
+                                        (byte)ILOpCode.Call, _, _, _, _,
+                                        (byte)ILOpCode.Ret
+                                    ] => CreateScriptMain(main, bytes),
                                     _ => null,
                                 };
+                                static DynamicMethod CreateScriptMain(MethodInfo main, byte[] bytes)
+                                {
+                                    ConstructorInfo constructor = main.Module.ResolveMethod(BitConverter.ToInt32(bytes.AsSpan(1, 4))) as ConstructorInfo;
+                                    MethodInfo initialize = main.Module.ResolveMethod(BitConverter.ToInt32(bytes.AsSpan(6, 4))) as MethodInfo;
+                                    DynamicMethod method = new(main.Name, initialize.ReturnType, [], main.Module);
+                                    ILGenerator generator = method.GetILGenerator();
+                                    generator.Emit(OpCodes.Newobj, constructor);
+                                    generator.Emit(OpCodes.Callvirt, initialize);
+                                    generator.Emit(OpCodes.Ret);
+                                    return method;
+                                }
                                 if (method is MethodInfo { ReturnType: Type type } info && (type == typeof(Task) || type.IsSubclassOf(typeof(Task))))
                                 {
                                     return info;
