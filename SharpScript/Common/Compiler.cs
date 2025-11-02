@@ -211,33 +211,37 @@ namespace SharpScript.Common
             return results;
         }
 
-        public Task<IEnumerable<RoslynCompletionItem>> GetCompletionsAsync(string code, int position, CancellationToken cancellationToken = default)
-        {
-            return InputOptions is RoslynOptions
+        public Task<IEnumerable<RoslynCompletionItem>> GetCompletionsAsync(string code, int position, CancellationToken cancellationToken = default) =>
+            InputOptions is RoslynOptions
                 ? CodeSession.SetSourceTextAsync(code, cancellationToken).AsTask().ContinueWith(x => x.Result.GetCompletionsAsync(position, cancellationToken).AsTask(), TaskScheduler.Default).Unwrap()
                 : Task.FromResult<IEnumerable<RoslynCompletionItem>>([]);
-        }
 
-        public Task<InfoTipItem> GetInfoTipAsync(string code, int position, CancellationToken cancellationToken = default)
-        {
-            return InputOptions is RoslynOptions
+        public Task<InfoTipItem> GetInfoTipAsync(string code, int position, CancellationToken cancellationToken = default) =>
+            InputOptions is RoslynOptions
                 ? CodeSession.SetSourceTextAsync(code, cancellationToken).AsTask().ContinueWith(x => x.Result.GetInfoTipAsync(position, cancellationToken).AsTask(), TaskScheduler.Default).Unwrap()
                 : Task.FromResult<InfoTipItem>(default);
-        }
 
-        public Task<AstNodeItem> GetAstAsync(string code, CancellationToken cancellationToken = default)
-        {
-            return InputOptions is RoslynOptions
+        public Task<AstNodeItem> GetAstAsync(string code, CancellationToken cancellationToken = default) =>
+            InputOptions is RoslynOptions
                 ? CodeSession.SetSourceTextAsync(code, cancellationToken).AsTask().ContinueWith(x => x.Result.GetAstAsync(cancellationToken).AsTask(), TaskScheduler.Default).Unwrap()
                 : Task.FromResult<AstNodeItem>(default);
-        }
 
-        private ValueTask<string> DecompileAsync(CompilationResults streams, CancellationToken cancellationToken = default) => OutputOptions switch
+        private async ValueTask<string> DecompileAsync(CompilationResults streams, CancellationToken cancellationToken = default)
         {
-            CSharpOutputOptions csharp => Decompiler.CSharpDecompileAsync(streams, csharp, cancellationToken),
-            ILOutputOptions => Decompiler.ILDecompileAsync(streams),
-            _ => throw new Exception("Invalid output type.")
-        };
+            try
+            {
+                return OutputOptions switch
+                {
+                    CSharpOutputOptions csharp => await Decompiler.CSharpDecompileAsync(streams, csharp, cancellationToken).ConfigureAwait(false),
+                    ILOutputOptions => await Decompiler.ILDecompileAsync(streams).ConfigureAwait(false),
+                    _ => throw new Exception("Invalid output type.")
+                };
+            }
+            finally
+            {
+                await streams.DisposeAsync().ConfigureAwait(false);
+            }
+        }
 
         [StackTraceHidden]
         private static async ValueTask<List<string>> ExecuteAsync(CompilationResults streams)
@@ -358,7 +362,7 @@ namespace SharpScript.Common
                 finally
                 {
                     context.Unload();
-                    streams.Dispose();
+                    await streams.DisposeAsync().ConfigureAwait(false);
                 }
             }
             catch (TargetInvocationException ex) when (ex.InnerException is Exception e)

@@ -1,10 +1,12 @@
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.JSInterop;
 using SharpScript.Common;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using SourceCodeKind = Microsoft.CodeAnalysis.SourceCodeKind;
@@ -13,25 +15,30 @@ namespace SharpScript
 {
     public static class Program
     {
-        public static Compiler Compiler { get; private set; }
-        public static WebAssemblyHost Current { get; private set; }
+        private static Compiler Compiler
+        {
+            get => field ??= new(NullLoggerFactory.Instance);
+            set;
+        }
+
+        private static WebAssemblyHost Current { get; set; }
 
         private static Task Main(string[] args)
         {
             WebAssemblyHostBuilder builder = WebAssemblyHostBuilder.CreateDefault(args);
-            Current = builder.Build();
-            Compiler = new Compiler(Current.Services.GetRequiredService<ILoggerFactory>());
-            return Current.RunAsync();
+            WebAssemblyHost current = Current = builder.Build();
+            Compiler = new Compiler(current.Services.GetRequiredService<ILoggerFactory>());
+            return current.RunAsync();
         }
 
         [JSInvokable]
-        public static Task InitAsync(string baseUrl, IDictionary<string, string> fingerprinting) => RoslynCodeSession.InitAsync(baseUrl, fingerprinting, Current.Services.GetRequiredService<ILogger<RoslynCodeSession>>()).AsTask();
+        public static Task InitAsync(string baseUrl, IDictionary<string, string> fingerprinting) => RoslynCodeSession.InitAsync(baseUrl, fingerprinting, Current is WebAssemblyHost host ? host.Services.GetRequiredService<ILogger<RoslynCodeSession>>() : NullLogger<RoslynCodeSession>.Instance).AsTask();
 
         [JSInvokable]
         public static Task<CompileResult> ProcessAsync(string code) => Compiler.ProcessAsync(code).AsTask();
 
         [JSInvokable]
-        public static Task<DotNetStreamReference> GetAssemblyAsync(string code) => Compiler.GetAssemblyAsync(code).AsTask().ContinueWith(x => x.Result == null ? null : new DotNetStreamReference(x.Result));
+        public static Task<DotNetStreamReference> GetAssemblyAsync(string code) => Compiler.GetAssemblyAsync(code).AsTask().ContinueWith(x => x.Result is MemoryStream stream ? new DotNetStreamReference(stream) : null);
 
         [JSInvokable]
         public static Task<List<Diagnostic>> GetDiagnosticsAsync(string code) => Compiler.GetDiagnosticsAsync(code).AsTask();

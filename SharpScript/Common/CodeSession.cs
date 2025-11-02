@@ -195,7 +195,7 @@ namespace SharpScript.Common
 
         public async ValueTask<ICodeSession> SetSourceTextAsync(string code, CancellationToken cancellationToken = default)
         {
-            SourceCode = await PerprocessCodeAsync(code, cancellationToken).ConfigureAwait(false);
+            SourceCode = await PreprocessCodeAsync(code, cancellationToken).ConfigureAwait(false);
             return this;
         }
 
@@ -220,11 +220,12 @@ namespace SharpScript.Common
             Compilation compilation = await CurrentDocument.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false);
             ImmutableArray<RoslynDiagnostic> diagnostics = await compilation.WithAnalyzers(_analyzers).GetAllDiagnosticsAsync(cancellationToken).ConfigureAwait(false);
             IEnumerable<RoslynDiagnostic> filtered = !_isConsole && _options is CSharpInputOptions { LanguageVersion: >= CSharpLanguageVersion.CSharp9 } ? diagnostics.Where(x => x is not { Id: "CS8805", Severity: DiagnosticSeverity.Error }) : diagnostics;
-            foreach (RoslynDiagnostic diagnostic in filtered)
+            Diagnostic[] array = await Task.WhenAll(filtered.Select(async diagnostic =>
             {
                 List<CodeAction> actions = await GetCodeActionsAsync(diagnostic, cancellationToken).ConfigureAwait(false);
-                results.Add(new Diagnostic(diagnostic, [.. actions.Select(x => new RoslynCodeAction(x, this))]));
-            }
+                return new Diagnostic(diagnostic, [.. actions.Select(x => new RoslynCodeAction(x, this))]);
+            })).ConfigureAwait(false);
+            results.AddRange(array);
             return results;
         }
 
@@ -339,9 +340,7 @@ namespace SharpScript.Common
                     {
                         Solution solution = Workspace.CurrentSolution.WithProjectCompilationOptions(_currentDocument.Project.Id, options.WithOutputKind(OutputKind.ConsoleApplication));
                         Document currentDocument = solution.GetDocument(_currentDocument.Id);
-                        await assemblyStream.DisposeAsync().ConfigureAwait(false);
-                        await symbolStream.DisposeAsync().ConfigureAwait(false);
-                        await documentationStream.DisposeAsync().ConfigureAwait(false);
+                        await Task.WhenAll(assemblyStream.DisposeAsync().AsTask(), symbolStream.DisposeAsync().AsTask(), documentationStream.DisposeAsync().AsTask()).ConfigureAwait(false);
                         assemblyStream = new();
                         symbolStream = new();
                         documentationStream = new();
@@ -365,17 +364,18 @@ namespace SharpScript.Common
         {
             MetadataReferenceCollection references = [];
             using HttpClient client = new() { BaseAddress = new Uri(_baseUrl) };
-            foreach (string assembly in assemblies)
+            await Task.WhenAll(assemblies.Select(async assembly =>
             {
                 try
                 {
                     string fileName = $"{assembly}.wasm";
                     if (fingerprinting.FirstOrDefault(x => x.Value.Equals(fileName, StringComparison.OrdinalIgnoreCase)) is { Key.Length: > 0 } result)
                     {
+                        Task<XmlDocumentationProvider> documentTask = CreateDocumentationAsync(client, assembly, logger);
                         byte[] stream = await client.GetByteArrayAsync(result.Key).ConfigureAwait(false);
                         await using MemoryStream array = await WebcilConverterUtil.ConvertFromWebcilAsync(stream).ConfigureAwait(false);
-                        references.Add(array, documentation: await CreateDocumentation(client, assembly, logger).ConfigureAwait(false), filePath: assembly);
-                        static async ValueTask<XmlDocumentationProvider> CreateDocumentation(HttpClient client, string assembly, ILogger<RoslynCodeSession> logger)
+                        references.Add(array, documentation: await documentTask.ConfigureAwait(false), filePath: assembly);
+                        static async Task<XmlDocumentationProvider> CreateDocumentationAsync(HttpClient client, string assembly, ILogger<RoslynCodeSession> logger)
                         {
                         start:
                             try
@@ -429,7 +429,7 @@ namespace SharpScript.Common
                 {
                     logger.LogError(ex, "The reference for '{assembly}' was not found.", assembly);
                 }
-            }
+            })).ConfigureAwait(false);
             return references;
         }
 
@@ -476,7 +476,7 @@ namespace SharpScript.Common
             return null;
         }
 
-        private async ValueTask<string> PerprocessCodeAsync(string code, CancellationToken cancellationToken = default)
+        private async ValueTask<string> PreprocessCodeAsync(string code, CancellationToken cancellationToken = default)
         {
             if (code.StartsWith('#'))
             {
@@ -602,10 +602,11 @@ namespace SharpScript.Common
                         using HttpClient client = new() { BaseAddress = new Uri(_baseUrl) };
                         if (_fingerprinting.FirstOrDefault(x => x.Value.Equals(fileName, StringComparison.OrdinalIgnoreCase)) is { Key.Length: > 0 } result)
                         {
+                            Task<XmlDocumentationProvider> documentTask = CreateDocumentationAsync(client, path, _logger, cancellationToken);
                             byte[] stream = await client.GetByteArrayAsync(result.Key, cancellationToken).ConfigureAwait(false);
                             await using MemoryStream array = await WebcilConverterUtil.ConvertFromWebcilAsync(stream, cancellationToken: cancellationToken).ConfigureAwait(false);
-                            references.Add(array, documentation: await CreateDocumentationAsync(client, path, _logger, cancellationToken).ConfigureAwait(false), filePath: path);
-                            static async ValueTask<XmlDocumentationProvider> CreateDocumentationAsync(HttpClient client, string assembly, ILogger<RoslynCodeSession> logger, CancellationToken cancellationToken = default)
+                            references.Add(array, documentation: await documentTask.ConfigureAwait(false), filePath: path);
+                            static async Task<XmlDocumentationProvider> CreateDocumentationAsync(HttpClient client, string assembly, ILogger<RoslynCodeSession> logger, CancellationToken cancellationToken = default)
                             {
                                 try
                                 {
@@ -824,7 +825,7 @@ namespace SharpScript.Common
         }
     }
 
-    public sealed record CompilationResults(string AssemblyName, MemoryStream AssemblyStream, MemoryStream SymbolStream = null, MemoryStream DocumentationStream = null) : IDisposable
+    public sealed record CompilationResults(string AssemblyName, MemoryStream AssemblyStream, MemoryStream SymbolStream = null, MemoryStream DocumentationStream = null) : IDisposable, IAsyncDisposable
     {
         public MetadataReferenceCollection References { get; init; }
 
@@ -852,6 +853,27 @@ namespace SharpScript.Common
             AssemblyStream?.Dispose();
             SymbolStream?.Dispose();
             DocumentationStream?.Dispose();
+            GC.SuppressFinalize(this);
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            await Task.WhenAll(GetTasks()).ConfigureAwait(false);
+            IEnumerable<Task> GetTasks()
+            {
+                if (AssemblyStream != null)
+                {
+                    yield return AssemblyStream.DisposeAsync().AsTask();
+                }
+                if (SymbolStream != null)
+                {
+                    yield return SymbolStream.DisposeAsync().AsTask();
+                }
+                if (DocumentationStream != null)
+                {
+                    yield return DocumentationStream.DisposeAsync().AsTask();
+                }
+            }
             GC.SuppressFinalize(this);
         }
     }
