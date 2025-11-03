@@ -1,26 +1,32 @@
-importScripts("https://cdn.jsdelivr.net/npm/comlink/dist/umd/comlink.min.js");
-const window = self;
-const document = {
-    baseURI: location.href,
-    childNodes: [],
-    documentElement: {
-        style: {
-            setProperty() { }
+import AsyncLock from "https://cdn.jsdelivr.net/npm/async-lock/+esm";
+import * as Comlink from "https://cdn.jsdelivr.net/npm/comlink/+esm";
+if (typeof window === "undefined") {
+    self.window = self;
+    self.document = {
+        baseURI: location.href,
+        childNodes: [],
+        documentElement: {
+            style: {
+                setProperty() { }
+            }
+        },
+        addEventListener() { },
+        createElement() {
+            return {};
+        },
+        createElementNS() {
+            return {};
+        },
+        hasChildNodes() {
+            return false;
+        },
+        querySelector() {
+            return null;
         }
-    },
-    addEventListener() { },
-    createElement() {
-        return {};
-    },
-    createElementNS() {
-        return {};
-    },
-    hasChildNodes() {
-        return false;
-    }
-};
-const Node = { COMMENT_NODE: 8 };
-const history = { state: {} };
+    };
+    self.Node = { COMMENT_NODE: 8 };
+    self.history = { state: {} };
+}
 let diagnostics = [], completions = [];
 function getFingerprinting() {
     let fingerprinting = Blazor.runtime.config.resources.fingerprinting;
@@ -36,16 +42,21 @@ function getFingerprinting() {
     }
     return fingerprinting;
 }
+const locker = new AsyncLock();
 const dotnet = {
     init(baseURI, onDownloadResourceProgress) {
-        document.baseURI = baseURI;
-        document.documentElement.style.setProperty = (x, y) => onDownloadResourceProgress(x, y);
+        if (typeof Document === "undefined") {
+            document.baseURI = baseURI;
+            if (onDownloadResourceProgress) {
+                document.documentElement.style.setProperty = (x, y) => onDownloadResourceProgress(x, y);
+            }
+        }
     },
     get fingerprinting() {
         return getFingerprinting();
     },
     async startAsync() {
-        importScripts("_framework/blazor.webassembly.js");
+        await import("./_framework/blazor.webassembly.js");
         await Blazor.start();
     },
     async initAsync() {
@@ -96,10 +107,10 @@ const dotnet = {
         return await DotNet.invokeMethodAsync("SharpScript", "GetCSharpInfoTipLiteAsync", code, position);
     },
     async getLanguageTypesAsync() {
-        return await DotNet.invokeMethodAsync("SharpScript", "GetLanguageTypes");
+        return await locker.acquire("inputLanguage", () => DotNet.invokeMethodAsync("SharpScript", "GetLanguageTypes"));
     },
     async setLanguageTypeAsync(type) {
-        return await DotNet.invokeMethodAsync("SharpScript", "SetLanguageType", type);
+        return await locker.acquire("inputLanguage", () => DotNet.invokeMethodAsync("SharpScript", "SetLanguageType", type));
     },
     async getSourceCodeKind() {
         return await DotNet.invokeMethodAsync("SharpScript", "GetSourceCodeKind");
@@ -108,28 +119,28 @@ const dotnet = {
         return await DotNet.invokeMethodAsync("SharpScript", "SetSourceCodeKind", kind);
     },
     async getOutputTypesAsync() {
-        return await DotNet.invokeMethodAsync("SharpScript", "GetOutputTypes");
+        return await locker.acquire("outputLanguage", () => DotNet.invokeMethodAsync("SharpScript", "GetOutputTypes"));
     },
     async setOutputTypeAsync(type) {
-        return await DotNet.invokeMethodAsync("SharpScript", "SetOutputType", type);
+        return await locker.acquire("outputLanguage", () => DotNet.invokeMethodAsync("SharpScript", "SetOutputType", type));
     },
     async getInputLanguageVersionsAsync() {
-        return await DotNet.invokeMethodAsync("SharpScript", "GetInputLanguageVersions");
+        return await locker.acquire("inputLanguage", () => DotNet.invokeMethodAsync("SharpScript", "GetInputLanguageVersions"));
     },
     async getInputLanguageVersionAsync() {
-        return await DotNet.invokeMethodAsync("SharpScript", "GetInputLanguageVersion");
+        return await locker.acquire("inputLanguage", () => DotNet.invokeMethodAsync("SharpScript", "GetInputLanguageVersion"));
     },
     async setInputLanguageVersionAsync(version) {
-        return await DotNet.invokeMethodAsync("SharpScript", "SetInputLanguageVersion", version);
+        return await locker.acquire("inputLanguage", () => DotNet.invokeMethodAsync("SharpScript", "SetInputLanguageVersion", version));
     },
     async getOutputLanguageVersionsAsync() {
-        return await DotNet.invokeMethodAsync("SharpScript", "GetOutputLanguageVersions");
+        return await locker.acquire("outputLanguage", () => DotNet.invokeMethodAsync("SharpScript", "GetOutputLanguageVersions"));
     },
     async getOutputLanguageVersionAsync() {
-        return await DotNet.invokeMethodAsync("SharpScript", "GetOutputLanguageVersion");
+        return await locker.acquire("outputLanguage", () => DotNet.invokeMethodAsync("SharpScript", "GetOutputLanguageVersion"));
     },
     async setOutputLanguageVersionAsync(version) {
-        return await DotNet.invokeMethodAsync("SharpScript", "SetOutputLanguageVersion", version);
+        return await locker.acquire("outputLanguage", () => DotNet.invokeMethodAsync("SharpScript", "SetOutputLanguageVersion", version));
     },
     async invokeMethodAsync(assembly, method, ...args) {
         return await DotNet.invokeMethodAsync(assembly, method, ...args);
@@ -158,4 +169,7 @@ const dotnet = {
         return URL.createObjectURL(file);
     }
 };
-Comlink.expose(dotnet);
+if (typeof WorkerGlobalScope !== "undefined" && self instanceof WorkerGlobalScope) {
+    Comlink.expose(dotnet);
+}
+export { dotnet };

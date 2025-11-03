@@ -40,6 +40,7 @@
                 "@uiw/codemirror-theme-vscode/dark": "https://cdn.jsdelivr.net/npm/@uiw/codemirror-theme-vscode/esm/dark.js",
                 "@uiw/codemirror-theme-vscode/light": "https://cdn.jsdelivr.net/npm/@uiw/codemirror-theme-vscode/esm/light.js",
                 "ansi_up": "https://cdn.jsdelivr.net/npm/ansi_up/+esm",
+                "async-lock": "https://cdn.jsdelivr.net/npm/async-lock/+esm",
                 "codemirror": "https://cdn.jsdelivr.net/npm/codemirror/dist/index.js",
                 "comlink": "https://cdn.jsdelivr.net/npm/comlink/+esm",
                 "crelt": "https://cdn.jsdelivr.net/npm/crelt/+esm",
@@ -210,7 +211,7 @@
                                     :roslyn-tooltip="roslynTooltip.output" readonly="true" style="flex: 1;"></codemirror>
                         <div class="output" v-else>
                             <fluent-tree-view class="no-selected-indicator" v-if="isSyntaxTree && syntaxTree"
-                                              style="flex: 1; margin: 12 0;">
+                                              style="flex: 1; margin: 12px 0;">
                                 <syntax-tree-item :item="syntaxTree"></syntax-tree-item>
                             </fluent-tree-view>
                             <div v-else-if="isRun && results.outputs.length && !diagnostics.errors.length">
@@ -321,6 +322,7 @@
 
     <script type="module">
         import LZString from "lz-string";
+        import AsyncLock from "async-lock";
         import * as Comlink from "comlink";
         import { createApp } from "vue";
         import { createI18n } from "vue-i18n";
@@ -364,27 +366,10 @@
                         infos: []
                     },
                     syntaxTree: null,
-                    locker: {
-                        resolves: [],
-                        reference: 0,
-                        async await() {
-                            return new Promise(resolve => {
-                                if (this.reference++ <= 0) {
-                                    resolve();
-                                }
-                                else {
-                                    this.resolves.push(resolve);
-                                }
-                            });
-                        },
-                        release() {
-                            if (--this.reference > 0) {
-                                this.resolves.pop()();
-                            }
-                        }
-                    },
+                    locker: new AsyncLock(),
                     assemblies: null,
-                    dotnet: Comlink.wrap(new Worker("worker.js")),
+                    dotnet: null,
+                    noWorker: false,
                     hashChanged: false,
                     roslynTooltip: {
                         input: null,
@@ -653,17 +638,17 @@
                     if (!this.isInitDotnet) {
                         const message = this.message;
                         this.message = this.$t("message.loadingDotnet");
-                        await this.locker.await();
-                        if (!this.isInitDotnet) {
-                            const message = this.message;
-                            this.message = this.$t("message.initWebWorker");
-                            await this.dotnet.init(document.baseURI, Comlink.proxy((x, y) => document.documentElement.style.setProperty(x, y)));
-                            this.message = message;
-                            await this.dotnet.startAsync();
-                        }
-                        this.locker.release();
+                        await this.locker.acquire("initDotNet", async () => {
+                            if (!this.isInitDotnet) {
+                                const message = this.message;
+                                this.message = this.$t("message.initWebWorker");
+                                await this.dotnet.init(document.baseURI, Comlink.proxy((x, y) => document.documentElement.style.setProperty(x, y)));
+                                this.message = message;
+                                await this.dotnet.startAsync();
+                                this.isInitDotnet = true;
+                            }
+                        });
                         this.message = message;
-                        this.isInitDotnet = true;
                     }
                 },
                 async initCompilerAsync() {
@@ -995,7 +980,7 @@
                         if (params.has("output")) {
                             this.output = params.get("output");
                         }
-                        if (this.outputLanguage === "CSharp") {
+                        if (this.output === "CSharp") {
                             if (params.has("csversion")) {
                                 this.outputLanguage = params.get("csversion");
                             }
@@ -1006,10 +991,16 @@
                         if (params.has("code")) {
                             this.code = LZString.decompressFromBase64(params.get("code"));
                         }
+                        if (params.has("noworker")) {
+                            return params.get("noworker") !== "false";
+                        }
                     }
                 },
                 setSettings() {
                     const settings = {};
+                    if (this.noWorker) {
+                        settings.noworker = true;
+                    }
                     if (this.language !== "CSharp") {
                         settings.language = this.language;
                     }
@@ -1048,8 +1039,14 @@
                     return html;
                 }
             },
-            mounted() {
-                this.loadSettings();
+            async mounted() {
+                if (this.loadSettings()) {
+                    this.dotnet = await import("./worker.js").then(x => x.dotnet);
+                    this.noWorker = true;
+                }
+                else {
+                    this.dotnet = Comlink.wrap(new Worker("worker.js", { type: "module" }));
+                }
                 addEventListener("hashchange", this.loadSettings);
             }
         }).component("codemirror", {
