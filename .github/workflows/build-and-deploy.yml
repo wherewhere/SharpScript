@@ -11,6 +11,8 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      Solution_Name: SharpScript/SharpScript.csproj
 
     steps:
       - name: Checkout
@@ -34,10 +36,10 @@ jobs:
 
       # Restore the application to populate the obj folder with RuntimeIdentifiers
       - name: Install Dependencies
-        run: dotnet restore
+        run: dotnet restore ${{ env.Solution_Name }}
 
       - name: Publish
-        run: dotnet publish -c:Release -o:public
+        run: dotnet publish ${{ env.Solution_Name }} -c:Release -o:public
 
       # Changes the base-tag in index.html to match GitHub Pages repository subdirectory
       - name: Change index.html base-tag
