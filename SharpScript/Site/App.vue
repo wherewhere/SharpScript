@@ -857,7 +857,7 @@
                 this.noWorker = true;
             }
             else {
-                const url = new URL("./worker.js", import.meta.url);
+                const url = new URL(/* @vite-ignore */ "./worker.js", import.meta.url);
                 this.dotnet = Comlink.wrap<DotNetWorker>(new Worker(url.href, { type: "module" }));
             }
             addEventListener("hashchange", this.loadSettings);
