@@ -24,6 +24,11 @@ jobs:
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'latest'
+
       - name: Install WASM Tools Workload
         run: dotnet workload install wasm-tools
 

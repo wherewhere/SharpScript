@@ -13,11 +13,19 @@
     <PackageReference Include="ICSharpCode.Decompiler" Version="10.0.0.8079-preview1" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.0" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="10.0.0" PrivateAssets="all" />
-    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Features" Version="5.3.0-2.25557.5" />
-    <PackageReference Include="Microsoft.CodeAnalysis.VisualBasic.Features" Version="5.3.0-2.25557.5" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Features" Version="5.3.0-2.25564.7" />
+    <PackageReference Include="Microsoft.CodeAnalysis.VisualBasic.Features" Version="5.3.0-2.25564.7" />
     <PackageReference Include="Mobius.ILasm" Version="0.1.0" />
     <PackageReference Include="System.Security.Permissions" Version="10.0.0" />
   </ItemGroup>
+
+  <Target Name="NPMRestore" AfterTargets="Restore">
+    <Exec Command="npm install" WorkingDirectory="Site" />
+  </Target>
+
+  <Target Name="NPMBuild" BeforeTargets="PreBuildEvent">
+    <Exec Command="npm run build" WorkingDirectory="Site" />
+  </Target>
 
   <Target Name="GetFrameworkXmlDocumentation" AfterTargets="ResolveReferences">
     <ItemGroup>
