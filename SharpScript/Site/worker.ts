@@ -29,6 +29,7 @@ if (typeof window === "undefined") {
     self.Node = { COMMENT_NODE: 8 } as any;
     self.history = { state: {} } as any;
 }
+
 let diagnostics: ICodeActionObject[] = [], completions: ICompletionItemObject[] = [];
 function getFingerprinting() {
     let fingerprinting: { [key: string]: string } = Blazor.runtime.config.resources.fingerprinting;
@@ -46,6 +47,7 @@ function getFingerprinting() {
 }
 type Fingerprinting = ReturnType<typeof getFingerprinting>;
 const locker = new AsyncLock();
+
 const dotnet = {
     init(baseURI: string, onDownloadResourceProgress: (x: string, y: string | null) => void): void | Promise<void> {
         if (typeof Document === "undefined") {
@@ -181,6 +183,7 @@ const dotnet = {
         return URL.createObjectURL(file);
     }
 };
+
 declare const WorkerGlobalScope: ObjectConstructor;
 if (typeof WorkerGlobalScope !== "undefined" && self instanceof WorkerGlobalScope) {
     Comlink.expose(dotnet);

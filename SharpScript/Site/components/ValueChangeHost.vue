@@ -18,7 +18,7 @@
                 type: String as PropType<keyof HTMLElementEventMap | string>,
                 required: true
             },
-            modelValue: String as PropType<string | number | boolean>
+            modelValue: [String, Number, Boolean]
         },
         emits: ["update:modelValue"],
         watch: {

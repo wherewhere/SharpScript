@@ -1,9 +1,9 @@
 <template>
     <MetaSetter :lang="$i18n.locale" :description="$t('description')" />
     <div class="content">
-        <div class="split-view">
-            <div class="split-content">
-                <div style="display: flex; justify-content: space-between; column-gap: 4px;">
+        <SplitPanels class="split-view" :direction="direction">
+            <template #panel1>
+                <div style="display: flex; justify-content: space-between; column-gap: 4px">
                     <div style="display: flex; column-gap: 4px;">
                         <fluent-select :title="$t('input.language.title')"
                                        :placeholder="$t('input.language.placeholder')" v-model="language" style="min-width: auto;">
@@ -30,9 +30,9 @@
                 </div>
                 <CodeMirror class="editor" v-model:value="code" :language="getLauguage()"
                             :roslyn-tooltip="roslynTooltip.input!" ref="editor" />
-            </div>
-            <div class="split-content">
-                <div style="display: flex; justify-content: space-between; column-gap: 4px;">
+            </template>
+            <template #panel2>
+                <div style="display: flex; justify-content: space-between; column-gap: 4px">
                     <fluent-select :title="$t('output.language.title')" :placeholder="$t('output.language.placeholder')"
                                    v-model="output" style="min-width: auto;">
                         <fluent-option title="CSharp" value="CSharp">C#</fluent-option>
@@ -93,8 +93,8 @@
                         </div>
                     </div>
                 </div>
-            </div>
-        </div>
+            </template>
+        </SplitPanels>
         <div class="status-bar">
             <div style="height: 20px;">
                 <Alert16Regular style="fill: currentColor; margin: 3px 4px -3px 0;" title="{{ $t('status.alert') }}" />
@@ -128,6 +128,7 @@
     import { linter, lintGutter } from "@codemirror/lint";
     import { hoverTooltip } from "@codemirror/view";
     import MetaSetter from "./components/MetaSetter.vue";
+    import SplitPanels from "./components/SplitPanels.vue";
     import CodeMirror from "./components/CodeMirror.vue";
     import SyntaxTreeItem from "./components/SyntaxTreeItem.vue";
     import ToggleButton from "./components/ToggleButton.vue";
@@ -137,12 +138,14 @@
     import Alert16Regular from "@fluentui/svg-icons/icons/alert_16_regular.svg?component";
     import DismissCircle16Regular from "@fluentui/svg-icons/icons/dismiss_circle_16_regular.svg?component";
     import Warning16Regular from "@fluentui/svg-icons/icons/warning_16_regular.svg?component";
+    import { direction } from "@fluentui/web-components";
 
     export default {
         name: "App",
         components: {
             CodeMirror,
             MetaSetter,
+            SplitPanels,
             SyntaxTreeItem,
             ToggleButton,
             TriangleRight12Filled,
@@ -186,7 +189,8 @@
                 roslynTooltip: {
                     input: null as (() => Extension) | null,
                     output: null as (() => Extension) | null
-                }
+                },
+                direction: "row" as "row" | "column"
             }
         },
         computed: {
@@ -861,6 +865,11 @@
                 this.dotnet = Comlink.wrap<DotNetWorker>(new Worker(url.href, { type: "module" }));
             }
             addEventListener("hashchange", this.loadSettings);
+            const scheme = matchMedia("(max-width: 767px)");
+            if (scheme) {
+                scheme.addEventListener("change", e => this.direction = e.matches ? "column" : "row");
+                this.direction = scheme.matches ? "column" : "row";
+            }
         }
     };
 </script>
@@ -933,16 +942,16 @@
 
     div.split-view {
         height: calc(100% - 30px);
-        display: flex;
         gap: 8px;
 
-        .split-content {
-            flex: 1;
-            width: 50%;
-            height: 100%;
+        :deep(.slotted) {
             display: flex;
             flex-direction: column;
             row-gap: 8px;
+
+            &::-webkit-scrollbar {
+                display: none;
+            }
 
             .editor {
                 flex: 1;
@@ -952,7 +961,7 @@
                 border-radius: calc(var(--layer-corner-radius) * 1px);
 
 
-                :deep(.cm-editor) {
+                .cm-editor {
                     flex: 1;
                     overflow: inherit;
                 }
@@ -976,15 +985,6 @@
                         padding: 4px 0;
                     }
                 }
-            }
-        }
-
-        @media (max-width: 767px) {
-            flex-direction: column;
-
-            .split-content {
-                width: 100%;
-                height: 50%;
             }
         }
     }

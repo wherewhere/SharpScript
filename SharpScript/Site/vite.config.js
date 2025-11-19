@@ -3,13 +3,15 @@ import vue from "@vitejs/plugin-vue";
 import legacy from "@vitejs/plugin-legacy";
 import svgLoader from "vite-svg-loader";
 import postcssPresetEnv from "postcss-preset-env";
+import { fileURLToPath } from "url";
+import fs from "fs";
+import path from "path";
+import Mime from "mime";
 
 export default defineConfig({
-    base: "/",
     base: "./",
     plugins: [
         vue({
-            include: [/\.vue$/, /\.md$/],
             template: {
                 compilerOptions: {
                     isCustomElement: tag => tag.includes('-')
@@ -21,15 +23,53 @@ export default defineConfig({
             polyfills: false,
             renderLegacyChunks: false
         }),
-        svgLoader()
+        svgLoader(), {
+            name: "dotnet-framework-static-files",
+            configureServer(server) {
+                const __dirname = path.dirname(fileURLToPath(import.meta.url));
+                server.middlewares.use((req, res, next) => {
+                    if (req.url && req.url.startsWith("/_framework")) {
+                        const frameworkRoot = path.resolve(__dirname, "../bin/Release/net10.0-browser/publish/wwwroot");
+                        const rawPath = decodeURIComponent(req.url.split('?')[0]);
+                        let filePath = path.resolve(frameworkRoot, `.${rawPath}`);
+                        fs.stat(filePath, (err, stat) => {
+                            if (err) {
+                                res.statusCode = 404;
+                                return res.end();
+                            }
+                            function sendFile(filePath) {
+                                const ext = path.extname(filePath).toLowerCase();
+                                const mime = Mime.getType(ext) ?? "application/octet-stream";
+                                res.setHeader("Content-Type", mime);
+                                res.setHeader("Cache-Control", "no-cache");
+                                const stream = fs.createReadStream(filePath);
+                                stream.on("error", () => {
+                                    res.statusCode = 500;
+                                    return res.end();
+                                });
+                                stream.pipe(res);
+                            }
+                            if (stat.isDirectory()) {
+                                filePath = path.join(filePath, "index.html");
+                                fs.stat(filePath, (err, stat) => {
+                                    if (err || !stat.isFile()) {
+                                        res.statusCode = 404;
+                                        return res.end();
+                                    }
+                                    sendFile(filePath);
+                                });
+                            }
+                            sendFile(filePath);
+                        });
+                    }
+                    else {
+                        next();
+                    }
+                });
+            }
+        }
     ],
     css: {
-        postcss: {
-            plugins: [postcssPresetEnv({
-                stage: 0,
-                browsers: ["supports custom-elementsv1"]
-            })]
-        },
         preprocessorOptions: {
             scss: {
                 importers: [{
@@ -66,22 +106,28 @@ export default defineConfig({
                     }
                 }]
             }
+        },
+        postcss: {
+            plugins: [postcssPresetEnv({
+                stage: 0,
+                browsers: ["supports custom-elementsv1"]
+            })]
         }
     },
     build: {
-        chunkSizeWarningLimit: 1024,
         outDir: "../wwwroot",
-        emptyOutDir: true,
         rollupOptions: {
             output: {
-                entryFileNames: "assets/[name].js",
-                chunkFileNames: "assets/[name].js",
                 assetFileNames: "assets/[name].[ext]",
+                chunkFileNames: "assets/[name].js",
+                entryFileNames: "assets/[name].js",
                 manualChunks: {
                     "shared": ["/helpers/shared.ts"]
                 }
             }
-        }
+        },
+        emptyOutDir: true,
+        chunkSizeWarningLimit: 1024
     },
     worker: {
         format: "es"
