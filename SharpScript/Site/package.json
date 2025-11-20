@@ -39,16 +39,15 @@
     "type": "git",
     "url": "git+https://github.com/wherewhere/SharpScript.git"
   },
+  "devDependencies": {
+    "eslint": "^9.0.0"
+  },
   "dependencies": {
-    "@babel/preset-typescript": "^7.0.0",
     "@babel/runtime": "^7.0.0",
     "@fluentui/svg-icons": "^1.0.0",
     "@fluentui/web-components": "^2.0.0",
     "@replit/codemirror-lang-csharp": "^6.0.0",
-    "@rollup/plugin-babel": "^6.0.0",
-    "@rollup/plugin-node-resolve": "^16.0.0",
     "@uiw/codemirror-theme-vscode": "^4.0.0",
-    "@vitejs/plugin-legacy": "^7.0.0",
     "@vitejs/plugin-vue": "^6.0.0",
     "ansi_up": "^6.0.6",
     "async-lock": "^1.0.0",
@@ -63,9 +62,5 @@
     "vite-svg-loader": "^5.0.0",
     "vue": "^3.0.0",
     "vue-i18n": "^11.0.0"
-  },
-  "devDependencies": {
-    "@types/babel__core": "^7.0.0",
-    "eslint": "^9.0.0"
   }
 }

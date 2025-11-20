@@ -292,27 +292,41 @@
     }
 
     .median {
-        background: var(--neutral-stroke-rest);
+        box-sizing: border-box;
+        background: var(--neutral-fill-input-rest);
+        border: calc(var(--stroke-width) * 1px) solid var(--neutral-stroke-layer-rest);
         border-radius: calc(var(--control-corner-radius) * 1px);
         display: inline-flex;
         align-items: center;
         justify-content: center;
 
-        &:hover {
-            background: var(--neutral-stroke-hover);
-        }
-
-        &:active {
-            background: var(--neutral-stroke-active);
-        }
-
-        &:focus {
-            background: var(--neutral-stroke-focus);
-        }
-
         span.handle {
             border: 1px solid var(--neutral-stroke-strong-rest);
             border-radius: 1px;
+        }
+
+        &:hover {
+            background: var(--neutral-fill-input-hover);
+
+            span.handle {
+                border: 1px solid var(--neutral-stroke-strong-hover);
+            }
+        }
+
+        &:active {
+            background: var(--neutral-fill-input-active);
+
+            span.handle {
+                border: 1px solid var(--neutral-stroke-strong-active);
+            }
+        }
+
+        &:focus {
+            background: var(--neutral-fill-input-focus);
+
+            span.handle {
+                border: 1px solid var(--neutral-stroke-strong-focus);
+            }
         }
     }
 

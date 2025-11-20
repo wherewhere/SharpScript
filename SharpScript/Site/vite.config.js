@@ -1,8 +1,6 @@
 import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
-import legacy from "@vitejs/plugin-legacy";
 import svgLoader from "vite-svg-loader";
-import postcssPresetEnv from "postcss-preset-env";
 import { fileURLToPath } from "url";
 import fs from "fs";
 import path from "path";
@@ -17,11 +15,6 @@ export default defineConfig({
                     isCustomElement: tag => tag.includes('-')
                 }
             }
-        }),
-        legacy({
-            targets: ["supports custom-elementsv1"],
-            polyfills: false,
-            renderLegacyChunks: false
         }),
         svgLoader(), {
             name: "dotnet-framework-static-files",
@@ -106,12 +99,6 @@ export default defineConfig({
                     }
                 }]
             }
-        },
-        postcss: {
-            plugins: [postcssPresetEnv({
-                stage: 0,
-                browsers: ["supports custom-elementsv1"]
-            })]
         }
     },
     build: {

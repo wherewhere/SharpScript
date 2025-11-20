@@ -124,7 +124,7 @@
     import { AnsiUp } from "ansi_up";
     import type { EditorView } from "codemirror";
     import type { Extension, Text } from "@codemirror/state";
-    import { autocompletion, Completion, CompletionContext, ifNotIn } from "@codemirror/autocomplete";
+    import { autocompletion, ifNotIn, Completion, CompletionContext } from "@codemirror/autocomplete";
     import { linter, lintGutter } from "@codemirror/lint";
     import { hoverTooltip } from "@codemirror/view";
     import MetaSetter from "./components/MetaSetter.vue";
@@ -138,7 +138,6 @@
     import Alert16Regular from "@fluentui/svg-icons/icons/alert_16_regular.svg?component";
     import DismissCircle16Regular from "@fluentui/svg-icons/icons/dismiss_circle_16_regular.svg?component";
     import Warning16Regular from "@fluentui/svg-icons/icons/warning_16_regular.svg?component";
-    import { direction } from "@fluentui/web-components";
 
     export default {
         name: "App",
@@ -957,9 +956,10 @@
                 flex: 1;
                 display: flex;
                 overflow: auto;
+                box-sizing: border-box;
                 background: var(--neutral-fill-input-rest);
+                border: calc(var(--stroke-width) * 1px) solid var(--neutral-stroke-layer-rest);
                 border-radius: calc(var(--layer-corner-radius) * 1px);
-
 
                 .cm-editor {
                     flex: 1;
