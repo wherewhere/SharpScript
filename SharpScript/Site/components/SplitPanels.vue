@@ -96,7 +96,6 @@
                         this.$el.removeAttribute("no-barhandle");
                     } else {
                         this.$el.setAttribute("no-barhandle", '');
-
                     }
                 }
             }
@@ -113,14 +112,24 @@
 
                 this.$el.addEventListener("pointermove", this.resizeDrag);
                 this.$el.addEventListener("pointerup", this.pointerup);
+                this.$el.addEventListener("touchmove", this.touchmove);
+                this.$el.addEventListener("touchend", this.pointerup);
             },
             pointerup() {
                 this.isResizing = false;
                 this.$emit("splitterresized", { panel1size: this.slot1size, panel2size: this.slot2size });
                 this.$el.removeEventListener("pointermove", this.resizeDrag);
                 this.$el.removeEventListener("pointerup", this.pointerup);
+                this.$el.removeEventListener("touchmove", this.touchmove);
+                this.$el.removeEventListener("touchend", this.pointerup);
             },
-            resizeDrag(e: PointerEvent) {
+            touchmove(e: TouchEvent) {
+                if (e.touches.length) {
+                    const { clientX, clientY } = e.touches[0];
+                    this.resizeDrag({ clientX, clientY });
+                }
+            },
+            resizeDrag(e: { clientX: number, clientY: number }) {
                 if (this.direction === "row") {
                     const newMedianStart = (document.body.dir === '' || document.body.dir === "ltr") ? (e.clientX - this.left) : (this.right - e.clientX);
                     const median = this.barsize;
