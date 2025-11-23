@@ -1,10 +1,10 @@
 <template>
-    <div></div>
+    <div ref="root"></div>
 </template>
 
-<script lang="ts">
+<script lang="ts" setup>
     import type { lang } from "../types";
-    import type { PropType } from "vue";
+    import { onMounted, onUnmounted, useTemplateRef, watch } from "vue";
     import { basicSetup, EditorView } from "codemirror";
     import { indentWithTab } from "@codemirror/commands";
     import { Compartment, EditorState, Facet, type Extension } from "@codemirror/state";
@@ -16,150 +16,157 @@
     import { vscodeDark, vscodeLight } from "@uiw/codemirror-theme-vscode";
     import instructions from "../assets/instructions.json";
 
-    export default {
-        name: "CodeMirror",
-        props: {
-            language: String as PropType<lang>,
-            value: String,
-            readonly: {
-                type: Boolean,
-                default: false
-            },
-            roslynTooltip: Function as PropType<() => Extension>
-        },
-        emits: ["update:value"],
-        data() {
-            return {
-                editor: null as EditorView | null,
-                changed: false,
-                themeSet: new Compartment(),
-                languageSet: new Compartment(),
-                readonlySet: new Compartment(),
-                linterSet: new Compartment(),
-                lintGutterSet: new Compartment(),
-                tooltipSet: new Compartment(),
-                autocompletionSet: new Compartment()
+    const { language, readonly, roslynTooltip } = defineProps<{
+        language?: lang;
+        readonly?: boolean;
+        roslynTooltip?: () => Extension;
+    }>();
+    const value = defineModel<string>("value");
+
+    let changed = false;
+    const languageSet = new Compartment();
+    const readonlySet = new Compartment();
+    watch(
+        () => language,
+        (newValue, oldValue) => {
+            if (newValue !== oldValue) {
+                const lang = getLauguage(newValue!)!;
+                editor!.dispatch({ effects: languageSet.reconfigure(lang) });
+                updateTooltip();
             }
-        },
-        watch: {
-            language(newValue: lang, oldValue: lang) {
-                if (newValue !== oldValue) {
-                    const lang = this.getLauguage(newValue)!;
-                    this.editor!.dispatch({ effects: this.languageSet.reconfigure(lang) });
-                    this.updateTooltip();
-                }
-            },
-            value(newValue: string, oldValue: string) {
-                if (!this.changed && newValue !== oldValue) {
-                    const editor = this.editor!;
-                    editor.dispatch({ changes: { from: 0, to: editor.state.doc.length, insert: newValue } });
-                }
-                this.changed = false;
-            },
-            readonly(newValue: boolean, oldValue: boolean) {
-                if (newValue !== oldValue) {
-                    this.editor!.dispatch({ effects: this.readonlySet.reconfigure(EditorState.readOnly.of(!!newValue)) });
-                }
-            },
-            roslynTooltip(newValue: (() => Extension), oldValue: (() => Extension)) {
-                if (newValue !== oldValue) {
-                    this.updateTooltip();
-                }
+        });
+    watch(
+        value,
+        (newValue, oldValue) => {
+            if (!changed && newValue !== oldValue) {
+                editor!.dispatch({ changes: { from: 0, to: editor!.state.doc.length, insert: newValue } });
             }
-        },
-        methods: {
-            updateTheme(e: MediaQueryListEvent) {
-                this.editor!.dispatch({ effects: this.themeSet.reconfigure(e.matches ? vscodeDark : vscodeLight) });
-            },
-            updateTooltip() {
-                this.editor!.dispatch({ effects: this.tooltipSet.reconfigure(this.language === "il" ? this.getILTooltip() : this.roslynTooltip ? this.roslynTooltip() : Facet.define<undefined>().of(undefined)) });
-            },
-            getLauguage(lang: lang) {
-                switch (lang) {
-                    case "il":
-                        return cil;
-                    case "csharp":
-                        return csharp();
-                    case "vb":
-                        return vb;
-                }
-            },
-            getILTooltip() {
-                return hoverTooltip(async (view, pos) => {
-                    const node = view.domAtPos(pos).node;
-                    if (node instanceof Text) {
-                        if (node.parentElement!.classList.contains("ͼr")) {
-                            const text = node.textContent as keyof typeof instructions;
-                            if (text) {
-                                const desc = instructions[text];
-                                if (desc) {
-                                    return {
-                                        pos,
-                                        create() {
-                                            const dom = document.createElement("div")
-                                            dom.classList.add("mirrorsharp-infotip");
-                                            const name = document.createElement("span");
-                                            name.className = "tok-keyword";
-                                            name.textContent = text;
-                                            const description = document.createElement("div");
-                                            description.className = "CodeMirror-infotip-description";
-                                            description.textContent = desc;
-                                            dom.appendChild(name);
-                                            dom.appendChild(description);
-                                            return { dom };
-                                        }
-                                    };
-                                }
-                            }
-                        }
-                    }
-                    return null;
-                });
+            changed = false;
+        });
+    watch(
+        () => readonly,
+        (newValue, oldValue) => {
+            if (newValue !== oldValue) {
+                editor!.dispatch({ effects: readonlySet.reconfigure(EditorState.readOnly.of(!!newValue)) });
             }
-        },
-        mounted() {
-            const getTheme = () => {
-                const scheme = matchMedia("(prefers-color-scheme: dark)");
-                if (typeof scheme !== "undefined") {
-                    scheme.addEventListener("change", this.updateTheme);
-                    if (scheme.matches) {
-                        return this.themeSet.of(vscodeDark);
-                    }
-                }
-                return this.themeSet.of(vscodeLight);
-            };
-            const empty = Facet.define<undefined>().of(undefined);
-            this.editor = new EditorView({
-                doc: this.value,
-                parent: this.$el,
-                extensions: [
-                    basicSetup,
-                    getTheme(),
-                    keymap.of([indentWithTab]),
-                    indentUnit.of("    "),
-                    this.autocompletionSet.of(empty),
-                    this.linterSet.of(empty),
-                    this.lintGutterSet.of(empty),
-                    this.tooltipSet.of(this.language === "il" ? this.getILTooltip() : this.roslynTooltip ? this.roslynTooltip() : empty),
-                    this.languageSet.of(this.getLauguage(this.language || "csharp")!),
-                    this.readonlySet.of(EditorState.readOnly.of(!!this.readonly)),
-                    EditorView.updateListener.of(e => {
-                        if (e.docChanged) {
-                            this.changed = true;
-                            this.$emit("update:value", e.state.doc.toString());
-                        }
-                    })
-                ]
-            });
-        },
-        unmounted() {
-            const scheme = matchMedia("(prefers-color-scheme: dark)");
-            if (typeof scheme !== "undefined") {
-                scheme.removeEventListener("change", this.updateTheme);
+        });
+    watch(
+        () => roslynTooltip,
+        (newValue, oldValue) => {
+            if (newValue !== oldValue) {
+                updateTooltip();
             }
-            this.editor!.destroy();
+        });
+
+    let editor: EditorView | null = null;
+    const themeSet = new Compartment();
+    function updateTheme(e: MediaQueryListEvent) {
+        editor!.dispatch({ effects: themeSet.reconfigure(e.matches ? vscodeDark : vscodeLight) });
+    }
+
+    const tooltipSet = new Compartment();
+    function updateTooltip() {
+        editor!.dispatch({ effects: tooltipSet.reconfigure(language === "il" ? getILTooltip() : roslynTooltip ? roslynTooltip() : Facet.define<undefined>().of(undefined)) });
+    }
+
+    function getLauguage(lang: lang) {
+        switch (lang) {
+            case "il":
+                return cil;
+            case "csharp":
+                return csharp();
+            case "vb":
+                return vb;
         }
-    };
+    }
+
+    function getILTooltip() {
+        return hoverTooltip(async (view, pos) => {
+            const node = view.domAtPos(pos).node;
+            if (node instanceof Text) {
+                if (node.parentElement!.classList.contains("ͼr")) {
+                    const text = node.textContent as keyof typeof instructions;
+                    if (text) {
+                        const desc = instructions[text];
+                        if (desc) {
+                            return {
+                                pos,
+                                create() {
+                                    const dom = document.createElement("div")
+                                    dom.classList.add("mirrorsharp-infotip");
+                                    const name = document.createElement("span");
+                                    name.className = "tok-keyword";
+                                    name.textContent = text;
+                                    const description = document.createElement("div");
+                                    description.className = "CodeMirror-infotip-description";
+                                    description.textContent = desc;
+                                    dom.appendChild(name);
+                                    dom.appendChild(description);
+                                    return { dom };
+                                }
+                            };
+                        }
+                    }
+                }
+            }
+            return null;
+        });
+    }
+
+    const root = useTemplateRef("root");
+    const linterSet = new Compartment();
+    const lintGutterSet = new Compartment();
+    const autocompletionSet = new Compartment();
+    const scheme = matchMedia("(prefers-color-scheme: dark)");
+    onMounted(() => {
+        function getTheme() {
+            if (typeof scheme !== "undefined") {
+                scheme.addEventListener("change", updateTheme);
+                if (scheme.matches) {
+                    return themeSet.of(vscodeDark);
+                }
+            }
+            return themeSet.of(vscodeLight);
+        };
+        const empty = Facet.define<undefined>().of(undefined);
+        editor = new EditorView({
+            doc: value.value,
+            parent: root.value!,
+            extensions: [
+                basicSetup,
+                getTheme(),
+                keymap.of([indentWithTab]),
+                indentUnit.of("    "),
+                autocompletionSet.of(empty),
+                linterSet.of(empty),
+                lintGutterSet.of(empty),
+                tooltipSet.of(language === "il" ? getILTooltip() : roslynTooltip ? roslynTooltip() : empty),
+                languageSet.of(getLauguage(language || "csharp")!),
+                readonlySet.of(EditorState.readOnly.of(!!readonly)),
+                EditorView.updateListener.of(e => {
+                    if (e.docChanged) {
+                        changed = true;
+                        value.value = e.state.doc.toString();
+                    }
+                })
+            ]
+        });
+    });
+    onUnmounted(() => {
+        if (typeof scheme !== "undefined") {
+            scheme.removeEventListener("change", updateTheme);
+        }
+        editor!.destroy();
+    });
+
+    defineExpose({
+        get editor() {
+            return editor;
+        },
+        linterSet,
+        lintGutterSet,
+        autocompletionSet
+    });
 </script>
 
 <style lang="scss">

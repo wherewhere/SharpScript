@@ -1,27 +1,27 @@
 <template>
-    <MetaSetter :lang="$i18n.locale" :description="$t('description')" />
+    <MetaSetter :lang="$i18n.locale" :description="t('description')" />
     <div class="content">
         <SplitPanels class="split-view" :direction="direction">
             <template #panel1>
                 <div style="display: flex; justify-content: space-between; column-gap: 4px">
                     <div style="display: flex; column-gap: 4px;">
-                        <fluent-select :title="$t('input.language.title')"
-                                       :placeholder="$t('input.language.placeholder')" v-model="language" style="min-width: auto;">
+                        <fluent-select :title="t('input.language.title')" :placeholder="t('input.language.placeholder')"
+                                       v-model="language" style="min-width: auto;">
                             <fluent-option title="CSharp" value="CSharp">C#</fluent-option>
                             <fluent-option title="VisualBasic" value="VisualBasic">VB</fluent-option>
                             <fluent-option title="IL" value="IL">IL</fluent-option>
                         </fluent-select>
-                        <ToggleButton v-model="isScript">{{ $t("input.language.script") }}</ToggleButton>
+                        <ToggleButton v-model="isScript">{{ t("input.language.script") }}</ToggleButton>
                     </div>
                     <div style="display: flex; column-gap: 4px;">
-                        <fluent-button :title="loading ? message : $t('input.process.title')" @click="processAsync"
+                        <fluent-button :title="loading ? message : t('input.process.title')" @click="processAsync"
                                        :disabled="loading || isSyntaxTree">
                             <fluent-progress-ring v-if="loading"
                                                   style="width: 12px; height: 12px;"></fluent-progress-ring>
                             <TriangleRight12Filled v-else style="fill: currentColor;" />
                         </fluent-button>
                         <fluent-select v-if="inputLanguages.length" v-model="inputLanguage" style="min-width: 105px;"
-                                       :title="$t('input.version.title')" :placeholder="$t('input.version.placeholder')">
+                                       :title="t('input.version.title')" :placeholder="t('input.version.placeholder')">
                             <fluent-option v-for="item in inputLanguages" :title="item" :value="item">
                                 {{ getVersion(item) }}
                             </fluent-option>
@@ -33,26 +33,26 @@
             </template>
             <template #panel2>
                 <div style="display: flex; justify-content: space-between; column-gap: 4px">
-                    <fluent-select :title="$t('output.language.title')" :placeholder="$t('output.language.placeholder')"
+                    <fluent-select :title="t('output.language.title')" :placeholder="t('output.language.placeholder')"
                                    v-model="output" style="min-width: auto;">
                         <fluent-option title="CSharp" value="CSharp">C#</fluent-option>
                         <fluent-option title="IL" value="IL">IL</fluent-option>
-                        <fluent-option title="Run" value="Run">{{ $t("output.language.run") }}</fluent-option>
+                        <fluent-option title="Run" value="Run">{{ t("output.language.run") }}</fluent-option>
                         <fluent-option title="SyntaxTree" value="SyntaxTree" :disabled="language === 'IL'">
-                            {{ $t("output.language.syntaxTree") }}
+                            {{ t("output.language.syntaxTree") }}
                         </fluent-option>
                     </fluent-select>
                     <div style="display: flex; column-gap: 4px;">
                         <fluent-button v-if="isInitLinter && !diagnostics.errors.length"
-                                       :title="$t('output.download.title')" @click="downloadAssemblyAsync" :disabled="loading">
+                                       :title="t('output.download.title')" @click="downloadAssemblyAsync" :disabled="loading">
                             <ArrowDownload16Regular style="fill: currentColor;" />
                         </fluent-button>
-                        <fluent-button v-if="!isInitLinter" :title="$t('output.linter.title')" @click="initLinterAsync"
+                        <fluent-button v-if="!isInitLinter" :title="t('output.linter.title')" @click="initLinterAsync"
                                        :disabled="loading">
                             <Sparkle16Regular style="fill: currentColor;" />
                         </fluent-button>
                         <fluent-select v-if="outputLanguages.length" v-model="outputLanguage" style="min-width: 92px;"
-                                       :title="$t('output.version.title')" :placeholder="$t('output.version.placeholder')">
+                                       :title="t('output.version.title')" :placeholder="t('output.version.placeholder')">
                             <fluent-option v-for="item in outputLanguages" :title="item" :value="item">
                                 {{ getVersion(item) }}
                             </fluent-option>
@@ -77,8 +77,8 @@
                                     <tr>
                                         <th style="width: 20px;"></th>
                                         <th>ID</th>
-                                        <th>{{ $t("output.diagnostic.message") }}</th>
-                                        <th>{{ $t("output.diagnostic.location") }}</th>
+                                        <th>{{ t("output.diagnostic.message") }}</th>
+                                        <th>{{ t("output.diagnostic.location") }}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -101,11 +101,11 @@
                 <span>{{ message }}</span>
             </div>
             <div style="height: 20px;">
-                <span :title="$t('status.errors', [diagnostics.errors.length])">
+                <span :title="t('status.errors', [diagnostics.errors.length])">
                     <DismissCircle16Regular style="fill: currentColor; margin: 3px 0 -3px 0;" />
                     <span style="margin: 0 0 0 4px;">{{ diagnostics.errors.length }}</span>
                 </span>
-                <span :title="$t('status.warnings', [diagnostics.warnings.length])" style="margin: 0 0 0 4px;">
+                <span :title="t('status.warnings', [diagnostics.warnings.length])" style="margin: 0 0 0 4px;">
                     <Warning16Regular style="fill: currentColor; margin: 3px 0 -3px 0;" />
                     <span style="margin: 0 0 0 4px;">{{ diagnostics.warnings.length }}</span>
                 </span>
@@ -115,18 +115,22 @@
     <div class="loading-progress" v-if="!isInitDotnet"></div>
 </template>
 
-<script lang="ts">
+<script lang="ts" setup>
     import type { } from "./types.js";
-    import type { AstNodeItem, Diagnostic, InfoTipItem, LinePosition, TaggedText } from "sharp-script";
+    import type { AstNodeItem, Diagnostic, LinePosition } from "sharp-script";
     import type { DotNetWorker, DiagnosticWrapper } from "./worker";
+    import { computed, nextTick, onMounted, ref, shallowRef, useTemplateRef, watch } from "vue";
+    import { useI18n } from "vue-i18n";
     import LZString from "lz-string";
     import { AsyncLock, Comlink } from "./helpers/shared";
     import { AnsiUp } from "ansi_up";
-    import type { EditorView } from "codemirror";
     import type { Extension, Text } from "@codemirror/state";
     import { autocompletion, ifNotIn, Completion, CompletionContext } from "@codemirror/autocomplete";
     import { linter, lintGutter } from "@codemirror/lint";
     import { hoverTooltip } from "@codemirror/view";
+    import { mapTextTagsToType, renderParts } from "./helpers/render-parts";
+    import { getAssemblyAsync } from "./helpers/autocompletion";
+    import { createTooltip } from "./helpers/tooltips.js";
     import MetaSetter from "./components/MetaSetter.vue";
     import SplitPanels from "./components/SplitPanels.vue";
     import CodeMirror from "./components/CodeMirror.vue";
@@ -139,738 +143,667 @@
     import DismissCircle16Regular from "@fluentui/svg-icons/icons/dismiss_circle_16_regular.svg?component";
     import Warning16Regular from "@fluentui/svg-icons/icons/warning_16_regular.svg?component";
 
-    export default {
-        name: "App",
-        components: {
-            CodeMirror,
-            MetaSetter,
-            SplitPanels,
-            SyntaxTreeItem,
-            ToggleButton,
-            TriangleRight12Filled,
-            ArrowDownload16Regular,
-            Sparkle16Regular,
-            Alert16Regular,
-            DismissCircle16Regular,
-            Warning16Regular
-        },
-        data() {
-            return {
-                code: 'using System;\nConsole.WriteLine("Hello, World!");',
-                language: "CSharp",
-                inputLanguages: ["Default", "CSharp1", "CSharp2", "CSharp3", "CSharp4", "CSharp5", "CSharp6", "CSharp7", "CSharp7_1", "CSharp7_2", "CSharp7_3", "CSharp8", "CSharp9", "CSharp10", "CSharp11", "CSharp12", "CSharp13", "CSharp14", "LatestMajor", "Preview", "Latest"],
-                inputLanguage: "Preview",
-                isScript: false,
-                output: "Run",
-                outputLanguages: [] as string[],
-                outputLanguage: "CSharp1",
-                isInitDotnet: false,
-                isInitCompiler: false,
-                isInitLinter: false,
-                loading: false,
-                message: '',
-                results: {
-                    diagnostics: [] as Partial<Diagnostic>[],
-                    decompiled: null as string | null,
-                    outputs: [] as string[]
-                },
-                diagnostics: {
-                    errors: [] as DiagnosticWrapper[],
-                    warnings: [] as DiagnosticWrapper[],
-                    infos: [] as DiagnosticWrapper[]
-                },
-                syntaxTree: null as AstNodeItem | null,
-                locker: new AsyncLock(),
-                assemblies: null as string[] | null,
-                dotnet: null as DotNetWorker | null,
-                noWorker: false,
-                hashChanged: false,
-                roslynTooltip: {
-                    input: null as (() => Extension) | null,
-                    output: null as (() => Extension) | null
-                },
-                direction: "row" as "row" | "column"
-            }
-        },
-        computed: {
-            isRun() {
-                return this.output === "Run";
-            },
-            isSyntaxTree() {
-                return this.output === "SyntaxTree";
-            },
-            isDecompile() {
-                return !this.isRun && !this.isSyntaxTree;
-            }
-        },
-        watch: {
-            async language(newValue, oldValue) {
-                if (newValue !== oldValue) {
-                    try {
-                        this.loading = true;
-                        const message = this.message;
-                        this.message = this.$t("message.changingLanguage");
-                        if (this.code === this.getDefaultCode(oldValue)) {
-                            this.code = this.getDefaultCode(newValue);
-                        }
-                        await this.initDotNetAsync();
-                        await this.dotnet!.setLanguageTypeAsync(newValue);
-                        this.inputLanguages = await this.dotnet!.getInputLanguageVersionsAsync();
-                        this.inputLanguage = await this.dotnet!.getInputLanguageVersionAsync();
-                        this.message = message;
-                    }
-                    catch (e) {
-                        this.message = this.$t("message.error", `${e}`);
-                        console.error(e);
-                    }
-                    finally {
-                        this.message = '';
-                        this.loading = false;
-                    }
-                }
-            },
-            async inputLanguage(newValue, oldValue) {
-                if (newValue !== oldValue) {
-                    try {
-                        this.loading = true;
-                        const message = this.message;
-                        this.message = this.$t("message.changingVersion");
-                        await this.initDotNetAsync();
-                        await this.dotnet!.setInputLanguageVersionAsync(newValue);
-                        this.message = message;
-                    }
-                    catch (e) {
-                        this.message = this.$t("message.error", `${e}`);
-                        console.error(e);
-                    }
-                    finally {
-                        this.message = '';
-                        this.loading = false;
-                    }
-                }
-            },
-            async isScript(newValue, oldValue) {
-                if (newValue !== oldValue) {
-                    try {
-                        this.loading = true;
-                        const message = this.message;
-                        this.message = this.$t("message.changingOutput");
-                        await this.initDotNetAsync();
-                        await this.dotnet!.setSourceCodeKind(newValue ? "Script" : "Regular");
-                        this.message = message;
-                    }
-                    catch (e) {
-                        this.message = this.$t("message.error", `${e}`);
-                        console.error(e);
-                    }
-                    finally {
-                        this.message = '';
-                        this.loading = false;
-                    }
-                }
-            },
-            async output(newValue, oldValue) {
-                if (newValue !== oldValue) {
-                    try {
-                        this.loading = true;
-                        const message = this.message;
-                        this.message = this.$t("message.changingOutput");
-                        await this.initDotNetAsync();
-                        if (newValue === "SyntaxTree") {
-                            this.outputLanguages = [];
-                            await this.initLinterAsync();
-                        }
-                        else {
-                            await this.dotnet!.setOutputTypeAsync(newValue);
-                            this.outputLanguages = await this.dotnet!.getOutputLanguageVersionsAsync();
-                            this.outputLanguage = await this.dotnet!.getOutputLanguageVersionAsync();
-                        }
-                        this.message = message;
-                    }
-                    catch (e) {
-                        this.message = this.$t("message.error", `${e}`);
-                        console.error(e);
-                    }
-                    finally {
-                        this.message = '';
-                        this.loading = false;
-                    }
-                }
-            },
-            async outputLanguage(newValue, oldValue) {
-                if (newValue !== oldValue) {
-                    try {
-                        this.loading = true;
-                        const message = this.message;
-                        this.message = this.$t("message.changingVersion");
-                        await this.initDotNetAsync();
-                        await this.dotnet!.setOutputLanguageVersionAsync(newValue);
-                        this.message = message;
-                    }
-                    catch (e) {
-                        this.message = this.$t("message.error", `${e}`);
-                        console.error(e);
-                    }
-                    finally {
-                        this.message = '';
-                        this.loading = false;
-                    }
-                }
-            }
-        },
-        methods: {
-            async processAsync() {
+    const { t } = useI18n();
+    const code = shallowRef('using System;\nConsole.WriteLine("Hello, World!");');
+    const language = shallowRef("CSharp");
+    const inputLanguages = ref(["Default", "CSharp1", "CSharp2", "CSharp3", "CSharp4", "CSharp5", "CSharp6", "CSharp7", "CSharp7_1", "CSharp7_2", "CSharp7_3", "CSharp8", "CSharp9", "CSharp10", "CSharp11", "CSharp12", "CSharp13", "CSharp14", "LatestMajor", "Preview", "Latest"]);
+    const inputLanguage = shallowRef("Preview");
+    const isScript = shallowRef(false);
+    const output = shallowRef("Run");
+    const outputLanguages = ref<string[]>([]);
+    const outputLanguage = shallowRef("CSharp1");
+    const isInitDotnet = shallowRef(false);
+    const isInitLinter = shallowRef(false);
+    const loading = shallowRef(false);
+    const message = shallowRef('');
+    const results = ref({
+        diagnostics: [] as Partial<Diagnostic>[],
+        decompiled: null as string | null,
+        outputs: [] as string[]
+    });
+    const diagnostics = ref({
+        errors: [] as DiagnosticWrapper[],
+        warnings: [] as DiagnosticWrapper[],
+        infos: [] as DiagnosticWrapper[]
+    });
+    const syntaxTree = shallowRef<AstNodeItem>();
+    const locker = new AsyncLock();
+    const roslynTooltip = ref({
+        input: null as (() => Extension) | null,
+        output: null as (() => Extension) | null
+    });
+    const direction = shallowRef<"row" | "column">("row");
+    const isRun = computed(() => output.value === "Run");
+    const isSyntaxTree = computed(() => output.value === "SyntaxTree");
+    const isDecompile = computed(() => !isRun.value && !isSyntaxTree.value);
+
+    let dotnet: DotNetWorker | null = null;
+    watch(
+        language,
+        async (newValue, oldValue) => {
+            if (newValue !== oldValue) {
                 try {
-                    this.loading = true;
-                    const message = this.message;
-                    this.message = this.$t("message.compiling");
-                    this.setSettings();
-                    await (this.language === "IL" ? this.initDotNetAsync() : this.initCompilerAsync());
-                    this.initEditer();
-                    await this.$nextTick();
-                    this.results = await this.dotnet!.processAsync(this.code);
-                    this.message = message;
+                    loading.value = true;
+                    const mes = message.value;
+                    message.value = t("message.changingLanguage");
+                    if (code.value === getDefaultCode(oldValue)) {
+                        code.value = getDefaultCode(newValue);
+                    }
+                    await initDotNetAsync();
+                    await dotnet!.setLanguageTypeAsync(newValue);
+                    inputLanguages.value = await dotnet!.getInputLanguageVersionsAsync();
+                    inputLanguage.value = await dotnet!.getInputLanguageVersionAsync();
+                    message.value = mes;
                 }
                 catch (e) {
-                    this.message = this.$t("message.error", `${e}`);
-                    this.results.diagnostics.push({
-                        location: {
-                            start: { line: 0, character: 0 },
-                            end: { line: 0, character: 0 }
-                        },
-                        message: `${e}`,
-                        severity: "Error"
-                    });
+                    message.value = t("message.error", `${e}`);
                     console.error(e);
                 }
                 finally {
-                    this.message = '';
-                    this.loading = false;
+                    message.value = '';
+                    loading.value = false;
                 }
-            },
-            async getDiagnosticsAsync(code: string) {
-                try {
-                    return await this.dotnet!.getDiagnosticsAsync(code);
-                }
-                catch (e) {
-                    console.warn(e);
-                }
-            },
-            async getCompletionsAsync(code: string, position: number) {
-                try {
-                    return await this.dotnet!.getCompletionsAsync(code, position);
-                }
-                catch (e) {
-                    console.warn(e);
-                }
-            },
-            async getInfoTipAsync(code: string, position: number) {
-                try {
-                    return await this.dotnet!.getInfoTipAsync(code, position);
-                }
-                catch (e) {
-                    console.warn(e);
-                }
-            },
-            async getAstAsync(code: string) {
-                try {
-                    return await this.dotnet!.getAstAsync(code);
-                }
-                catch (e) {
-                    console.warn(e);
-                }
-            },
-            async getCSharpInfoTipLiteAsync(code: string, position: number) {
-                try {
-                    return await this.dotnet!.getCSharpInfoTipLiteAsync(code, position);
-                }
-                catch (e) {
-                    console.warn(e);
-                }
-            },
-            async diagnosticInvokeAsync(index: number) {
-                try {
-                    return await this.dotnet!.diagnosticInvokeAsync(index);
-                }
-                catch (e) {
-                    console.warn(e);
-                }
-            },
-            async completionGetDescriptionAsync(index: number) {
-                try {
-                    return await this.dotnet!.completionGetDescriptionAsync(index);
-                }
-                catch (e) {
-                    console.warn(e);
-                }
-            },
-            async completionGetChangeAsync(index: number) {
-                try {
-                    return await this.dotnet!.completionGetChangeAsync(index);
-                }
-                catch (e) {
-                    console.warn(e);
-                }
-            },
-            async downloadAssemblyAsync() {
-                try {
-                    this.loading = true;
-                    const message = this.message;
-                    this.message = this.$t("message.compiling");
-                    const href = await this.dotnet!.getAssemblyLinkAsync(this.code);
-                    const link = document.createElement('a');
-                    link.href = href;
-                    link.download = "SharpScript.zip";
-                    link.click();
-                    this.message = message;
-                }
-                catch (e) {
-                    this.message = this.$t("message.error", `${e}`);
-                    console.error(e);
-                }
-                finally {
-                    this.message = '';
-                    this.loading = false;
-                }
-            },
-            async initLinterAsync() {
-                try {
-                    this.loading = true;
-                    const message = this.message;
-                    this.message = this.$t("message.initLinter");
-                    await (this.language === "IL" ? this.initDotNetAsync() : this.initCompilerAsync());
-                    this.initEditer();
-                    this.message = message;
-                }
-                catch (e) {
-                    console.warn(e);
-                }
-                finally {
-                    this.loading = false;
-                }
-            },
-            async initDotNetAsync() {
-                if (!this.isInitDotnet) {
-                    const message = this.message;
-                    this.message = this.$t("message.loadingDotnet");
-                    await this.locker.acquire("initDotNet", async () => {
-                        if (!this.isInitDotnet) {
-                            const message = this.message;
-                            this.message = this.$t("message.initWebWorker");
-                            await this.dotnet!.init(document.baseURI, Comlink.proxy((x, y) => document.documentElement.style.setProperty(x, y)));
-                            this.message = message;
-                            await this.dotnet!.startAsync();
-                            this.isInitDotnet = true;
-                        }
-                    });
-                    this.message = message;
-                }
-            },
-            async initCompilerAsync() {
-                if (!this.isInitCompiler) {
-                    await this.initDotNetAsync();
-                    const message = this.message;
-                    this.message = this.$t("message.downloadReferences");
-                    await this.dotnet!.initAsync();
-                    this.message = message;
-                    this.isInitCompiler = true;
-                }
-            },
-            initEditer() {
-                if (!this.isInitLinter) {
-                    const editorHost: any = this.$refs.editor;
-                    const editor: EditorView = editorHost!.editor;
-                    function getIndex(doc: Text, span: LinePosition) {
-                        if (doc.lines <= span.line) {
-                            return doc.length;
-                        }
-                        const index = doc.line(span.line + 1).from + span.character;
-                        if (index > doc.length) {
-                            return doc.length;
-                        }
-                        return index;
-                    }
-                    const that = this;
-                    editor.dispatch({
-                        effects: editorHost.linterSet.reconfigure(linter(async view => {
-                            if (that.isSyntaxTree) {
-                                this.getAstAsync(view.state.doc.toString()).then(x => that.syntaxTree = x!);
-                            }
-                            let diagnostics = await this.getDiagnosticsAsync(view.state.doc.toString());
-                            if (diagnostics instanceof Array) {
-                                this.diagnostics = {
-                                    errors: [],
-                                    warnings: [],
-                                    infos: []
-                                };
-                                if (that.language === "IL") {
-                                    diagnostics = diagnostics.filter(x => x.severity !== "Info" || x.message !== "Operation completed successfully");
-                                }
-                                return diagnostics.map(diagnostic => {
-                                    return {
-                                        from: getIndex(view.state.doc, diagnostic.location.start),
-                                        to: getIndex(view.state.doc, diagnostic.location.end),
-                                        severity: (() => {
-                                            switch (diagnostic.severity) {
-                                                case "Error":
-                                                    that.diagnostics.errors.push(diagnostic);
-                                                    return "error";
-                                                case "Warning":
-                                                    that.diagnostics.warnings.push(diagnostic);
-                                                    return "warning";
-                                                case "Info":
-                                                case "Hidden":
-                                                default:
-                                                    if (diagnostic.tags.some(x => x.startsWith("EnforceOnBuild"))) {
-                                                        return "hint";
-                                                    }
-                                                    else {
-                                                        that.diagnostics.infos.push(diagnostic);
-                                                        return "info";
-                                                    }
-                                            }
-                                        })(),
-                                        markClass: diagnostic.tags.includes("Unnecessary") ? "cm-lintRange-unnecessary" : undefined,
-                                        message: `${diagnostic.id ? `${diagnostic.id}: ` : ''}${diagnostic.message}`,
-                                        actions: diagnostic.actions.map(x => {
-                                            return {
-                                                name: x.title,
-                                                async apply(view) {
-                                                    const results = await that.diagnosticInvokeAsync(x.action);
-                                                    if (results instanceof Array) {
-                                                        view.dispatch({
-                                                            changes: results.map(x => {
-                                                                const span = x.span;
-                                                                return { from: span.start, to: span.end, insert: x.newText }
-                                                            })
-                                                        });
-                                                    }
-                                                }
-                                            }
-                                        })
-                                    }
-                                });
-                            }
-                            return [];
-                        }))
-                    });
-                    editor.dispatch({
-                        effects: editorHost.lintGutterSet.reconfigure(lintGutter())
-                    });
-                    function mapTextTagsToType(tags: string[]) {
-                        switch (tags.length) {
-                            case 0: if (tags.length === 0)
-                                console.warn('No tag found for completion, falling back to "keyword".');
-                                return "keyword";
-                            case 1:
-                                return tags[0].toLowerCase();
-                            default:
-                                return `${tags[0].toLowerCase()}-${tags[1].toLowerCase()}`;
-                        }
-                    }
-                    function renderPartTo(parent: HTMLElement, part: TaggedText) {
-                        const span = document.createElement("span");
-                        span.className = `tok-${part.tag.toLowerCase()}`;
-                        span.textContent = part.text;
-                        parent.appendChild(span);
-                    }
-                    function createSection() {
-                        const section = document.createElement("div");
-                        section.className = "mirrorsharp-parts-section";
-                        return section;
-                    }
-                    function renderPartsTo(parent: HTMLElement, parts: TaggedText[], splitLinesToSections: boolean) {
-                        let section = splitLinesToSections ? createSection() : parent;
-                        for (const part of parts) {
-                            if (part.tag === "linebreak" && splitLinesToSections) {
-                                parent.appendChild(section);
-                                section = createSection();
-                                continue;
-                            }
-                            renderPartTo(section, part);
-                        }
-                        if (splitLinesToSections) {
-                            parent.appendChild(section);
-                        }
-                    }
-                    function renderParts(parts: TaggedText[], splitLinesToSections: boolean) {
-                        const container = document.createElement("div");
-                        renderPartsTo(container, parts, splitLinesToSections);
-                        return container;
-                    }
-                    async function customCompletionAsync(context: CompletionContext) {
-                        if (that.language !== "IL") {
-                            const pos = context.pos;
-                            const line = context.state.doc.lineAt(pos);
-                            const text = line.text;
-                            if (text.startsWith("#r ") || text.startsWith("#R ")) {
-                                async function getAssemblyAsync() {
-                                    if (that.assemblies) {
-                                        return that.assemblies;
-                                    }
-                                    else {
-                                        const fingerprinting = await that.dotnet!.fingerprinting;
-                                        const assemblies = [];
-                                        for (const key in fingerprinting) {
-                                            const value = fingerprinting[key];
-                                            const assembly = value.substring(0, value.lastIndexOf("."));
-                                            assemblies.push(assembly);
-                                        }
-                                        that.assemblies = assemblies;
-                                        return assemblies;
-                                    }
-                                }
-                                const path = text.substring(3).trim();
-                                const from = line.from + 3;
-                                const assemblies = await getAssemblyAsync();
-                                const results: Completion[] = [];
-                                for (const assembly of assemblies) {
-                                    if (assembly.startsWith(path)) {
-                                        results.push({
-                                            label: assembly,
-                                            type: "assembly",
-                                            apply(view, completion) {
-                                                const label = completion.label;
-                                                view.dispatch({
-                                                    changes: { from, to: line.to, insert: label },
-                                                    selection: { anchor: from + label.length }
-                                                });
-                                            }
-                                        });
-                                    }
-                                }
-                                return results;
-                            }
-                        }
-                        return [];
-                    }
-                    editor.dispatch({
-                        effects: editorHost.autocompletionSet.reconfigure(autocompletion({
-                            override: [ifNotIn([';', '{', '}'], async context => {
-                                const from = context.pos;
-                                const completions = await this.getCompletionsAsync(context.state.doc.toString(), from);
-                                const matchContext = context.matchBefore(/[\w\d]+/) ?? { from };
-                                return {
-                                    from: matchContext.from ?? from,
-                                    options: [...completions!.map(item => {
-                                        return {
-                                            label: item.displayText,
-                                            detail: item.inlineDescription,
-                                            type: mapTextTagsToType(item.tags),
-                                            async info() {
-                                                const results = await that.completionGetDescriptionAsync(item.self);
-                                                return renderParts(results!, true);
-                                            },
-                                            async apply(view, completion, from, to) {
-                                                const results = await that.completionGetChangeAsync(item.self);
-                                                if (results) {
-                                                    const textChanges = results.textChanges;
-                                                    if (textChanges instanceof Array) {
-                                                        const selection = { anchor: results.newPosition ?? to };
-                                                        const changes = textChanges.map((x, i) => {
-                                                            const span = x.span;
-                                                            if (typeof results.newPosition !== "number") {
-                                                                if (i == 0) {
-                                                                    selection.anchor = from;
-                                                                }
-                                                                selection.anchor += x.newText?.length ?? 0;
-                                                                if (span.start < from) {
-                                                                    selection.anchor -= Math.min(from, span.end) - span.start;
-                                                                }
-                                                            }
-                                                            return { from: span.start, to: span.end, insert: x.newText };
-                                                        });
-                                                        view.dispatch({ changes });
-                                                        if (selection.anchor <= view.state.doc.length) {
-                                                            view.dispatch({ selection });
-                                                        }
-                                                    }
-                                                }
-                                                else {
-                                                    const label = completion.label;
-                                                    return view.dispatch({
-                                                        changes: { from, to, insert: label },
-                                                        selection: { anchor: from + label.length }
-                                                    });
-                                                }
-                                            }
-                                        } as Completion;
-                                    }),
-                                    ...await customCompletionAsync(context)],
-                                    filter: false
-                                };
-                            })]
-                        }))
-                    });
-                    function createTooltip(tooltip: InfoTipItem, pos: number) {
-                        return {
-                            pos,
-                            create() {
-                                const dom = document.createElement("div")
-                                dom.classList.add("mirrorsharp-infotip");
-                                tooltip.sections.forEach((section, index) => {
-                                    const element = document.createElement("div");
-                                    element.className = "mirrorsharp-parts-section";
-                                    if (index === 0) {
-                                        const icon = document.createElement("span");
-                                        icon.classList.add("cm-completionIcon", `cm-completionIcon-${mapTextTagsToType(tooltip.tags)}`);
-                                        element.appendChild(icon);
-                                    }
-                                    renderPartsTo(element, section.parts, false);
-                                    dom.appendChild(element);
-                                });
-                                return { dom };
-                            }
-                        };
-                    }
-                    this.roslynTooltip.input = () => hoverTooltip(async (view, pos) => {
-                        const tooltip = await this.getInfoTipAsync(view.state.doc.toString(), pos);
-                        return createTooltip(tooltip!, pos);
-                    });
-                    this.roslynTooltip.output = () => hoverTooltip(async (view, pos) => {
-                        const tooltip = await this.getCSharpInfoTipLiteAsync(view.state.doc.toString(), pos);
-                        return createTooltip(tooltip!, pos);
-                    });
-                    this.isInitLinter = true;
-                }
-            },
-            getLauguage() {
-                switch (this.language) {
-                    case "IL":
-                        return "il";
-                    case "CSharp":
-                        return "csharp";
-                    case "VisualBasic":
-                        return "vb";
-                    default:
-                        return "plaintext";
-                }
-            },
-            getOutputLanguage() {
-                switch (this.output) {
-                    case "IL":
-                        return "il";
-                    case "CSharp":
-                        return "csharp";
-                    case "VisualBasic":
-                        return "vb";
-                    default:
-                        return "plaintext";
-                }
-            },
-            getVersion(version: string) {
-                return version.replace("VisualBasic", "VB ").replace("CSharp", "C# ").replace('_', '.');
-            },
-            getDefaultCode(language: string) {
-                switch (language) {
-                    case "CSharp":
-                        return 'using System;\nConsole.WriteLine("Hello, World!");';
-                    case "VisualBasic":
-                        return 'Imports System\nPublic Module Program\n    Public Sub Main()\n        Console.WriteLine("Hello, World!")\n    End Sub\nEnd Module';
-                    case "IL":
-                        return `.assembly ' ' {\n}\n.assembly extern System.Console {\n}\n.method static void Main() {\n    .entrypoint\n    ldstr "Hello, World!"\n    call void [System.Console]System.Console::WriteLine(string)\n    ret\n}`;
-                    default:
-                        return '';
-                }
-            },
-            getLocation(item: DiagnosticWrapper) {
-                return `[${item.location.start.line + 1}, ${item.location.start.character}] - [${item.location.end.line + 1}, ${item.location.end.character}]`;
-            },
-            loadSettings() {
-                if (this.hashChanged) {
-                    this.hashChanged = false;
-                    return;
-                }
-                const hash = location.hash.substring(1);
-                if (hash) {
-                    const params = new URLSearchParams(hash);
-                    if (params.has("language")) {
-                        this.language = params.get("language")!;
-                    }
-                    if (this.language !== "IL") {
-                        if (params.has("version")) {
-                            this.inputLanguage = params.get("version")!;
-                        }
-                    }
-                    if (params.has("output")) {
-                        this.output = params.get("output")!;
-                    }
-                    if (this.output === "CSharp") {
-                        if (params.has("csversion")) {
-                            this.outputLanguage = params.get("csversion")!;
-                        }
-                    }
-                    if (params.has("script")) {
-                        this.isScript = params.get("script") !== "false";
-                    }
-                    if (params.has("code")) {
-                        this.code = LZString.decompressFromBase64(params.get("code")!);
-                    }
-                    if (params.has("noworker")) {
-                        return params.get("noworker") !== "false";
-                    }
-                }
-            },
-            setSettings() {
-                const settings: { [key: string]: string } = {};
-                if (this.noWorker) {
-                    settings.noworker = "true";
-                }
-                if (this.language !== "CSharp") {
-                    settings.language = this.language;
-                }
-                if (this.output !== "Run") {
-                    settings.output = this.output;
-                }
-                if (this.isScript) {
-                    settings.script = "true";
-                }
-                if (settings.language !== "IL") {
-                    if (settings.language === "VisualBasic") {
-                        if (this.inputLanguage !== "Latest") {
-                            settings.version = this.inputLanguage;
-                        }
-                    }
-                    else {
-                        if (this.inputLanguage !== "Preview") {
-                            settings.version = this.inputLanguage;
-                        }
-                    }
-                }
-                if (settings.output === "CSharp") {
-                    if (this.outputLanguage !== "CSharp1") {
-                        settings.csversion = this.outputLanguage;
-                    }
-                }
-                if (this.code) {
-                    settings.code = LZString.compressToBase64(this.code);
-                }
-                location.hash = new URLSearchParams(settings).toString();
-                this.hashChanged = true;
-            },
-            renderConsole(output: string) {
-                const ansi_up = new AnsiUp();
-                const html = ansi_up.ansi_to_html(output);
-                return html;
-            }
-        },
-        async mounted() {
-            if (this.loadSettings()) {
-                this.dotnet = await import("./worker").then(x => x.dotnet);
-                this.noWorker = true;
-            }
-            else {
-                const url = new URL(/* @vite-ignore */ "./worker.js", import.meta.url);
-                this.dotnet = Comlink.wrap<DotNetWorker>(new Worker(url.href, { type: "module" }));
-            }
-            addEventListener("hashchange", this.loadSettings);
-            const scheme = matchMedia("(max-width: 767px)");
-            if (scheme) {
-                scheme.addEventListener("change", e => this.direction = e.matches ? "column" : "row");
-                this.direction = scheme.matches ? "column" : "row";
             }
         }
-    };
+    )
+    watch(
+        inputLanguage,
+        async (newValue, oldValue) => {
+            if (newValue !== oldValue) {
+                try {
+                    loading.value = true;
+                    const mes = message.value;
+                    message.value = t("message.changingVersion");
+                    await initDotNetAsync();
+                    await dotnet!.setInputLanguageVersionAsync(newValue);
+                    message.value = mes;
+                }
+                catch (e) {
+                    message.value = t("message.error", `${e}`);
+                    console.error(e);
+                }
+                finally {
+                    message.value = '';
+                    loading.value = false;
+                }
+            }
+        }
+    );
+    watch(
+        isScript,
+        async (newValue, oldValue) => {
+            if (newValue !== oldValue) {
+                try {
+                    loading.value = true;
+                    const mes = message.value;
+                    message.value = t("message.changingOutput");
+                    await initDotNetAsync();
+                    await dotnet!.setSourceCodeKind(newValue ? "Script" : "Regular");
+                    message.value = mes;
+                }
+                catch (e) {
+                    message.value = t("message.error", `${e}`);
+                    console.error(e);
+                }
+                finally {
+                    message.value = '';
+                    loading.value = false;
+                }
+            }
+        }
+    );
+    watch(
+        output,
+        async (newValue, oldValue) => {
+            if (newValue !== oldValue) {
+                try {
+                    loading.value = true;
+                    const mes = message.value;
+                    message.value = t("message.changingOutput");
+                    await initDotNetAsync();
+                    if (newValue === "SyntaxTree") {
+                        outputLanguages.value = [];
+                        await initLinterAsync();
+                    }
+                    else {
+                        await dotnet!.setOutputTypeAsync(newValue);
+                        outputLanguages.value = await dotnet!.getOutputLanguageVersionsAsync();
+                        outputLanguage.value = await dotnet!.getOutputLanguageVersionAsync();
+                    }
+                    message.value = mes;
+                }
+                catch (e) {
+                    message.value = t("message.error", `${e}`);
+                    console.error(e);
+                }
+                finally {
+                    message.value = '';
+                    loading.value = false;
+                }
+            }
+        }
+    );
+    watch(
+        outputLanguage,
+        async (newValue, oldValue) => {
+            if (newValue !== oldValue) {
+                try {
+                    loading.value = true;
+                    const mes = message.value;
+                    message.value = t("message.changingVersion");
+                    await initDotNetAsync();
+                    await dotnet!.setOutputLanguageVersionAsync(newValue);
+                    message.value = mes;
+                }
+                catch (e) {
+                    message.value = t("message.error", `${e}`);
+                    console.error(e);
+                }
+                finally {
+                    message.value = '';
+                    loading.value = false;
+                }
+            }
+        }
+    );
+
+    async function processAsync() {
+        try {
+            loading.value = true;
+            const mes = message.value;
+            message.value = t("message.compiling");
+            setSettings();
+            await (language.value === "IL" ? initDotNetAsync() : initCompilerAsync());
+            initEditer();
+            await nextTick();
+            results.value = await dotnet!.processAsync(code.value);
+            message.value = mes;
+        }
+        catch (e) {
+            message.value = t("message.error", `${e}`);
+            results.value.diagnostics.push({
+                location: {
+                    start: { line: 0, character: 0 },
+                    end: { line: 0, character: 0 }
+                },
+                message: `${e}`,
+                severity: "Error"
+            });
+            console.error(e);
+        }
+        finally {
+            message.value = '';
+            loading.value = false;
+        }
+    }
+
+    async function getDiagnosticsAsync(code: string) {
+        try {
+            return await dotnet!.getDiagnosticsAsync(code);
+        }
+        catch (e) {
+            console.warn(e);
+        }
+    }
+
+    async function getCompletionsAsync(code: string, position: number) {
+        try {
+            return await dotnet!.getCompletionsAsync(code, position);
+        }
+        catch (e) {
+            console.warn(e);
+        }
+    }
+
+    async function getInfoTipAsync(code: string, position: number) {
+        try {
+            return await dotnet!.getInfoTipAsync(code, position);
+        }
+        catch (e) {
+            console.warn(e);
+        }
+    }
+
+    async function getAstAsync(code: string) {
+        try {
+            return await dotnet!.getAstAsync(code);
+        }
+        catch (e) {
+            console.warn(e);
+        }
+    }
+
+    async function getCSharpInfoTipLiteAsync(code: string, position: number) {
+        try {
+            return await dotnet!.getCSharpInfoTipLiteAsync(code, position);
+        }
+        catch (e) {
+            console.warn(e);
+        }
+    }
+
+    async function diagnosticInvokeAsync(index: number) {
+        try {
+            return await dotnet!.diagnosticInvokeAsync(index);
+        }
+        catch (e) {
+            console.warn(e);
+        }
+    }
+
+    async function completionGetDescriptionAsync(index: number) {
+        try {
+            return await dotnet!.completionGetDescriptionAsync(index);
+        }
+        catch (e) {
+            console.warn(e);
+        }
+    }
+
+    async function completionGetChangeAsync(index: number) {
+        try {
+            return await dotnet!.completionGetChangeAsync(index);
+        }
+        catch (e) {
+            console.warn(e);
+        }
+    }
+
+    async function downloadAssemblyAsync() {
+        try {
+            loading.value = true;
+            const mes = message.value;
+            message.value = t("message.compiling");
+            const href = await dotnet!.getAssemblyLinkAsync(code.value);
+            const link = document.createElement('a');
+            link.href = href;
+            link.download = "SharpScript.zip";
+            link.click();
+            message.value = mes;
+        }
+        catch (e) {
+            message.value = t("message.error", `${e}`);
+            console.error(e);
+        }
+        finally {
+            message.value = '';
+            loading.value = false;
+        }
+    }
+
+    async function initLinterAsync() {
+        try {
+            loading.value = true;
+            const mes = message.value;
+            message.value = t("message.initLinter");
+            await (language.value === "IL" ? initDotNetAsync() : initCompilerAsync());
+            initEditer();
+            message.value = mes;
+        }
+        catch (e) {
+            console.warn(e);
+        }
+        finally {
+            loading.value = false;
+        }
+    }
+
+    async function initDotNetAsync() {
+        if (!isInitDotnet.value) {
+            const mes = message.value;
+            message.value = t("message.loadingDotnet");
+            await locker.acquire("initDotNet", async () => {
+                if (!isInitDotnet.value) {
+                    const mes = message.value;
+                    message.value = t("message.initWebWorker");
+                    await dotnet!.init(document.baseURI, Comlink.proxy((x, y) => document.documentElement.style.setProperty(x, y)));
+                    message.value = mes;
+                    await dotnet!.startAsync();
+                    isInitDotnet.value = true;
+                }
+            });
+            message.value = mes;
+        }
+    }
+
+    let isInitCompiler = false;
+    async function initCompilerAsync() {
+        if (!isInitCompiler) {
+            await initDotNetAsync();
+            const mes = message.value;
+            message.value = t("message.downloadReferences");
+            await dotnet!.initAsync();
+            message.value = mes;
+            isInitCompiler = true;
+        }
+    }
+
+    const editor = useTemplateRef("editor");
+    function initEditer() {
+        if (!isInitLinter.value) {
+            const editorHost = editor.value!;
+            const editorView = editorHost.editor!;
+            function getIndex(doc: Text, span: LinePosition) {
+                if (doc.lines <= span.line) {
+                    return doc.length;
+                }
+                const index = doc.line(span.line + 1).from + span.character;
+                if (index > doc.length) {
+                    return doc.length;
+                }
+                return index;
+            }
+            editorView.dispatch({
+                effects: editorHost.linterSet.reconfigure(linter(async view => {
+                    if (isSyntaxTree) {
+                        getAstAsync(view.state.doc.toString()).then(x => syntaxTree.value = x!);
+                    }
+                    let diags = await getDiagnosticsAsync(view.state.doc.toString());
+                    if (diags instanceof Array) {
+                        diagnostics.value = {
+                            errors: [],
+                            warnings: [],
+                            infos: []
+                        };
+                        if (language.value === "IL") {
+                            diags = diags.filter(x => x.severity !== "Info" || x.message !== "Operation completed successfully");
+                        }
+                        return diags.map(diagnostic => {
+                            return {
+                                from: getIndex(view.state.doc, diagnostic.location.start),
+                                to: getIndex(view.state.doc, diagnostic.location.end),
+                                severity: (() => {
+                                    switch (diagnostic.severity) {
+                                        case "Error":
+                                            diagnostics.value.errors.push(diagnostic);
+                                            return "error";
+                                        case "Warning":
+                                            diagnostics.value.warnings.push(diagnostic);
+                                            return "warning";
+                                        case "Info":
+                                        case "Hidden":
+                                        default:
+                                            if (diagnostic.tags.some(x => x.startsWith("EnforceOnBuild"))) {
+                                                return "hint";
+                                            }
+                                            else {
+                                                diagnostics.value.infos.push(diagnostic);
+                                                return "info";
+                                            }
+                                    }
+                                })(),
+                                markClass: diagnostic.tags.includes("Unnecessary") ? "cm-lintRange-unnecessary" : undefined,
+                                message: `${diagnostic.id ? `${diagnostic.id}: ` : ''}${diagnostic.message}`,
+                                actions: diagnostic.actions.map(x => {
+                                    return {
+                                        name: x.title,
+                                        async apply(view) {
+                                            const results = await diagnosticInvokeAsync(x.action);
+                                            if (results instanceof Array) {
+                                                view.dispatch({
+                                                    changes: results.map(x => {
+                                                        const span = x.span;
+                                                        return { from: span.start, to: span.end, insert: x.newText }
+                                                    })
+                                                });
+                                            }
+                                        }
+                                    }
+                                })
+                            }
+                        });
+                    }
+                    return [];
+                }))
+            });
+            editorView.dispatch({
+                effects: editorHost.lintGutterSet.reconfigure(lintGutter())
+            });
+            async function customCompletionAsync(context: CompletionContext) {
+                if (language.value !== "IL") {
+                    const pos = context.pos;
+                    const line = context.state.doc.lineAt(pos);
+                    const text = line.text;
+                    if (text.startsWith("#r ") || text.startsWith("#R ")) {
+                        const path = text.substring(3).trim();
+                        const from = line.from + 3;
+                        const results: Completion[] = [];
+                        for (const assembly of await getAssemblyAsync(dotnet!.fingerprinting)) {
+                            if (assembly.startsWith(path)) {
+                                results.push({
+                                    label: assembly,
+                                    type: "assembly",
+                                    apply(view, completion) {
+                                        const label = completion.label;
+                                        view.dispatch({
+                                            changes: { from, to: line.to, insert: label },
+                                            selection: { anchor: from + label.length }
+                                        });
+                                    }
+                                });
+                            }
+                        }
+                        return results;
+                    }
+                }
+                return [];
+            }
+            editorView.dispatch({
+                effects: editorHost.autocompletionSet.reconfigure(autocompletion({
+                    override: [ifNotIn([';', '{', '}'], async context => {
+                        const from = context.pos;
+                        const completions = await getCompletionsAsync(context.state.doc.toString(), from);
+                        const matchContext = context.matchBefore(/[\w\d]+/) ?? { from };
+                        return {
+                            from: matchContext.from ?? from,
+                            options: [...completions!.map(item => {
+                                return {
+                                    label: item.displayText,
+                                    detail: item.inlineDescription,
+                                    type: mapTextTagsToType(item.tags),
+                                    async info() {
+                                        const results = await completionGetDescriptionAsync(item.self);
+                                        return renderParts(results!, true);
+                                    },
+                                    async apply(view, completion, from, to) {
+                                        const results = await completionGetChangeAsync(item.self);
+                                        if (results) {
+                                            const textChanges = results.textChanges;
+                                            if (textChanges instanceof Array) {
+                                                const selection = { anchor: results.newPosition ?? to };
+                                                const changes = textChanges.map((x, i) => {
+                                                    const span = x.span;
+                                                    if (typeof results.newPosition !== "number") {
+                                                        if (i == 0) {
+                                                            selection.anchor = from;
+                                                        }
+                                                        selection.anchor += x.newText?.length ?? 0;
+                                                        if (span.start < from) {
+                                                            selection.anchor -= Math.min(from, span.end) - span.start;
+                                                        }
+                                                    }
+                                                    return { from: span.start, to: span.end, insert: x.newText };
+                                                });
+                                                view.dispatch({ changes });
+                                                if (selection.anchor <= view.state.doc.length) {
+                                                    view.dispatch({ selection });
+                                                }
+                                            }
+                                        }
+                                        else {
+                                            const label = completion.label;
+                                            return view.dispatch({
+                                                changes: { from, to, insert: label },
+                                                selection: { anchor: from + label.length }
+                                            });
+                                        }
+                                    }
+                                } as Completion;
+                            }),
+                            ...await customCompletionAsync(context)],
+                            filter: false
+                        };
+                    })]
+                }))
+            });
+            
+            roslynTooltip.value.input = () => hoverTooltip(async (view, pos) => {
+                const tooltip = await getInfoTipAsync(view.state.doc.toString(), pos);
+                return createTooltip(tooltip!, pos);
+            });
+            roslynTooltip.value.output = () => hoverTooltip(async (view, pos) => {
+                const tooltip = await getCSharpInfoTipLiteAsync(view.state.doc.toString(), pos);
+                return createTooltip(tooltip!, pos);
+            });
+            isInitLinter.value = true;
+        }
+    }
+
+    function getLauguage() {
+        switch (language.value) {
+            case "IL":
+                return "il";
+            case "CSharp":
+                return "csharp";
+            case "VisualBasic":
+                return "vb";
+            default:
+                return "plaintext";
+        }
+    }
+
+    function getOutputLanguage() {
+        switch (output.value) {
+            case "IL":
+                return "il";
+            case "CSharp":
+                return "csharp";
+            case "VisualBasic":
+                return "vb";
+            default:
+                return "plaintext";
+        }
+    }
+
+    function getVersion(version: string) {
+        return version.replace("VisualBasic", "VB ").replace("CSharp", "C# ").replace('_', '.');
+    }
+
+    function getDefaultCode(language: string) {
+        switch (language) {
+            case "CSharp":
+                return 'using System;\nConsole.WriteLine("Hello, World!");';
+            case "VisualBasic":
+                return 'Imports System\nPublic Module Program\n    Public Sub Main()\n        Console.WriteLine("Hello, World!")\n    End Sub\nEnd Module';
+            case "IL":
+                return `.assembly ' ' {\n}\n.assembly extern System.Console {\n}\n.method static void Main() {\n    .entrypoint\n    ldstr "Hello, World!"\n    call void [System.Console]System.Console::WriteLine(string)\n    ret\n}`;
+            default:
+                return '';
+        }
+    }
+
+    function getLocation(item: DiagnosticWrapper) {
+        return `[${item.location.start.line + 1}, ${item.location.start.character}] - [${item.location.end.line + 1}, ${item.location.end.character}]`;
+    }
+
+    let hashChanged = false;
+    function loadSettings() {
+        if (hashChanged) {
+            hashChanged = false;
+            return;
+        }
+        const hash = location.hash.substring(1);
+        if (hash) {
+            const params = new URLSearchParams(hash);
+            if (params.has("language")) {
+                language.value = params.get("language")!;
+            }
+            if (language.value !== "IL") {
+                if (params.has("version")) {
+                    inputLanguage.value = params.get("version")!;
+                }
+            }
+            if (params.has("output")) {
+                output.value = params.get("output")!;
+            }
+            if (output.value === "CSharp") {
+                if (params.has("csversion")) {
+                    outputLanguage.value = params.get("csversion")!;
+                }
+            }
+            if (params.has("script")) {
+                isScript.value = params.get("script") !== "false";
+            }
+            if (params.has("code")) {
+                code.value = LZString.decompressFromBase64(params.get("code")!);
+            }
+            if (params.has("noworker")) {
+                return params.get("noworker") !== "false";
+            }
+        }
+    }
+
+    let noWorker = false;
+    function setSettings() {
+        const settings: { [key: string]: string } = {};
+        if (noWorker) {
+            settings.noworker = "true";
+        }
+        if (language.value !== "CSharp") {
+            settings.language = language.value;
+        }
+        if (output.value !== "Run") {
+            settings.output = output.value;
+        }
+        if (isScript.value) {
+            settings.script = "true";
+        }
+        if (settings.language !== "IL") {
+            if (settings.language === "VisualBasic") {
+                if (inputLanguage.value !== "Latest") {
+                    settings.version = inputLanguage.value;
+                }
+            }
+            else {
+                if (inputLanguage.value !== "Preview") {
+                    settings.version = inputLanguage.value;
+                }
+            }
+        }
+        if (settings.output === "CSharp") {
+            if (outputLanguage.value !== "CSharp1") {
+                settings.csversion = outputLanguage.value;
+            }
+        }
+        if (code.value) {
+            settings.code = LZString.compressToBase64(code.value);
+        }
+        location.hash = new URLSearchParams(settings).toString();
+        hashChanged = true;
+    }
+
+    function renderConsole(output: string) {
+        const ansi_up = new AnsiUp();
+        const html = ansi_up.ansi_to_html(output);
+        return html;
+    }
+
+    onMounted(async () => {
+        if (loadSettings()) {
+            dotnet = await import("./worker").then(x => x.dotnet);
+            noWorker = true;
+        }
+        else {
+            const url = new URL(/* @vite-ignore */ "./worker.js", import.meta.url);
+            dotnet = Comlink.wrap<DotNetWorker>(new Worker(url.href, { type: "module" }));
+        }
+        addEventListener("hashchange", loadSettings);
+        const scheme = matchMedia("(max-width: 767px)");
+        if (scheme) {
+            scheme.addEventListener("change", e => direction.value = e.matches ? "column" : "row");
+            direction.value = scheme.matches ? "column" : "row";
+        }
+    });
 </script>
 
 <style lang="scss">

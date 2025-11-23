@@ -10,36 +10,31 @@
     </fluent-tree-item>
 </template>
 
-<script lang="ts">
-    import type { PropType } from "vue";
+<script generic="T extends AstItemAll" lang="ts" setup>
+    import type { } from "../types";
     import type { AstItemMap, AstItemAll } from "sharp-script";
 
-    export default {
-        name: "SyntaxTreeItem",
-        props: {
-            item: {
-                type: Object as PropType<AstItemAll>,
-                required: true
-            }
-        },
-        methods: {
-            escapeCommon(value: string) {
-                return value
-                    .replace('\r', '\\r')
-                    .replace('\n', '\\n')
-                    .replace('\t', '\\t');
-            },
-            escapeTrivia(value: string) {
-                return this.escapeCommon(value)
-                    .replace(/(^ +| +$)/g, (_, $1) => $1.length > 1 ? `<space:${$1.length}>` : "<space>");
-            },
-            renderValue(value: string, type: keyof AstItemMap) {
-                if (typeof value !== "string") { return `${value}`; }
-                else if (type === "trivia") { return this.escapeTrivia(value); }
-                else { return this.escapeCommon(value); }
-            }
-        }
+    const { item } = defineProps<{
+        item: T;
+    }>();
+
+    function escapeCommon(value: string) {
+        return value
+            .replace('\r', '\\r')
+            .replace('\n', '\\n')
+            .replace('\t', '\\t');
     };
+
+    function escapeTrivia(value: string) {
+        return escapeCommon(value)
+            .replace(/(^ +| +$)/g, (_, $1) => $1.length > 1 ? `<space:${$1.length}>` : "<space>");
+    };
+
+    function renderValue(value: string, type: keyof AstItemMap) {
+        if (typeof value !== "string") { return `${value}`; }
+        else if (type === "trivia") { return escapeTrivia(value); }
+        else { return escapeCommon(value); }
+    }
 </script>
 
 <style lang="scss" scoped>

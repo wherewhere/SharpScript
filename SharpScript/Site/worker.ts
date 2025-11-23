@@ -45,7 +45,7 @@ function getFingerprinting() {
     }
     return fingerprinting;
 }
-type Fingerprinting = ReturnType<typeof getFingerprinting>;
+export type Fingerprinting = ReturnType<typeof getFingerprinting>;
 const locker = new AsyncLock();
 
 const dotnet = {

@@ -1,5 +1,5 @@
 <template>
-    <div class="split-panels" :direction="direction">
+    <div class="split-panels" :direction="direction" ref="root">
         <div class="slotted slot1">
             <slot name="panel1"></slot>
         </div>
@@ -12,204 +12,193 @@
     </div>
 </template>
 
-<script lang="ts">
-    import { PropType } from "vue";
+<script lang="ts" setup>
+    import { onMounted, shallowRef, useTemplateRef, watch } from 'vue';
 
-    export default {
-        name: "SplitPanels",
-        props: {
-            direction: {
-                type: String as PropType<"row" | "column">,
-                default: "row"
-            },
-            collapsed: {
-                type: Boolean,
-                default: false
-            },
-            barsize: {
-                type: Number,
-                default: 8
-            },
-            barhandle: {
-                type: Boolean,
-                default: true
-            },
-            slot1minsize: {
-                type: Number,
-                default: 0
-            },
-            slot2minsize: {
-                type: Number,
-                default: 0
-            }
-        },
-        data() {
-            return {
-                isResizing: false,
-                slot1size: 0,
-                slot2size: 0,
-                totalsize: 0,
-                left: 0,
-                right: 0,
-                top: 0
-            }
-        },
-        watch: {
-            isResizing(newValue: boolean, oldValue: boolean) {
-                if (newValue !== oldValue) {
-                    if (newValue) {
-                        this.$el.setAttribute("resizing", '');
-                    } else {
-                        this.$el.style.userSelect = '';
-                        this.$el.style.cursor = '';
-                        this.$el.removeAttribute("resizing");
-                    }
-                }
-            },
-            direction(newValue: string, oldValue: string) {
-                if (newValue !== oldValue) {
-                    this.$el.style.gridTemplateRows = '';
-                    this.$el.style.gridTemplateColumns = '';
-                    this.updateBarSizeStyle();
-                }
-            },
-            collapsed(newValue: boolean, oldValue: boolean) {
-                if (newValue !== oldValue) {
-                    const realValue = newValue !== null && newValue !== undefined && newValue !== false;
-                    if (realValue) {
-                        this.$el.setAttribute("collapsed", '');
-                    } else {
-                        this.$el.removeAttribute("collapsed");
-                    }
-                    this.$emit("splittercollapsed", { collapsed: realValue });
-                }
-            },
-            barsize(newValue: number, oldValue: number) {
-                if (newValue !== oldValue) {
-                    this.updateBarSizeStyle();
-                }
-            },
-            barhandle(newValue: boolean, oldValue: boolean) {
-                if (newValue !== oldValue) {
-                    const realValue = newValue !== null && newValue !== undefined && newValue !== false;
-                    if (realValue) {
-                        this.$el.removeAttribute("no-barhandle");
-                    } else {
-                        this.$el.setAttribute("no-barhandle", '');
-                    }
+    const { direction = "row", collapsed, barsize = 8, barhandle, slot1minsize, slot2minsize } = defineProps<{
+        direction?: "row" | "column";
+        collapsed?: boolean;
+        barsize?: number;
+        barhandle?: boolean;
+        slot1minsize?: number;
+        slot2minsize?: number;
+    }>();
+
+    const root = useTemplateRef("root");
+    const median = useTemplateRef("median");
+    const emit = defineEmits<{
+        (e: "splittercollapsed", payload: { collapsed: boolean }): void;
+        (e: "splitterresized", payload: { panel1size: number, panel2size: number }): void;
+    }>();
+
+    const isResizing = shallowRef(false);
+
+    watch(
+        isResizing,
+        (newValue, oldValue) => {
+            if (newValue !== oldValue) {
+                if (newValue) {
+                    root.value!.setAttribute("resizing", '');
+                } else {
+                    root.value!.style.userSelect = '';
+                    root.value!.style.cursor = '';
+                    root.value!.removeAttribute("resizing");
                 }
             }
-        },
-        emits: ["splittercollapsed", "splitterresized"],
-        methods: {
-            pointerdown() {
-                this.isResizing = true;
-                const clientRect = this.$el.getBoundingClientRect();
-                this.left = clientRect.x;
-                this.right = clientRect.right;
-                this.top = clientRect.y;
-                this.totalsize = this.direction === "row" ? clientRect.width : clientRect.height;
-
-                this.$el.addEventListener("pointermove", this.resizeDrag);
-                this.$el.addEventListener("pointerup", this.pointerup);
-                this.$el.addEventListener("touchmove", this.touchmove);
-                this.$el.addEventListener("touchend", this.pointerup);
-            },
-            pointerup() {
-                this.isResizing = false;
-                this.$emit("splitterresized", { panel1size: this.slot1size, panel2size: this.slot2size });
-                this.$el.removeEventListener("pointermove", this.resizeDrag);
-                this.$el.removeEventListener("pointerup", this.pointerup);
-                this.$el.removeEventListener("touchmove", this.touchmove);
-                this.$el.removeEventListener("touchend", this.pointerup);
-            },
-            touchmove(e: TouchEvent) {
-                if (e.touches.length) {
-                    const { clientX, clientY } = e.touches[0];
-                    this.resizeDrag({ clientX, clientY });
-                }
-            },
-            resizeDrag(e: { clientX: number, clientY: number }) {
-                if (this.direction === "row") {
-                    const newMedianStart = (document.body.dir === '' || document.body.dir === "ltr") ? (e.clientX - this.left) : (this.right - e.clientX);
-                    const median = this.barsize;
-
-                    this.slot1size = Math.floor(newMedianStart - (median / 2));
-                    this.slot2size = Math.floor(this.$el.clientWidth - this.slot1size - (median / 2));
-
-                    let min1size = this.ensurevalue(this.slot1minsize);
-                    if (this.slot1size < min1size) {
-                        this.slot1size = Math.floor(min1size);
-                        this.slot2size = Math.floor(this.$el.clientWidth - this.slot1size - (median / 2));
-                    }
-                    let min2size = this.ensurevalue(this.slot2minsize);
-                    if (this.slot2size < min2size) {
-                        this.slot2size = Math.floor(min2size);
-                        this.slot1size = Math.floor(this.$el.clientWidth - this.slot2size - (median / 2));
-                    }
-
-                    const totalSize = this.slot1size + this.slot2size - median;
-                    let slot1fraction = (this.slot1size / totalSize).toFixed(2);
-                    let slot2fraction = (this.slot2size / totalSize).toFixed(2);
-                    this.$el.style.gridTemplateColumns = `${slot1fraction}fr ${median}px ${slot2fraction}fr`;
-                }
-                if (this.direction === "column") {
-                    const newMedianTop = e.clientY - this.top;
-                    const median = this.barsize;
-
-                    this.slot1size = Math.floor(newMedianTop - (median / 2));
-                    this.slot2size = Math.floor(this.$el.clientHeight - this.slot1size - (median / 2));
-
-                    let min1size = this.ensurevalue(this.slot1minsize);
-                    if (this.slot1size < min1size) {
-                        this.slot1size = Math.floor(min1size);
-                        this.slot2size = Math.floor(this.$el.clientHeight - this.slot1size - (median / 2));
-                    }
-                    let min2size = this.ensurevalue(this.slot2minsize);
-                    if (this.slot2size < min2size) {
-                        this.slot2size = Math.floor(min2size);
-                        this.slot1size = Math.floor(this.$el.clientHeight - this.slot2size - (median / 2));
-                    }
-
-                    const totalSize = this.slot1size + this.slot2size - median;
-                    let slot1fraction = (this.slot1size / totalSize).toFixed(2);
-                    let slot2fraction = (this.slot2size / totalSize).toFixed(2);
-
-                    this.$el.style.gridTemplateRows = `${slot1fraction}fr ${median}px ${slot2fraction}fr`;
-                }
-            },
-            updateBarSizeStyle() {
-                let median = this.$refs.median as HTMLDivElement | null;
-
-                if (median && median.style) {
-                    if (this.direction === "row") {
-                        median.style.inlineSize = `${this.barsize}px`;
-                        median.style.blockSize = '';
-                    }
-                    else {
-                        median.style.blockSize = `${this.barsize}px`;
-                        median.style.inlineSize = '';
-                    }
-                }
-            },
-            ensurevalue(value: string | number | any) {
-                if (!value) { return 0; }
-
-                value = value.trim().toLowerCase();
-
-                if (value.endsWith('%')) { return this.totalsize * parseFloat(value) / 100; }
-
-                if (value.endsWith("px")) { return parseFloat(value); }
-
-                if (value.endsWith("fr")) { return this.totalsize * parseFloat(value); }
-
-                return 0;
+        }
+    );
+    watch(
+        () => direction,
+        (newValue, oldValue) => {
+            if (newValue !== oldValue) {
+                root.value!.style.gridTemplateRows = '';
+                root.value!.style.gridTemplateColumns = '';
+                updateBarSizeStyle();
             }
-        },
-        mounted() {
-            this.updateBarSizeStyle();
-        },
-    };
+        });
+    watch(
+        () => collapsed,
+        (newValue, oldValue) => {
+            if (newValue !== oldValue) {
+                const realValue = newValue !== null && newValue !== undefined && newValue !== false;
+                if (realValue) {
+                    root.value!.setAttribute("collapsed", '');
+                } else {
+                    root.value!.removeAttribute("collapsed");
+                }
+                emit("splittercollapsed", { collapsed: realValue });
+            }
+        });
+    watch(
+        () => barsize,
+        (newValue, oldValue) => {
+            if (newValue !== oldValue) {
+                updateBarSizeStyle();
+            }
+        });
+    watch(
+        () => barhandle,
+        (newValue, oldValue) => {
+            if (newValue !== oldValue) {
+                const realValue = newValue !== null && newValue !== undefined && newValue !== false;
+                if (realValue) {
+                    root.value!.removeAttribute("no-barhandle");
+                } else {
+                    root.value!.setAttribute("no-barhandle", '');
+                }
+            }
+        });
+
+    let slot1size = 0, slot2size = 0, totalsize = 0, left = 0, right = 0, top = 0;
+
+    function pointerdown() {
+        isResizing.value = true;
+        const clientRect = root.value!.getBoundingClientRect();
+        left = clientRect.x;
+        right = clientRect.right;
+        top = clientRect.y;
+        totalsize = direction === "row" ? clientRect.width : clientRect.height;
+
+        root.value!.addEventListener("pointermove", resizeDrag);
+        root.value!.addEventListener("pointerup", pointerup);
+        root.value!.addEventListener("touchmove", touchmove);
+        root.value!.addEventListener("touchend", pointerup);
+    }
+
+    function pointerup() {
+        isResizing.value = false;
+        emit("splitterresized", { panel1size: slot1size, panel2size: slot2size });
+        root.value!.removeEventListener("pointermove", resizeDrag);
+        root.value!.removeEventListener("pointerup", pointerup);
+        root.value!.removeEventListener("touchmove", touchmove);
+        root.value!.removeEventListener("touchend", pointerup);
+    }
+
+    function touchmove(e: TouchEvent) {
+        if (e.touches.length) {
+            const { clientX, clientY } = e.touches[0];
+            resizeDrag({ clientX, clientY });
+        }
+    }
+
+    function resizeDrag(e: { clientX: number, clientY: number }) {
+        if (direction === "row") {
+            const newMedianStart = (document.body.dir === '' || document.body.dir === "ltr") ? (e.clientX - left) : (right - e.clientX);
+            const median = barsize;
+
+            slot1size = Math.floor(newMedianStart - (median / 2));
+            slot2size = Math.floor(root.value!.clientWidth - slot1size - (median / 2));
+
+            let min1size = ensurevalue(slot1minsize);
+            if (slot1size < min1size) {
+                slot1size = Math.floor(min1size);
+                slot2size = Math.floor(root.value!.clientWidth - slot1size - (median / 2));
+            }
+            let min2size = ensurevalue(slot2minsize);
+            if (slot2size < min2size) {
+                slot2size = Math.floor(min2size);
+                slot1size = Math.floor(root.value!.clientWidth - slot2size - (median / 2));
+            }
+
+            const totalSize = slot1size + slot2size - median;
+            let slot1fraction = (slot1size / totalSize).toFixed(2);
+            let slot2fraction = (slot2size / totalSize).toFixed(2);
+            root.value!.style.gridTemplateColumns = `${slot1fraction}fr ${median}px ${slot2fraction}fr`;
+        }
+        if (direction === "column") {
+            const newMedianTop = e.clientY - top;
+            const median = barsize;
+
+            slot1size = Math.floor(newMedianTop - (median / 2));
+            slot2size = Math.floor(root.value!.clientHeight - slot1size - (median / 2));
+
+            let min1size = ensurevalue(slot1minsize);
+            if (slot1size < min1size) {
+                slot1size = Math.floor(min1size);
+                slot2size = Math.floor(root.value!.clientHeight - slot1size - (median / 2));
+            }
+            let min2size = ensurevalue(slot2minsize);
+            if (slot2size < min2size) {
+                slot2size = Math.floor(min2size);
+                slot1size = Math.floor(root.value!.clientHeight - slot2size - (median / 2));
+            }
+
+            const totalSize = slot1size + slot2size - median;
+            let slot1fraction = (slot1size / totalSize).toFixed(2);
+            let slot2fraction = (slot2size / totalSize).toFixed(2);
+
+            root.value!.style.gridTemplateRows = `${slot1fraction}fr ${median}px ${slot2fraction}fr`;
+        }
+    }
+
+    function updateBarSizeStyle() {
+        if (median.value && median.value.style) {
+            if (direction === "row") {
+                median.value.style.inlineSize = `${barsize}px`;
+                median.value.style.blockSize = '';
+            }
+            else {
+                median.value.style.blockSize = `${barsize}px`;
+                median.value.style.inlineSize = '';
+            }
+        }
+    }
+
+    function ensurevalue(value: string | number | any) {
+        if (!value) { return 0; }
+
+        value = value.trim().toLowerCase();
+
+        if (value.endsWith('%')) { return totalsize * parseFloat(value) / 100; }
+
+        if (value.endsWith("px")) { return parseFloat(value); }
+
+        if (value.endsWith("fr")) { return totalsize * parseFloat(value); }
+
+        return 0;
+    }
+
+    onMounted(updateBarSizeStyle);
 </script>
 
 <style lang="scss" scoped>

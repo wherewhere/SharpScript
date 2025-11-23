@@ -4,22 +4,12 @@
     </fluent-button>
 </template>
 
-<script lang="ts">
-    export default {
-        name: "ToggleButton",
-        props: {
-            modelValue: Boolean
-        },
-        computed: {
-            appearance() {
-                return this.modelValue ? "accent" : "neutral";
-            }
-        },
-        emits: ["update:modelValue"],
-        methods: {
-            onclick() {
-                this.$emit("update:modelValue", !this.modelValue);
-            }
-        }
-    };
+<script lang="ts" setup>
+    import { computed } from 'vue';
+
+    const modelValue = defineModel<Boolean>({ default: false });
+    const appearance = computed(() => modelValue.value ? "accent" : "neutral");
+    function onclick() {
+        modelValue.value = !modelValue.value;
+    }
 </script>

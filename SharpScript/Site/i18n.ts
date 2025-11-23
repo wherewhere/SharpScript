@@ -1,6 +1,7 @@
 import { createI18n } from "vue-i18n";
 
 export default createI18n({
+    legacy: false,
     locale: (() => {
         const supportLanguages = ["en-US", "zh-CN"];
         const supportLanguageCodes =
