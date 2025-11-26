@@ -189,7 +189,6 @@ if (typeof WorkerGlobalScope !== "undefined" && self instanceof WorkerGlobalScop
     Comlink.expose(dotnet);
 }
 
-type UnPromisify<T> = T extends Promise<infer U> ? U : never;
 export { dotnet };
-export type DiagnosticWrapper = UnPromisify<ReturnType<typeof dotnet.getDiagnosticsAsync>>[number];
+export type DiagnosticWrapper = Awaited<ReturnType<typeof dotnet.getDiagnosticsAsync>>[number];
 export type DotNetWorker = typeof dotnet;

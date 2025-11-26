@@ -1,5 +1,4 @@
 <template>
-    <MetaSetter :lang="$i18n.locale" :description="t('description')" />
     <div class="content">
         <SplitPanels class="split-view" :direction="direction">
             <template #panel1>
@@ -119,8 +118,9 @@
     import type { } from "./types.js";
     import type { AstNodeItem, Diagnostic, LinePosition } from "sharp-script";
     import type { DotNetWorker, DiagnosticWrapper } from "./worker";
-    import { computed, nextTick, onMounted, ref, shallowRef, useTemplateRef, watch } from "vue";
+    import { computed, nextTick, onMounted, ref, shallowRef, useTemplateRef, watch, watchPostEffect } from "vue";
     import { useI18n } from "vue-i18n";
+    import { useSeoMeta } from "@unhead/vue";
     import LZString from "lz-string";
     import { AsyncLock, Comlink } from "./helpers/shared";
     import { AnsiUp } from "ansi_up";
@@ -131,7 +131,7 @@
     import { mapTextTagsToType, renderParts } from "./helpers/render-parts";
     import { getAssemblyAsync } from "./helpers/autocompletion";
     import { createTooltip } from "./helpers/tooltips.js";
-    import MetaSetter from "./components/MetaSetter.vue";
+    import { keywords } from "./package.json";
     import SplitPanels from "./components/SplitPanels.vue";
     import CodeMirror from "./components/CodeMirror.vue";
     import SyntaxTreeItem from "./components/SyntaxTreeItem.vue";
@@ -143,7 +143,35 @@
     import DismissCircle16Regular from "@fluentui/svg-icons/icons/dismiss_circle_16_regular.svg?component";
     import Warning16Regular from "@fluentui/svg-icons/icons/warning_16_regular.svg?component";
 
-    const { t } = useI18n();
+    const { locale, t } = useI18n();
+    watchPostEffect(() => document.documentElement.lang = locale.value);
+
+    const title = "SharpScript";
+    const description = computed(() => t("description"));
+    const author = "wherewhere";
+    useSeoMeta({
+        // Basic SEO
+        title,
+        description,
+        author: author,
+        keywords: keywords.join(", "),
+
+        // Open Graph
+        ogTitle: title,
+        ogDescription: description,
+        ogType: "website",
+        ogLocale: () => locale.value.replace('-', '_'),
+        ogSiteName: title,
+
+        // Twitter
+        twitterCard: "summary",
+        twitterSite: "@wherewhere7",
+
+        // Product specific (structured data will be generated)
+        articleAuthor: [author],
+        articleTag: keywords
+    });
+
     const code = shallowRef('using System;\nConsole.WriteLine("Hello, World!");');
     const language = shallowRef("CSharp");
     const inputLanguages = ref(["Default", "CSharp1", "CSharp2", "CSharp3", "CSharp4", "CSharp5", "CSharp6", "CSharp7", "CSharp7_1", "CSharp7_2", "CSharp7_3", "CSharp8", "CSharp9", "CSharp10", "CSharp11", "CSharp12", "CSharp13", "CSharp14", "LatestMajor", "Preview", "Latest"]);

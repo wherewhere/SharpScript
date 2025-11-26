@@ -8,13 +8,11 @@
     "build": "vite build"
   },
   "keywords": [
-    "Minecraft",
-    "Enchants",
-    "Order",
-    "MC",
-    "附魔",
-    "我的世界",
-    "麦块"
+    "playground",
+    "csharp",
+    "msil",
+    "vb-net",
+    "roslyn"
   ],
   "homepage": "https://github.com/wherewhere/SharpScript",
   "bugs": {
@@ -40,7 +38,14 @@
     "url": "git+https://github.com/wherewhere/SharpScript.git"
   },
   "devDependencies": {
-    "eslint": "^9.0.0"
+    "@vitejs/plugin-vue": "^6.0.0",
+    "eslint": "^9.0.0",
+    "mime": "^4.0.0",
+    "sass": "^1.0.0",
+    "terser": "^5.0.0",
+    "vite": "^7.0.0",
+    "vite-plugin-simple-html": "^1.0.0",
+    "vite-svg-loader": "^5.0.0"
   },
   "dependencies": {
     "@babel/runtime": "^7.0.0",
@@ -48,20 +53,13 @@
     "@fluentui/web-components": "^2.0.0",
     "@replit/codemirror-lang-csharp": "^6.0.0",
     "@uiw/codemirror-theme-vscode": "^4.0.0",
-    "@vitejs/plugin-vue": "^6.0.0",
+    "@unhead/vue": "^2.0.0",
     "ansi_up": "^6.0.6",
     "async-lock": "^1.0.0",
     "codemirror": "^6.0.0",
     "comlink": "^4.0.0",
     "lz-string": "^1.0.0",
-    "mime": "^4.0.0",
     "mirrorsharp-codemirror-6-preview": "^1.0.0",
-    "postcss-preset-env": "^10.0.0",
-    "sass": "^1.0.0",
-    "terser": "^5.0.0",
-    "vite": "^7.0.0",
-    "vite-plugin-simple-html": "^1.0.0",
-    "vite-svg-loader": "^5.0.0",
     "vue": "^3.0.0",
     "vue-i18n": "^11.0.0"
   }
