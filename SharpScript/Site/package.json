@@ -38,6 +38,7 @@
     "url": "git+https://github.com/wherewhere/SharpScript.git"
   },
   "devDependencies": {
+    "@types/node": "^24.0.0",
     "@vitejs/plugin-vue": "^6.0.0",
     "eslint": "^9.0.0",
     "mime": "^4.0.0",

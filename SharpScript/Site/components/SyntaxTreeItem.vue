@@ -11,7 +11,7 @@
 </template>
 
 <script generic="T extends AstItemAll" lang="ts" setup>
-    import type { } from "../types";
+    import "../types";
     import type { AstItemMap, AstItemAll } from "sharp-script";
 
     const { item } = defineProps<{
@@ -41,8 +41,7 @@
     fluent-tree-item {
         cursor: inherit;
 
-        &::part(positioning-region),
-        :deep(.positioning-region) {
+        &::part(positioning-region) {
             background: none;
         }
     }

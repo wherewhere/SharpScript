@@ -1,16 +1,14 @@
 import fs from "fs";
 import path from "path";
 import Mime from "mime";
-import { fileURLToPath } from "url";
+import type { Plugin } from "vite";
 
-/** @type {import("vite").Plugin} */
 export default {
     name: "dotnet-framework-static-files",
     configureServer(server) {
-        const __dirname = path.dirname(fileURLToPath(import.meta.url));
         server.middlewares.use((req, res, next) => {
             if (req.url && req.url.startsWith("/_framework")) {
-                const frameworkRoot = path.resolve(__dirname, "../bin/Release/net10.0-browser/publish/wwwroot");
+                const frameworkRoot = path.resolve(__dirname, "../../bin/Release/net10.0-browser/publish/wwwroot");
                 const rawPath = decodeURIComponent(req.url.split('?')[0]);
                 let filePath = path.resolve(frameworkRoot, `.${rawPath}`);
                 fs.stat(filePath, (err, stat) => {
@@ -18,7 +16,7 @@ export default {
                         res.statusCode = 404;
                         return res.end();
                     }
-                    function sendFile(filePath) {
+                    function sendFile(filePath: string) {
                         const ext = path.extname(filePath).toLowerCase();
                         const mime = Mime.getType(ext) ?? "application/octet-stream";
                         res.setHeader("Content-Type", mime);
@@ -48,4 +46,4 @@ export default {
             }
         });
     }
-};
+} as Plugin;

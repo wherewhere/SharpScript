@@ -5,7 +5,7 @@
                 <div style="display: flex; justify-content: space-between; column-gap: 4px">
                     <div style="display: flex; column-gap: 4px;">
                         <fluent-select :title="t('input.language.title')" :placeholder="t('input.language.placeholder')"
-                                       v-model="language" style="min-width: auto;">
+                                       position="below" v-model="language" style="min-width: auto;">
                             <fluent-option title="CSharp" value="CSharp">C#</fluent-option>
                             <fluent-option title="VisualBasic" value="VisualBasic">VB</fluent-option>
                             <fluent-option title="IL" value="IL">IL</fluent-option>
@@ -20,7 +20,8 @@
                             <TriangleRight12Filled v-else style="fill: currentColor;" />
                         </fluent-button>
                         <fluent-select v-if="inputLanguages.length" v-model="inputLanguage" style="min-width: 105px;"
-                                       :title="t('input.version.title')" :placeholder="t('input.version.placeholder')">
+                                       :title="t('input.version.title')" position="below"
+                                       :placeholder="t('input.version.placeholder')">
                             <fluent-option v-for="item in inputLanguages" :title="item" :value="item">
                                 {{ getVersion(item) }}
                             </fluent-option>
@@ -33,7 +34,7 @@
             <template #panel2>
                 <div style="display: flex; justify-content: space-between; column-gap: 4px">
                     <fluent-select :title="t('output.language.title')" :placeholder="t('output.language.placeholder')"
-                                   v-model="output" style="min-width: auto;">
+                                   position="below" v-model="output" style="min-width: auto;">
                         <fluent-option title="CSharp" value="CSharp">C#</fluent-option>
                         <fluent-option title="IL" value="IL">IL</fluent-option>
                         <fluent-option title="Run" value="Run">{{ t("output.language.run") }}</fluent-option>
@@ -51,7 +52,8 @@
                             <Sparkle16Regular style="fill: currentColor;" />
                         </fluent-button>
                         <fluent-select v-if="outputLanguages.length" v-model="outputLanguage" style="min-width: 92px;"
-                                       :title="t('output.version.title')" :placeholder="t('output.version.placeholder')">
+                                       position="below" :title="t('output.version.title')"
+                                       :placeholder="t('output.version.placeholder')">
                             <fluent-option v-for="item in outputLanguages" :title="item" :value="item">
                                 {{ getVersion(item) }}
                             </fluent-option>
@@ -115,13 +117,13 @@
 </template>
 
 <script lang="ts" setup>
-    import type { } from "./types.js";
+    import "./types";
     import type { AstNodeItem, Diagnostic, LinePosition } from "sharp-script";
     import type { DotNetWorker, DiagnosticWrapper } from "./worker";
     import { computed, nextTick, onMounted, ref, shallowRef, useTemplateRef, watch, watchPostEffect } from "vue";
     import { useI18n } from "vue-i18n";
     import { useSeoMeta } from "@unhead/vue";
-    import LZString from "lz-string";
+    import { compressToEncodedURIComponent, decompressFromEncodedURIComponent } from "lz-string";
     import { AsyncLock, Comlink } from "./helpers/shared";
     import { AnsiUp } from "ansi_up";
     import type { Extension, Text } from "@codemirror/state";
@@ -674,7 +676,7 @@
                     })]
                 }))
             });
-            
+
             roslynTooltip.value.input = () => hoverTooltip(async (view, pos) => {
                 const tooltip = await getInfoTipAsync(view.state.doc.toString(), pos);
                 return createTooltip(tooltip!, pos);
@@ -763,7 +765,7 @@
                 isScript.value = params.get("script") !== "false";
             }
             if (params.has("code")) {
-                code.value = LZString.decompressFromBase64(params.get("code")!);
+                code.value = decompressFromEncodedURIComponent(params.get("code")!);
             }
             if (params.has("noworker")) {
                 return params.get("noworker") !== "false";
@@ -804,7 +806,7 @@
             }
         }
         if (code.value) {
-            settings.code = LZString.compressToBase64(code.value);
+            settings.code = compressToEncodedURIComponent(code.value);
         }
         location.hash = new URLSearchParams(settings).toString();
         hashChanged = true;
@@ -878,12 +880,11 @@
         position: absolute;
     }
 
-    .no-selected-indicator fluent-tree-item[selected]::after {
+    .no-selected-indicator :deep(fluent-tree-item[selected])::after {
         display: none;
     }
 
-    :deep(fluent-select)::part(listbox),
-    :deep(fluent-select) .listbox {
+    :deep(fluent-select)::part(listbox) {
         max-height: calc(var(--base-height-multiplier) * 30px);
     }
 
@@ -918,6 +919,7 @@
                 display: flex;
                 overflow: auto;
                 box-sizing: border-box;
+                flex-direction: column;
                 background: var(--neutral-fill-input-rest);
                 border: calc(var(--stroke-width) * 1px) solid var(--neutral-stroke-layer-rest);
                 border-radius: calc(var(--layer-corner-radius) * 1px);
@@ -938,6 +940,7 @@
 
                 &>.output {
                     display: flex;
+                    flex-direction: column;
                     font-family: var(--font-monospace);
                     padding: 0 12px;
                     width: 100%;

@@ -2,8 +2,8 @@ import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
 import svgLoader from "vite-svg-loader";
 import simpleHtmlPlugin from "vite-plugin-simple-html";
-import dotnetFrameworkStaticFiles from "./helpers/dotnet-framework-static-files.mjs";
-import githubImporter from "./helpers/github-importer.mjs";
+import dotnetFrameworkStaticFiles from "./helpers/dotnet-framework-static-files";
+import githubImporter from "./helpers/github-importer";
 
 export default defineConfig({
     base: "./",

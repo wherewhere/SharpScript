@@ -1,4 +1,5 @@
-/** @type {import("sass").Importer<"async">} */
+import { Importer } from "sass";
+
 export default {
   canonicalize(url) {
     return url.startsWith("github:") ? new URL(url) : null;
@@ -31,4 +32,4 @@ export default {
       }
     }
   }
-};
+} as Importer<"async">;
