@@ -133,7 +133,7 @@ namespace SharpScript.Common
             options.GetOptions(isConsole, out CompilationOptions compilation, out ParseOptions parse);
             _language = compilation.Language;
             Solution solution = Workspace.CurrentSolution
-                .AddProject(projectId, "SharpScript.Project.CodeSession", nameof(SharpScript), _language)
+                .AddProject(projectId, "SharpScript.Project.CodeSession", "SharpScript.Playground", _language)
                 .AddMetadataReferences(projectId, References)
                 .WithProjectCompilationOptions(projectId, compilation)
                 .WithProjectParseOptions(projectId, parse)
@@ -694,7 +694,7 @@ namespace SharpScript.Common
                 if (driver.Assemble([_code], assemblyStream))
                 {
                     _ = assemblyStream.Seek(0, SeekOrigin.Begin);
-                    return ValueTask.FromResult(new CompilationResults(nameof(SharpScript), assemblyStream, null));
+                    return ValueTask.FromResult(new CompilationResults("SharpScript.Playground", assemblyStream, null));
                 }
             }
             catch (Exception ex) when (ex.GetType().Name.StartsWith("yy"))

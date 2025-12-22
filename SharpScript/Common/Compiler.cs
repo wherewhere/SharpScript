@@ -509,7 +509,8 @@ namespace SharpScript.Common
                     break;
                 case VisualBasicInputOptions vb:
                     compilation = new VisualBasicCompilationOptions(
-                        isConsole ? OutputKind.ConsoleApplication : OutputKind.DynamicallyLinkedLibrary);
+                        isConsole ? OutputKind.ConsoleApplication : OutputKind.DynamicallyLinkedLibrary,
+                        optimizationLevel: OptimizationLevel.Release);
                     parse = new VisualBasicParseOptions(
                         vb.LanguageVersion,
                         DocumentationMode.Parse,

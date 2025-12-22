@@ -179,7 +179,7 @@ const dotnet = {
     },
     async getAssemblyLinkAsync(code: string) {
         const assembly = await this.getAssemblyAsync(code);
-        const file = new File([await assembly.arrayBuffer()], "SharpScript.zip");
+        const file = new File([await assembly.arrayBuffer()], "SharpScript.Playground.zip");
         return URL.createObjectURL(file);
     }
 };

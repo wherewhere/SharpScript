@@ -3,10 +3,11 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Numerics;
 
 namespace SharpScript.Common
 {
-    public sealed class MetadataReferenceCollection : IReadOnlyList<PortableExecutableReference>
+    public sealed class MetadataReferenceCollection : IReadOnlyList<PortableExecutableReference>, IAdditionOperators<MetadataReferenceCollection, MetadataReferenceCollection, MetadataReferenceCollection>
     {
         private readonly List<PortableExecutableReference> _references;
         private readonly List<byte[]> _referenceBytes;
@@ -83,7 +84,7 @@ namespace SharpScript.Common
 
         IEnumerator IEnumerable.GetEnumerator() => _references.GetEnumerator();
 
-        public static MetadataReferenceCollection operator +(MetadataReferenceCollection left, in MetadataReferenceCollection right)
+        public static MetadataReferenceCollection operator +(MetadataReferenceCollection left, MetadataReferenceCollection right)
         {
             switch (left, right)
             {

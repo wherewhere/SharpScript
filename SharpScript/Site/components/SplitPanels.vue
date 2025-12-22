@@ -13,7 +13,7 @@
 </template>
 
 <script lang="ts" setup>
-    import { onMounted, shallowRef, useTemplateRef, watch } from 'vue';
+    import { onMounted, shallowRef, useTemplateRef, watch } from "vue";
 
     const { direction = "row", collapsed, barsize = 8, barhandle, slot1minsize, slot2minsize } = defineProps<{
         direction?: "row" | "column";
