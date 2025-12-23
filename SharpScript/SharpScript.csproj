@@ -19,6 +19,10 @@
     <PackageReference Include="System.Security.Permissions" Version="10.0.1" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Reference Include="$(NetCoreTargetingPackRoot)\Microsoft.NETCore.App.Ref\$(BundledNETCoreAppPackageVersion)\analyzers\dotnet\cs\*.dll" Aliases="AnalyzersCSharp" />
+  </ItemGroup>
+
   <Target Name="NPMRestore" AfterTargets="Restore">
     <Exec Command="npm install" WorkingDirectory="Site" />
   </Target>

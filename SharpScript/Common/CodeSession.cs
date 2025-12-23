@@ -2,6 +2,7 @@
 using Microsoft.CodeAnalysis.CodeActions;
 using Microsoft.CodeAnalysis.CodeFixes;
 using Microsoft.CodeAnalysis.Completion;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Emit;
 using Microsoft.CodeAnalysis.QuickInfo;
@@ -41,6 +42,7 @@ namespace SharpScript.Common
 
         private readonly Dictionary<string, List<CodeFixProvider>> _providers;
         private readonly ImmutableArray<DiagnosticAnalyzer> _analyzers;
+        private readonly GeneratorDriver _generator;
         private readonly RoslynOptions _options;
         private readonly string _language;
         private readonly bool _isConsole;
@@ -157,6 +159,16 @@ namespace SharpScript.Common
             }
             GetAnalyzers(assemblyName, _language, out IEnumerable<DiagnosticAnalyzer> analyzers, out _providers);
             _analyzers = [.. analyzers];
+            if (_language == LanguageNames.CSharp)
+            {
+                _generator = GetCSharpGenerator(
+                    "Microsoft.Interop.ComInterfaceGenerator",
+                    "Microsoft.Interop.JavaScript.JSImportGenerator",
+                    "Microsoft.Interop.LibraryImportGenerator",
+                    "Microsoft.Interop.SourceGeneration",
+                    "System.Text.Json.SourceGeneration",
+                    "System.Text.RegularExpressions.Generator").WithUpdatedParseOptions(parse);
+            }
         }
 
         public static async ValueTask InitAsync(string baseUrl, IDictionary<string, string> fingerprinting, ILogger<RoslynCodeSession> logger)
@@ -179,6 +191,7 @@ namespace SharpScript.Common
                     "System.Private.CoreLib",
                     "System.Private.Uri",
                     "System.Runtime",
+                    "System.Runtime.InteropServices.JavaScript",
                     "System.Text.Json",
                     "System.Text.RegularExpressions").ConfigureAwait(false);
             }
@@ -218,6 +231,10 @@ namespace SharpScript.Common
         public async ValueTask<T> GetDiagnosticsAsync<T>(T results, CancellationToken cancellationToken = default) where T : ICollection<Diagnostic>
         {
             Compilation compilation = await CurrentDocument.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false);
+            if (_generator != null)
+            {
+                _ = _generator.RunGeneratorsAndUpdateCompilation(compilation, out compilation, out _, cancellationToken);
+            }
             ImmutableArray<RoslynDiagnostic> diagnostics = await compilation.WithAnalyzers(_analyzers).GetAllDiagnosticsAsync(cancellationToken).ConfigureAwait(false);
             IEnumerable<RoslynDiagnostic> filtered = !_isConsole && _options is CSharpInputOptions { LanguageVersion: >= CSharpLanguageVersion.CSharp9 } ? diagnostics.Where(x => x is not { Id: "CS8805", Severity: DiagnosticSeverity.Error }) : diagnostics;
             Diagnostic[] array = await Task.WhenAll(filtered.Select(async diagnostic =>
@@ -323,6 +340,10 @@ namespace SharpScript.Common
             MemoryStream symbolStream = new();
             MemoryStream documentationStream = new();
             Compilation compilation = await CurrentDocument.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false);
+            if (_generator != null)
+            {
+                _ = _generator.RunGeneratorsAndUpdateCompilation(compilation, out compilation, out _, cancellationToken);
+            }
             EmitResult emitResult = compilation.Emit(assemblyStream, symbolStream, documentationStream, cancellationToken: cancellationToken);
             if (emitResult.Success)
             {
@@ -437,12 +458,12 @@ namespace SharpScript.Common
         {
             Type[] types = Assembly.Load(new AssemblyName(assemblyName)).GetTypes();
 
-            analyzers = types.Where(x => x.IsSubclassOf(typeof(DiagnosticAnalyzer)) && x is { IsAbstract: false } && x.GetCustomAttributes(typeof(DiagnosticAnalyzerAttribute), true).OfType<DiagnosticAnalyzerAttribute>().Any(x => x.Languages.Contains(language)))
+            analyzers = types.Where(x => x is { IsAbstract: false } && x.IsSubclassOf(typeof(DiagnosticAnalyzer)) && x.GetCustomAttributes<DiagnosticAnalyzerAttribute>(true).Any(x => x.Languages.Contains(language)))
                              .Select(Activator.CreateInstance)
                              .OfType<DiagnosticAnalyzer>();
 
             IEnumerable<CodeFixProvider> codeFixProvider =
-                types.Where(x => x.IsSubclassOf(typeof(CodeFixProvider)) && x is { IsAbstract: false } && x.IsDefined(typeof(ExportCodeFixProviderAttribute)))
+                types.Where(x => x is { IsAbstract: false } && x.IsSubclassOf(typeof(CodeFixProvider)) && x.IsDefined(typeof(ExportCodeFixProviderAttribute)))
                      .Select(Activator.CreateInstance)
                      .OfType<CodeFixProvider>();
 
@@ -459,6 +480,25 @@ namespace SharpScript.Common
                     list.Add(provider);
                 }
             }
+        }
+
+        private static GeneratorDriver GetCSharpGenerator(params string[] assemblies)
+        {
+            IEnumerable<Type> types = assemblies.Select(x => Assembly.Load(new AssemblyName(x)).GetTypes()).SelectMany(x => x);
+
+            IEnumerable<IIncrementalGenerator> incrementalGenerators =
+                types.Where(x => x is { IsAbstract: false } && x.IsAssignableTo(typeof(IIncrementalGenerator)) && x.GetCustomAttributes<GeneratorAttribute>(true).Any())
+                     .Select(Activator.CreateInstance)
+                     .OfType<IIncrementalGenerator>();
+
+            CSharpGeneratorDriver generator = CSharpGeneratorDriver.Create(incrementalGenerators.ToArray());
+
+            IEnumerable<ISourceGenerator> generators =
+                types.Where(x => x is { IsAbstract: false } && x.IsAssignableTo(typeof(ISourceGenerator)) && x.GetCustomAttributes<GeneratorAttribute>(true).Any())
+                     .Select(Activator.CreateInstance)
+                     .OfType<ISourceGenerator>();
+
+            return generator.AddGenerators([.. generators]);
         }
 
         public async ValueTask<AstNodeItem> GetAstAsync(CancellationToken cancellationToken = default)
