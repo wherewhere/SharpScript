@@ -118,8 +118,8 @@
 
 <script lang="ts" setup>
     import "./types";
-    import type { AstNodeItem, Diagnostic, LinePosition } from "sharp-script";
-    import type { DotNetWorker, DiagnosticWrapper } from "./worker";
+    import type { AstNodeItem, LinePosition } from "sharp-script";
+    import type { setProperty, DotNetWorker, DiagnosticWrapper } from "./worker";
     import { computed, nextTick, onMounted, ref, shallowRef, useTemplateRef, watch, watchPostEffect } from "vue";
     import { useI18n } from "vue-i18n";
     import { useSeoMeta } from "@unhead/vue";
@@ -133,6 +133,7 @@
     import { mapTextTagsToType, renderParts } from "./helpers/render-parts";
     import { getAssemblyAsync } from "./helpers/autocompletion";
     import { createTooltip } from "./helpers/tooltips.js";
+    import { setTimeoutAsync } from "./helpers/utils.js";
     import { keywords } from "./package.json";
     import SplitPanels from "./components/SplitPanels.vue";
     import CodeMirror from "./components/CodeMirror.vue";
@@ -187,7 +188,6 @@
     const loading = shallowRef(false);
     const message = shallowRef('');
     const results = ref({
-        diagnostics: [] as Partial<Diagnostic>[],
         decompiled: null as string | null,
         outputs: [] as string[]
     });
@@ -346,18 +346,44 @@
             await (language.value === "IL" ? initDotNetAsync() : initCompilerAsync());
             initEditer();
             await nextTick();
-            results.value = await dotnet!.processAsync(code.value);
+            const result = await dotnet!.processAsync(code.value);
+            results.value = result;
+            diagnostics.value = {
+                errors: [],
+                warnings: [],
+                infos: []
+            };
+            result.diagnostics.forEach(diagnostic => {
+                switch (diagnostic.severity) {
+                    case "Error":
+                        diagnostics.value.errors.push(diagnostic);
+                        break;
+                    case "Warning":
+                        diagnostics.value.warnings.push(diagnostic);
+                        break;
+                    case "Info":
+                    case "Hidden":
+                    default:
+                        if (!diagnostic.tags.some(x => x.startsWith("EnforceOnBuild"))) {
+                            diagnostics.value.infos.push(diagnostic);
+                        }
+                        break;
+                }
+            });
             message.value = mes;
         }
         catch (e) {
             message.value = t("message.error", `${e}`);
-            results.value.diagnostics.push({
+            diagnostics.value.errors.push({
+                id: '',
                 location: {
                     start: { line: 0, character: 0 },
                     end: { line: 0, character: 0 }
                 },
                 message: `${e}`,
-                severity: "Error"
+                severity: "Error",
+                actions: [],
+                tags: []
             });
             console.error(e);
         }
@@ -478,6 +504,7 @@
         }
     }
 
+    let noWorker = false;
     async function initDotNetAsync() {
         if (!isInitDotnet.value) {
             const mes = message.value;
@@ -486,7 +513,12 @@
                 if (!isInitDotnet.value) {
                     const mes = message.value;
                     message.value = t("message.initWebWorker");
-                    await dotnet!.init(document.baseURI, Comlink.proxy((x, y) => document.documentElement.style.setProperty(x, y)));
+                    if (noWorker) {
+                        dotnet!.init();
+                    }
+                    else {
+                        await dotnet!.init(document.baseURI, Comlink.proxy<setProperty>((x, y) => document.documentElement.style.setProperty(x, y)));
+                    }
                     message.value = mes;
                     await dotnet!.startAsync();
                     isInitDotnet.value = true;
@@ -502,6 +534,9 @@
             await initDotNetAsync();
             const mes = message.value;
             message.value = t("message.downloadReferences");
+            if (noWorker) {
+                await setTimeoutAsync(1);
+            }
             await dotnet!.initAsync();
             message.value = mes;
             isInitCompiler = true;
@@ -773,7 +808,6 @@
         }
     }
 
-    let noWorker = false;
     function setSettings() {
         const settings: { [key: string]: string } = {};
         if (noWorker) {

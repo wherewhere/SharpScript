@@ -1,5 +1,5 @@
 /// <reference types="./vite.env.d.ts" />
-import type { ICodeActionObject, ICompletionItemObject } from "sharp-script";
+import type { Diagnostic, ICodeActionObject, ICompletionItemObject } from "sharp-script";
 import { AsyncLock, Comlink } from "./helpers/shared";
 
 if (typeof window === "undefined") {
@@ -31,6 +31,27 @@ if (typeof window === "undefined") {
 }
 
 let diagnostics: ICodeActionObject[] = [], completions: ICompletionItemObject[] = [];
+function getDiagnostics(list: Diagnostic[]) {
+    if (list instanceof Array) {
+        diagnostics.forEach(x => x.dispose());
+        diagnostics = [];
+        return list.map(diagnostic => {
+            const { actions, ...result } = diagnostic;
+            return {
+                ...result,
+                actions: diagnostic.actions.map(x => {
+                    diagnostics.push(x.action);
+                    return {
+                        title: x.title,
+                        action: diagnostics.length - 1
+                    }
+                })
+            };
+        });
+    }
+    return [];
+}
+
 function getFingerprinting() {
     let fingerprinting: { [key: string]: string } = Blazor.runtime.config.resources.fingerprinting;
     if (!fingerprinting) {
@@ -46,10 +67,11 @@ function getFingerprinting() {
     return fingerprinting;
 }
 export type Fingerprinting = ReturnType<typeof getFingerprinting>;
+export type setProperty = typeof document.documentElement.style.setProperty;
 const locker = new AsyncLock();
 
 const dotnet = {
-    init(baseURI: string, onDownloadResourceProgress: (x: string, y: string | null) => void): void | Promise<void> {
+    init(baseURI?: string, onDownloadResourceProgress?: setProperty): void | Promise<void> {
         if (typeof Document === "undefined") {
             (document as any).baseURI = baseURI;
             if (onDownloadResourceProgress) {
@@ -69,31 +91,18 @@ const dotnet = {
         return await DotNet.invokeMethodAsync("SharpScript", "InitAsync", new URL("_framework/", document.baseURI).toString(), getFingerprinting());
     },
     async processAsync(code: string) {
-        return await DotNet.invokeMethodAsync("SharpScript", "ProcessAsync", code);
+        const { diagnostics, ...result } = await DotNet.invokeMethodAsync("SharpScript", "ProcessAsync", code);
+        return {
+            ...result,
+            diagnostics: getDiagnostics(diagnostics)
+        }
     },
     async getAssemblyAsync(code: string) {
         return await DotNet.invokeMethodAsync("SharpScript", "GetAssemblyAsync", code);
     },
     async getDiagnosticsAsync(code: string) {
         const result = await DotNet.invokeMethodAsync("SharpScript", "GetDiagnosticsAsync", code);
-        if (result instanceof Array) {
-            diagnostics.forEach(x => x.dispose());
-            diagnostics = [];
-            return result.map(diagnostic => {
-                const { actions, ...result } = diagnostic;
-                return {
-                    ...result,
-                    actions: diagnostic.actions.map(x => {
-                        diagnostics.push(x.action);
-                        return {
-                            title: x.title,
-                            action: diagnostics.length - 1
-                        }
-                    })
-                };
-            });
-        }
-        return [];
+        return getDiagnostics(result);
     },
     async getCompletionsAsync(code: string, position: number) {
         const result = await DotNet.invokeMethodAsync("SharpScript", "GetCompletionsAsync", code, position);

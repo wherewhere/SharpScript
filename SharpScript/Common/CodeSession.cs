@@ -231,11 +231,7 @@ namespace SharpScript.Common
         public async ValueTask<T> GetDiagnosticsAsync<T>(T results, CancellationToken cancellationToken = default) where T : ICollection<Diagnostic>
         {
             Compilation compilation = await CurrentDocument.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false);
-            if (_generator != null)
-            {
-                _ = _generator.RunGeneratorsAndUpdateCompilation(compilation, out compilation, out _, cancellationToken);
-            }
-            ImmutableArray<RoslynDiagnostic> diagnostics = await compilation.WithAnalyzers(_analyzers).GetAllDiagnosticsAsync(cancellationToken).ConfigureAwait(false);
+            ImmutableArray<RoslynDiagnostic> diagnostics = await compilation.WithGeneratorDriver(_generator, cancellationToken).WithAnalyzers(_analyzers).GetAllDiagnosticsAsync(cancellationToken).ConfigureAwait(false);
             IEnumerable<RoslynDiagnostic> filtered = !_isConsole && _options is CSharpInputOptions { LanguageVersion: >= CSharpLanguageVersion.CSharp9 } ? diagnostics.Where(x => x is not { Id: "CS8805", Severity: DiagnosticSeverity.Error }) : diagnostics;
             Diagnostic[] array = await Task.WhenAll(filtered.Select(async diagnostic =>
             {
@@ -340,11 +336,7 @@ namespace SharpScript.Common
             MemoryStream symbolStream = new();
             MemoryStream documentationStream = new();
             Compilation compilation = await CurrentDocument.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false);
-            if (_generator != null)
-            {
-                _ = _generator.RunGeneratorsAndUpdateCompilation(compilation, out compilation, out _, cancellationToken);
-            }
-            EmitResult emitResult = compilation.Emit(assemblyStream, symbolStream, documentationStream, cancellationToken: cancellationToken);
+            EmitResult emitResult = compilation.WithGeneratorDriver(_generator, cancellationToken).Emit(assemblyStream, symbolStream, documentationStream, cancellationToken: cancellationToken);
             if (emitResult.Success)
             {
                 _ = assemblyStream.Seek(0, SeekOrigin.Begin);
@@ -366,7 +358,7 @@ namespace SharpScript.Common
                         symbolStream = new();
                         documentationStream = new();
                         compilation = await currentDocument.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false);
-                        emitResult = compilation.Emit(assemblyStream, symbolStream, documentationStream, cancellationToken: cancellationToken);
+                        emitResult = compilation.WithGeneratorDriver(_generator, cancellationToken).Emit(assemblyStream, symbolStream, documentationStream, cancellationToken: cancellationToken);
                         if (emitResult.Success)
                         {
                             _ = assemblyStream.Seek(0, SeekOrigin.Begin);
@@ -1287,5 +1279,21 @@ namespace SharpScript.Common
         public override string Type => "value";
         public TextSpan Span => span;
         public string Value => value;
+    }
+
+    file static class Extensions
+    {
+        public static Compilation WithGeneratorDriver<T>(this Compilation compilation, T driver, CancellationToken cancellationToken = default) where T : GeneratorDriver
+        {
+            if (driver == null)
+            {
+                return compilation;
+            }
+            else
+            {
+                _ = driver.RunGeneratorsAndUpdateCompilation(compilation, out Compilation updatedCompilation, out _, cancellationToken);
+                return updatedCompilation;
+            }
+        }
     }
 }
