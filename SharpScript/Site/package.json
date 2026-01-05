@@ -40,6 +40,8 @@
   "devDependencies": {
     "@types/node": "^24.0.0",
     "@vitejs/plugin-vue": "^6.0.0",
+    "cssnano": "^7.0.0",
+    "cssnano-preset-advanced": "^7.0.0",
     "eslint": "^9.0.0",
     "mime": "^4.0.0",
     "sass": "^1.0.0",
@@ -55,7 +57,7 @@
     "@replit/codemirror-lang-csharp": "^6.0.0",
     "@uiw/codemirror-theme-vscode": "^4.0.0",
     "@unhead/vue": "^2.0.0",
-    "ansi_up": "^6.0.6",
+    "ansi_up": "^6.0.0",
     "async-lock": "^1.0.0",
     "codemirror": "^6.0.0",
     "comlink": "^4.0.0",

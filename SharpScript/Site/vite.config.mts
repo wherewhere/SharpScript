@@ -4,6 +4,7 @@ import svgLoader from "vite-svg-loader";
 import simpleHtmlPlugin from "vite-plugin-simple-html";
 import dotnetFrameworkStaticFiles from "./helpers/dotnet-framework-static-files";
 import githubImporter from "./helpers/github-importer";
+import cssnano from "cssnano";
 
 export default defineConfig({
     base: "./",
@@ -31,6 +32,13 @@ export default defineConfig({
             scss: {
                 importers: [githubImporter]
             }
+        },
+        postcss: {
+            plugins: [
+                cssnano({
+                    preset: "advanced"
+                })
+            ]
         },
         devSourcemap: true
     },
