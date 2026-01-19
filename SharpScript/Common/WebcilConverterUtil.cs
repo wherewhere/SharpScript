@@ -3,6 +3,8 @@ using System;
 using System.Buffers.Binary;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -25,7 +27,7 @@ namespace SharpScript.Common
         private static readonly DateTime Epoch = new(1970, 1, 1);
         private static readonly unsafe int SizeofDOSHeader = sizeof(IMAGE_DOS_HEADER);          // 64
         private static readonly unsafe int SizeofFileHeader = sizeof(IMAGE_FILE_HEADER);
-        private static readonly unsafe int SizeofMSDOS = MSDOS.Length;                          // 64
+        private static readonly int SizeofMSDOS = MSDOS.Length;                                 // 64
         private static readonly unsafe int SizeofNTHeaders = sizeof(IMAGE_NT_HEADERS32);        // 248
         private static readonly unsafe int SizeofOptionalHeader = sizeof(IMAGE_OPTIONAL_HEADER32);
         private static readonly unsafe int SizeofSectionHeader = sizeof(IMAGE_SECTION_HEADER);  // 40
@@ -302,24 +304,14 @@ namespace SharpScript.Common
 
         private static async ValueTask<T> ReadStructureAsync<T>(Stream s, CancellationToken cancellationToken = default) where T : unmanaged
         {
-            int size;
-            unsafe
-            {
-                size = sizeof(T);
-            }
+            int size = Unsafe.SizeOf<T>();
             byte[] buffer = new byte[size];
             int read = await s.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
             if (read != size)
             {
                 throw new InvalidOperationException("Couldn't read the full structure from the stream.");
             }
-            unsafe
-            {
-                fixed (byte* ptr = buffer)
-                {
-                    return *(T*)ptr;
-                }
-            }
+            return Unsafe.As<byte, T>(ref buffer[0]);
         }
 
         internal static int RoundToNearest(this int number, int nearest = 512)
@@ -342,10 +334,6 @@ namespace SharpScript.Common
             await stream.WriteAsync(bytes, cancellationToken).ConfigureAwait(false);
         }
 
-        private static unsafe byte[] StructToBytes<T>(T structData) where T : unmanaged
-        {
-            T* ptr = &structData;
-            return new ReadOnlySpan<byte>(ptr, sizeof(T)).ToArray();
-        }
+        private static byte[] StructToBytes<T>(T structData) where T : unmanaged => MemoryMarshal.CreateReadOnlySpan(in Unsafe.As<T, byte>(ref structData), Unsafe.SizeOf<T>()).ToArray();
     }
 }
