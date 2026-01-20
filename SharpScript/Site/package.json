@@ -38,7 +38,7 @@
     "url": "git+https://github.com/wherewhere/SharpScript.git"
   },
   "devDependencies": {
-    "@types/node": "^24.0.0",
+    "@types/node": "^25.0.0",
     "@vitejs/plugin-vue": "^6.0.0",
     "cssnano": "^7.0.0",
     "cssnano-preset-advanced": "^7.0.0",

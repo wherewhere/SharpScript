@@ -9,7 +9,7 @@
     import { indentWithTab } from "@codemirror/commands";
     import { Compartment, EditorState, Facet, type Extension } from "@codemirror/state";
     import { indentUnit } from "@codemirror/language";
-    import { hoverTooltip, keymap } from "@codemirror/view";
+    import { hoverTooltip, keymap, type ViewUpdate } from "@codemirror/view";
     import { csharp } from "@replit/codemirror-lang-csharp";
     import { cil } from "mirrorsharp-codemirror-6-preview/codemirror/languages/cil";
     import { vb } from "mirrorsharp-codemirror-6-preview/codemirror/languages/vb";
@@ -113,6 +113,10 @@
         });
     }
 
+    const emit = defineEmits<{
+        change: [update: ViewUpdate]
+    }>();
+
     const root = useTemplateRef("root");
     const linterSet = new Compartment();
     const lintGutterSet = new Compartment();
@@ -147,6 +151,7 @@
                     if (e.docChanged) {
                         changed = true;
                         value.value = e.state.doc.toString();
+                        emit("change", e);
                     }
                 })
             ]

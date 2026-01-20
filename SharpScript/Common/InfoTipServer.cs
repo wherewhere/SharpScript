@@ -2,6 +2,7 @@
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.QuickInfo;
 using Microsoft.CodeAnalysis.Text;
+using SharpScript.Models;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -14,40 +15,27 @@ namespace SharpScript.Common
 
         public static AdhocWorkspace Workspace { get; }
 
-        private static string _code;
-        public static string SourceCode
+        public static SourceText SourceText
         {
-            get => _code;
-            set
+            get;
+            private set
             {
-                if (_code != value)
+                if (field != value)
                 {
-                    _code = value;
-                    SourceText = SourceText.From(value, Encoding.Default);
+                    field = value;
                     _outOfDate = true;
-                    EnsureUpToDate();
                 }
             }
         }
 
-        public static SourceText SourceText { get; private set; }
-
         private static Document _currentDocument;
-        public static Document CurrentDocument
-        {
-            get
-            {
-                EnsureUpToDate();
-                return _currentDocument;
-            }
-        }
 
         public static QuickInfoService QuickInfoService
         {
             get
             {
                 EnsureUpToDate();
-                field ??= QuickInfoService.GetService(CurrentDocument);
+                field ??= QuickInfoService.GetService(_currentDocument);
                 return field;
             }
         }
@@ -59,7 +47,7 @@ namespace SharpScript.Common
             ProjectId projectId = ProjectId.CreateNewId();
             DocumentId docId = DocumentId.CreateNewId(projectId, "SharpScript.CodeSession");
             Solution solution = Workspace.CurrentSolution
-                .AddProject(projectId, "SharpScript.Project.CodeSession", "SharpScript", LanguageNames.CSharp)
+                .AddProject(projectId, "SharpScript.Project.CodeSession", "SharpScript.QuickInfo", LanguageNames.CSharp)
                 .AddMetadataReferences(projectId, RoslynCodeSession.References)
                 .WithProjectParseOptions(projectId,
                     new CSharpParseOptions(
@@ -81,16 +69,12 @@ namespace SharpScript.Common
             _outOfDate = false;
         }
 
+        public static void SetSourceCode(string code) => SourceText = SourceText.From(code, Encoding.Default);
+
         public static async ValueTask<InfoTipItem> GetInfoTipAsync(int position, CancellationToken cancellationToken = default)
         {
-            QuickInfoItem info = await QuickInfoService.GetQuickInfoAsync(CurrentDocument, position, cancellationToken).ConfigureAwait(false);
+            QuickInfoItem info = await QuickInfoService.GetQuickInfoAsync(_currentDocument, position, cancellationToken).ConfigureAwait(false);
             return info is null or { Sections.IsEmpty: true } ? default : new InfoTipItem(info);
-        }
-
-        public static Task<InfoTipItem> GetInfoTipAsync(string code, int position, CancellationToken cancellationToken = default)
-        {
-            SourceCode = code;
-            return GetInfoTipAsync(position, cancellationToken).AsTask();
         }
     }
 }

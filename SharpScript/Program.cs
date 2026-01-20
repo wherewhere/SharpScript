@@ -1,9 +1,11 @@
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
+using Microsoft.CodeAnalysis.Text;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.JSInterop;
 using SharpScript.Common;
+using SharpScript.Models;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -35,25 +37,34 @@ namespace SharpScript
         public static Task InitAsync(string baseUrl, IDictionary<string, string> fingerprinting) => RoslynCodeSession.InitAsync(baseUrl, fingerprinting, Current is WebAssemblyHost host ? host.Services.GetRequiredService<ILogger<RoslynCodeSession>>() : NullLogger<RoslynCodeSession>.Instance).AsTask();
 
         [JSInvokable]
-        public static Task<CompileResult> ProcessAsync(string code) => Compiler.ProcessAsync(code).AsTask();
+        public static void ResetCode(string code) => Compiler.ResetCode(code);
 
         [JSInvokable]
-        public static Task<DotNetStreamReference> GetAssemblyAsync(string code) => Compiler.GetAssemblyAsync(code).AsTask().ContinueWith(x => x.Result is MemoryStream stream ? new DotNetStreamReference(stream) : null);
+        public static void ApplyChanges(TextChanges changes) => Compiler.ApplyChanges(changes);
 
         [JSInvokable]
-        public static Task<List<Diagnostic>> GetDiagnosticsAsync(string code) => Compiler.GetDiagnosticsAsync(code).AsTask();
+        public static Task<CompileResult> ProcessAsync() => Compiler.ProcessAsync().AsTask();
 
         [JSInvokable]
-        public static Task<IEnumerable<RoslynCompletionItem>> GetCompletionsAsync(string code, int position) => Compiler.GetCompletionsAsync(code, position);
+        public static Task<DotNetStreamReference> GetAssemblyAsync() => Compiler.GetAssemblyAsync().AsTask().ContinueWith(x => x.Result is MemoryStream stream ? new DotNetStreamReference(stream) : null);
 
         [JSInvokable]
-        public static Task<InfoTipItem> GetInfoTipAsync(string code, int position) => Compiler.GetInfoTipAsync(code, position);
+        public static Task<List<Diagnostic>> GetDiagnosticsAsync() => Compiler.GetDiagnosticsAsync().AsTask();
 
         [JSInvokable]
-        public static Task<AstNodeItem> GetAstAsync(string code) => Compiler.GetAstAsync(code);
+        public static Task<IEnumerable<RoslynCompletionItem>> GetCompletionsAsync(int position) => Compiler.GetCompletionsAsync(position).AsTask();
 
         [JSInvokable]
-        public static Task<InfoTipItem> GetCSharpInfoTipLiteAsync(string code, int position) => InfoTipServer.GetInfoTipAsync(code, position);
+        public static Task<InfoTipItem> GetInfoTipAsync(int position) => Compiler.GetInfoTipAsync(position).AsTask();
+
+        [JSInvokable]
+        public static Task<AstNodeItem> GetAstAsync() => Compiler.GetAstAsync().AsTask();
+
+        [JSInvokable]
+        public static void SetCSharpInfoTipLite(string code) => InfoTipServer.SetSourceCode(code);
+
+        [JSInvokable]
+        public static Task<InfoTipItem> GetCSharpInfoTipLiteAsync(int position) => InfoTipServer.GetInfoTipAsync(position).AsTask();
 
         [JSInvokable]
         public static IEnumerable<string> GetLanguageTypes() => Compiler.LanguageTypes.Select(x => x.ToString());

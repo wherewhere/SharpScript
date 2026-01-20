@@ -29,7 +29,7 @@
                     </div>
                 </div>
                 <CodeMirror class="editor" v-model:value="code" :language="getLauguage()"
-                            :roslyn-tooltip="roslynTooltip.input!" ref="editor" />
+                            :roslyn-tooltip="roslynTooltip.input!" @change="onChange" ref="editor" />
             </template>
             <template #panel2>
                 <div style="display: flex; justify-content: space-between; column-gap: 4px">
@@ -118,7 +118,7 @@
 
 <script lang="ts" setup>
     import "./types";
-    import type { AstNodeItem, LinePosition } from "sharp-script";
+    import type { AstNodeItem, LinePosition, TextChanges } from "sharp-script";
     import type { setProperty, DotNetWorker, DiagnosticWrapper } from "./worker";
     import { computed, nextTick, onMounted, ref, shallowRef, useTemplateRef, watch, watchPostEffect } from "vue";
     import { useI18n } from "vue-i18n";
@@ -129,7 +129,7 @@
     import type { Extension, Text } from "@codemirror/state";
     import { autocompletion, ifNotIn, Completion, CompletionContext } from "@codemirror/autocomplete";
     import { linter, lintGutter } from "@codemirror/lint";
-    import { hoverTooltip } from "@codemirror/view";
+    import { hoverTooltip, type ViewUpdate } from "@codemirror/view";
     import { mapTextTagsToType, renderParts } from "./helpers/render-parts";
     import { getAssemblyAsync } from "./helpers/autocompletion";
     import { createTooltip } from "./helpers/tooltips.js";
@@ -180,7 +180,7 @@
     const inputLanguages = ref(["Default", "CSharp1", "CSharp2", "CSharp3", "CSharp4", "CSharp5", "CSharp6", "CSharp7", "CSharp7_1", "CSharp7_2", "CSharp7_3", "CSharp8", "CSharp9", "CSharp10", "CSharp11", "CSharp12", "CSharp13", "CSharp14", "LatestMajor", "Preview", "Latest"]);
     const inputLanguage = shallowRef("Preview");
     const isScript = shallowRef(false);
-    const output = shallowRef("Run");
+    const output = shallowRef<"CSharp" | "VisualBasic" | "IL" | "Run" | "SyntaxTree">("Run");
     const outputLanguages = ref<string[]>([]);
     const outputLanguage = shallowRef("CSharp1");
     const isInitDotnet = shallowRef(false);
@@ -336,6 +336,32 @@
             }
         }
     );
+    watch(
+        () => results.value.decompiled,
+        async (newValue, oldValue) => {
+            if (newValue !== oldValue && output.value === "CSharp") {
+                setCSharpInfoTipLiteAsync(newValue ?? '');
+            }
+        }
+    )
+
+    async function resetCodeAsync(code: string) {
+        try {
+            return await dotnet!.resetCodeAsync(code);
+        }
+        catch (e) {
+            console.warn(e);
+        }
+    }
+
+    async function applyChangesAsync(changes: TextChanges) {
+        try {
+            return await dotnet!.applyChangesAsync(changes);
+        }
+        catch (e) {
+            console.warn(e);
+        }
+    }
 
     async function processAsync() {
         try {
@@ -344,9 +370,9 @@
             message.value = t("message.compiling");
             setSettings();
             await (language.value === "IL" ? initDotNetAsync() : initCompilerAsync());
-            initEditer();
+            await initEditerAsync();
             await nextTick();
-            const result = await dotnet!.processAsync(code.value);
+            const result = await dotnet!.processAsync();
             results.value = result;
             diagnostics.value = {
                 errors: [],
@@ -393,45 +419,54 @@
         }
     }
 
-    async function getDiagnosticsAsync(code: string) {
+    async function getDiagnosticsAsync() {
         try {
-            return await dotnet!.getDiagnosticsAsync(code);
+            return await dotnet!.getDiagnosticsAsync();
         }
         catch (e) {
             console.warn(e);
         }
     }
 
-    async function getCompletionsAsync(code: string, position: number) {
+    async function getCompletionsAsync(position: number) {
         try {
-            return await dotnet!.getCompletionsAsync(code, position);
+            return await dotnet!.getCompletionsAsync(position);
         }
         catch (e) {
             console.warn(e);
         }
     }
 
-    async function getInfoTipAsync(code: string, position: number) {
+    async function getInfoTipAsync(position: number) {
         try {
-            return await dotnet!.getInfoTipAsync(code, position);
+            return await dotnet!.getInfoTipAsync(position);
         }
         catch (e) {
             console.warn(e);
         }
     }
 
-    async function getAstAsync(code: string) {
+    async function getAstAsync() {
         try {
-            return await dotnet!.getAstAsync(code);
+            return await dotnet!.getAstAsync();
         }
         catch (e) {
             console.warn(e);
         }
     }
 
-    async function getCSharpInfoTipLiteAsync(code: string, position: number) {
+    async function setCSharpInfoTipLiteAsync(code: string) {
         try {
-            return await dotnet!.getCSharpInfoTipLiteAsync(code, position);
+            return await dotnet!.setCSharpInfoTipLiteAsync(code);
+        }
+        catch (e) {
+            console.warn(e);
+        }
+    }
+
+    async function getCSharpInfoTipLiteAsync(position: number) {
+        try {
+            return await dotnet!.getCSharpInfoTipLiteAsync(position);
         }
         catch (e) {
             console.warn(e);
@@ -470,7 +505,7 @@
             loading.value = true;
             const mes = message.value;
             message.value = t("message.compiling");
-            const href = await dotnet!.getAssemblyLinkAsync(code.value);
+            const href = await dotnet!.getAssemblyLinkAsync();
             const link = document.createElement('a');
             link.href = href;
             link.download = "SharpScript.zip";
@@ -493,7 +528,7 @@
             const mes = message.value;
             message.value = t("message.initLinter");
             await (language.value === "IL" ? initDotNetAsync() : initCompilerAsync());
-            initEditer();
+            await initEditerAsync();
             message.value = mes;
         }
         catch (e) {
@@ -543,11 +578,31 @@
         }
     }
 
+    const onChange = shallowRef((_: ViewUpdate) => { });
     const editor = useTemplateRef("editor");
-    function initEditer() {
+    async function initEditerAsync() {
         if (!isInitLinter.value) {
             const editorHost = editor.value!;
             const editorView = editorHost.editor!;
+            await resetCodeAsync(code.value);
+            onChange.value = async ({ changes }: ViewUpdate) => {
+                const events: TextChanges = [];
+                changes.iterChanges((fromA, toA, _, __, inserted) => {
+                    events.push({
+                        span: {
+                            start: fromA,
+                            end: toA,
+                        },
+                        newText: inserted.toString(),
+                    });
+                });
+                events.sort((a, b) => {
+                    if (!("span" in a)) { return 1; }
+                    if (!("span" in b)) { return -1; }
+                    return (b.span.start - a.span.start);
+                });
+                await applyChangesAsync(events);
+            };
             function getIndex(doc: Text, span: LinePosition) {
                 if (doc.lines <= span.line) {
                     return doc.length;
@@ -561,9 +616,9 @@
             editorView.dispatch({
                 effects: editorHost.linterSet.reconfigure(linter(async view => {
                     if (isSyntaxTree) {
-                        getAstAsync(view.state.doc.toString()).then(x => syntaxTree.value = x!);
+                        getAstAsync().then(x => syntaxTree.value = x!);
                     }
-                    let diags = await getDiagnosticsAsync(view.state.doc.toString());
+                    let diags = await getDiagnosticsAsync();
                     if (diags instanceof Array) {
                         diagnostics.value = {
                             errors: [],
@@ -657,7 +712,7 @@
                 effects: editorHost.autocompletionSet.reconfigure(autocompletion({
                     override: [ifNotIn([';', '{', '}'], async context => {
                         const from = context.pos;
-                        const completions = await getCompletionsAsync(context.state.doc.toString(), from);
+                        const completions = await getCompletionsAsync(from);
                         const matchContext = context.matchBefore(/[\w\d]+/) ?? { from };
                         return {
                             from: matchContext.from ?? from,
@@ -712,12 +767,12 @@
                 }))
             });
 
-            roslynTooltip.value.input = () => hoverTooltip(async (view, pos) => {
-                const tooltip = await getInfoTipAsync(view.state.doc.toString(), pos);
+            roslynTooltip.value.input = () => hoverTooltip(async (_, pos) => {
+                const tooltip = await getInfoTipAsync(pos);
                 return createTooltip(tooltip!, pos);
             });
-            roslynTooltip.value.output = () => hoverTooltip(async (view, pos) => {
-                const tooltip = await getCSharpInfoTipLiteAsync(view.state.doc.toString(), pos);
+            roslynTooltip.value.output = () => hoverTooltip(async (_, pos) => {
+                const tooltip = await getCSharpInfoTipLiteAsync(pos);
                 return createTooltip(tooltip!, pos);
             });
             isInitLinter.value = true;
@@ -789,7 +844,7 @@
                 }
             }
             if (params.has("output")) {
-                output.value = params.get("output")!;
+                output.value = params.get("output")! as typeof output.value;
             }
             if (output.value === "CSharp") {
                 if (params.has("csversion")) {

@@ -4,6 +4,7 @@ using ICSharpCode.Decompiler.CSharp.OutputVisitor;
 using ICSharpCode.Decompiler.CSharp.Syntax;
 using ICSharpCode.Decompiler.Disassembler;
 using ICSharpCode.Decompiler.Metadata;
+using SharpScript.Models;
 using System.IO;
 using System.Linq;
 using System.Reflection.Metadata;

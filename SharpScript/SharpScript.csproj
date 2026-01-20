@@ -13,8 +13,8 @@
     <PackageReference Include="ICSharpCode.Decompiler" Version="10.0.0.8282-preview2" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.2" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="10.0.2" PrivateAssets="all" />
-    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Features" Version="5.4.0-2.26068.1" />
-    <PackageReference Include="Microsoft.CodeAnalysis.VisualBasic.Features" Version="5.4.0-2.26068.1" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Features" Version="5.4.0-2.26069.1" />
+    <PackageReference Include="Microsoft.CodeAnalysis.VisualBasic.Features" Version="5.4.0-2.26069.1" />
     <PackageReference Include="Mobius.ILasm" Version="0.1.0" />
     <PackageReference Include="System.Security.Permissions" Version="10.0.2" />
   </ItemGroup>

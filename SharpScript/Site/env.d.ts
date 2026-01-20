@@ -75,6 +75,8 @@ declare module "sharp-script" {
         readonly newText?: string;
     };
 
+    export type TextChanges = { span: Pick<TextSpan, "start" | "end">, newText: string }[]
+
     export interface DotNetObject {
         /**
          * Invokes the specified .NET instance public method asynchronously.
@@ -251,7 +253,7 @@ declare module "bilibili-card:*" {
 }
 
 declare module "*/blazor.webassembly.js" {
-    import { CompileResult, Diagnostic, ICompletionItem, InfoTipItem, AstNodeItem } from "sharp-script";
+    import { CompileResult, Diagnostic, TextChanges, ICompletionItem, InfoTipItem, AstNodeItem } from "sharp-script";
     global {
         const Blazor: {
             runtime: {
@@ -261,13 +263,16 @@ declare module "*/blazor.webassembly.js" {
         };
         const DotNet: {
             invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "InitAsync", baseUrl: string, fingerprinting: { [key: string]: string }): Promise<void>;
-            invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "ProcessAsync", code: string): Promise<CompileResult>;
-            invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "GetAssemblyAsync", code: string): Promise<{ arrayBuffer(): Promise<ArrayBuffer> }>;
-            invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "GetDiagnosticsAsync", code: string): Promise<Diagnostic[]>;
-            invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "GetCompletionsAsync", code: string, position: number): Promise<ICompletionItem[]>;
-            invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "GetInfoTipAsync", code: string, position: number): Promise<InfoTipItem>;
-            invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "GetAstAsync", code: string): Promise<AstNodeItem>;
-            invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "GetCSharpInfoTipLiteAsync", code: string, position: number): Promise<InfoTipItem>;
+            invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "ResetCode", code: string): Promise<void>;
+            invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "ApplyChanges", changes: TextChanges): Promise<void>;
+            invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "ProcessAsync"): Promise<CompileResult>;
+            invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "GetAssemblyAsync"): Promise<{ arrayBuffer(): Promise<ArrayBuffer> }>;
+            invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "GetDiagnosticsAsync"): Promise<Diagnostic[]>;
+            invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "GetCompletionsAsync", position: number): Promise<ICompletionItem[]>;
+            invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "GetInfoTipAsync", position: number): Promise<InfoTipItem>;
+            invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "GetAstAsync"): Promise<AstNodeItem>;
+            invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "SetCSharpInfoTipLite", code: string): Promise<void>;
+            invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "GetCSharpInfoTipLiteAsync", position: number): Promise<InfoTipItem>;
             invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "GetLanguageTypes"): Promise<string[]>;
             invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "SetLanguageType", type: string): Promise<void>;
             invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "GetSourceCodeKind"): Promise<string>;

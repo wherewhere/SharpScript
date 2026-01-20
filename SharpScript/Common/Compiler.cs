@@ -1,7 +1,7 @@
 ﻿using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.VisualBasic;
+using Microsoft.CodeAnalysis.Text;
 using Microsoft.Extensions.Logging;
+using SharpScript.Models;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -14,21 +14,21 @@ using System.Runtime.Loader;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using CSharpLanguageVersion = Microsoft.CodeAnalysis.CSharp.LanguageVersion;
-using LanguageVersion = ICSharpCode.Decompiler.CSharp.LanguageVersion;
-using VisualBasicLanguageVersion = Microsoft.CodeAnalysis.VisualBasic.LanguageVersion;
+using Diagnostic = SharpScript.Models.Diagnostic;
 
 namespace SharpScript.Common
 {
     public class Compiler(ILoggerFactory factory)
     {
+        private static readonly SourceText EmptySourceText = SourceText.From(string.Empty);
+
         public static LanguageType[] LanguageTypes { get; } = Enum.GetValues<LanguageType>();
         public static OutputType[] OutputTypes { get; } = Enum.GetValues<OutputType>();
 
         private readonly ILogger<Compiler> _logger = factory.CreateLogger<Compiler>();
 
-        private ICodeSession<ICodeSession> _codeSession;
-        public ICodeSession<ICodeSession> CodeSession
+        private ICodeSession _codeSession;
+        public ICodeSession CodeSession
         {
             get
             {
@@ -38,10 +38,10 @@ namespace SharpScript.Common
                     switch (InputOptions)
                     {
                         case RoslynOptions options:
-                            _codeSession = new RoslynCodeSession(string.Empty, options, isConsole, factory.CreateLogger<RoslynCodeSession>());
+                            _codeSession = new RoslynCodeSession(EmptySourceText, options, isConsole, factory.CreateLogger<RoslynCodeSession>());
                             break;
                         case ILInputOptions:
-                            _codeSession = new ILCodeSession(string.Empty, isConsole);
+                            _codeSession = new ILCodeSession(EmptySourceText, isConsole);
                             break;
                     }
                 }
@@ -145,21 +145,25 @@ namespace SharpScript.Common
                 switch (InputOptions)
                 {
                     case RoslynOptions options:
-                        _codeSession = new RoslynCodeSession(string.Empty, options, isConsole, factory.CreateLogger<RoslynCodeSession>());
+                        _codeSession = new RoslynCodeSession(_codeSession.SourceCode ?? EmptySourceText, options, isConsole, factory.CreateLogger<RoslynCodeSession>());
                         break;
                     case ILInputOptions:
-                        _codeSession = new ILCodeSession(string.Empty, isConsole);
+                        _codeSession = new ILCodeSession(_codeSession.SourceCode ?? EmptySourceText, isConsole);
                         break;
                 }
             }
         }
 
-        private async ValueTask<(CompilationResults streams, List<Diagnostic> diagnostics)> CompilateAsync(string code, CancellationToken cancellationToken = default)
+        public void ResetCode(string code) => CodeSession.ResetCode(code);
+
+        public void ApplyChanges(TextChanges changes) => CodeSession.ApplyChanges(changes);
+
+        private async ValueTask<(CompilationResults streams, List<Diagnostic> diagnostics)> CompilateAsync(CancellationToken cancellationToken = default)
         {
             List<Diagnostic> results = [];
             try
             {
-                CompilationResults streams = await CodeSession.SetSourceTextAsync(code, cancellationToken).AsTask().ContinueWith(x => x.Result.CompileAsync(results, cancellationToken).AsTask(), TaskScheduler.Default).Unwrap().ConfigureAwait(false);
+                CompilationResults streams = await CodeSession.CompileAsync(results, cancellationToken).ConfigureAwait(false);
                 return (streams, results);
             }
             catch (AggregateException aex) when (aex.InnerExceptions?.Count > 1)
@@ -184,13 +188,13 @@ namespace SharpScript.Common
             return (null, results);
         }
 
-        public async ValueTask<List<Diagnostic>> GetDiagnosticsAsync(string code, CancellationToken cancellationToken = default)
+        public async ValueTask<List<Diagnostic>> GetDiagnosticsAsync(CancellationToken cancellationToken = default)
         {
             List<Diagnostic> results = [];
             try
             {
                 bool isConsole = OutputType == OutputType.Run;
-                results = await CodeSession.SetSourceTextAsync(code, cancellationToken).AsTask().ContinueWith(x => x.Result.GetDiagnosticsAsync(results, cancellationToken).AsTask(), TaskScheduler.Default).Unwrap().ConfigureAwait(false);
+                results = await CodeSession.GetDiagnosticsAsync(results, cancellationToken).ConfigureAwait(false);
                 return results;
             }
             catch (AggregateException aex) when (aex.InnerExceptions?.Count > 1)
@@ -211,20 +215,20 @@ namespace SharpScript.Common
             return results;
         }
 
-        public Task<IEnumerable<RoslynCompletionItem>> GetCompletionsAsync(string code, int position, CancellationToken cancellationToken = default) =>
+        public ValueTask<IEnumerable<RoslynCompletionItem>> GetCompletionsAsync(int position, CancellationToken cancellationToken = default) =>
             InputOptions is RoslynOptions
-                ? CodeSession.SetSourceTextAsync(code, cancellationToken).AsTask().ContinueWith(x => x.Result.GetCompletionsAsync(position, cancellationToken).AsTask(), TaskScheduler.Default).Unwrap()
-                : Task.FromResult<IEnumerable<RoslynCompletionItem>>([]);
+                ? CodeSession.GetCompletionsAsync(position, cancellationToken)
+                : ValueTask.FromResult<IEnumerable<RoslynCompletionItem>>([]);
 
-        public Task<InfoTipItem> GetInfoTipAsync(string code, int position, CancellationToken cancellationToken = default) =>
+        public ValueTask<InfoTipItem> GetInfoTipAsync(int position, CancellationToken cancellationToken = default) =>
             InputOptions is RoslynOptions
-                ? CodeSession.SetSourceTextAsync(code, cancellationToken).AsTask().ContinueWith(x => x.Result.GetInfoTipAsync(position, cancellationToken).AsTask(), TaskScheduler.Default).Unwrap()
-                : Task.FromResult<InfoTipItem>(default);
+                ? CodeSession.GetInfoTipAsync(position, cancellationToken)
+                : ValueTask.FromResult<InfoTipItem>(default);
 
-        public Task<AstNodeItem> GetAstAsync(string code, CancellationToken cancellationToken = default) =>
+        public ValueTask<AstNodeItem> GetAstAsync(CancellationToken cancellationToken = default) =>
             InputOptions is RoslynOptions
-                ? CodeSession.SetSourceTextAsync(code, cancellationToken).AsTask().ContinueWith(x => x.Result.GetAstAsync(cancellationToken).AsTask(), TaskScheduler.Default).Unwrap()
-                : Task.FromResult<AstNodeItem>(default);
+                ? CodeSession.GetAstAsync(cancellationToken)
+                : ValueTask.FromResult<AstNodeItem>(default);
 
         private async ValueTask<string> DecompileAsync(CompilationResults streams, CancellationToken cancellationToken = default)
         {
@@ -380,11 +384,11 @@ namespace SharpScript.Common
             return results;
         }
 
-        public async ValueTask<CompileResult> ProcessAsync(string code, CancellationToken cancellationToken = default)
+        public async ValueTask<CompileResult> ProcessAsync(CancellationToken cancellationToken = default)
         {
             try
             {
-                (CompilationResults assemblyStream, List<Diagnostic> diagnostics) = await CompilateAsync(code, cancellationToken).ConfigureAwait(false);
+                (CompilationResults assemblyStream, List<Diagnostic> diagnostics) = await CompilateAsync(cancellationToken).ConfigureAwait(false);
                 if (assemblyStream != null)
                 {
                     switch (OutputType)
@@ -408,11 +412,11 @@ namespace SharpScript.Common
             return new CompileResult([], null);
         }
 
-        public async ValueTask<MemoryStream> GetAssemblyAsync(string code, CancellationToken cancellationToken = default)
+        public async ValueTask<MemoryStream> GetAssemblyAsync(CancellationToken cancellationToken = default)
         {
             try
             {
-                (CompilationResults results, _) = await CompilateAsync(code, cancellationToken).ConfigureAwait(false);
+                (CompilationResults results, _) = await CompilateAsync(cancellationToken).ConfigureAwait(false);
                 if (results is { AssemblyStream: MemoryStream assemblyStream })
                 {
                     results.Position = 0;
@@ -450,137 +454,4 @@ namespace SharpScript.Common
     }
 
     public record struct CompileResult(List<Diagnostic> Diagnostics, string Decompiled, params List<string> Outputs);
-
-    [Flags]
-    public enum LanguageType
-    {
-        CSharp = 0b011,
-        VisualBasic = 0b111,
-        IL = 0b001
-    }
-
-    [Flags]
-    public enum OutputType
-    {
-        CSharp = 0b0011,
-        VisualBasic = 0b0111,
-        IL = 0b0001,
-        Run = 0b1000
-    }
-
-    public interface IInputOptions
-    {
-        string LanguageName => null;
-        Array LanguageVersions => null;
-        Enum LanguageVersion { get => null; set { } }
-    }
-
-    public abstract class InputOptions : IInputOptions;
-
-    public abstract class RoslynOptions : InputOptions, IInputOptions
-    {
-        public static SourceCodeKind SourceCodeKind { get; set; } = SourceCodeKind.Regular;
-
-        public virtual string LanguageName => this switch
-        {
-            CSharpInputOptions => LanguageNames.CSharp,
-            VisualBasicInputOptions => LanguageNames.VisualBasic,
-            _ => throw new Exception("Invalid language type.")
-        };
-
-        public void GetOptions(bool isConsole, out CompilationOptions compilation, out ParseOptions parse)
-        {
-            switch (this)
-            {
-                case CSharpInputOptions csharp:
-                    CSharpLanguageVersion version = csharp.LanguageVersion;
-                    NullableContextOptions nullable = version >= CSharpLanguageVersion.CSharp8
-                        ? NullableContextOptions.Enable
-                        : NullableContextOptions.Disable;
-                    compilation = new CSharpCompilationOptions(
-                        isConsole ? OutputKind.ConsoleApplication : OutputKind.DynamicallyLinkedLibrary,
-                        optimizationLevel: OptimizationLevel.Release,
-                        allowUnsafe: true,
-                        nullableContextOptions: nullable);
-                    parse = new CSharpParseOptions(
-                        version,
-                        DocumentationMode.Parse,
-                        SourceCodeKind);
-                    break;
-                case VisualBasicInputOptions vb:
-                    compilation = new VisualBasicCompilationOptions(
-                        isConsole ? OutputKind.ConsoleApplication : OutputKind.DynamicallyLinkedLibrary,
-                        optimizationLevel: OptimizationLevel.Release);
-                    parse = new VisualBasicParseOptions(
-                        vb.LanguageVersion,
-                        DocumentationMode.Parse,
-                        SourceCodeKind);
-                    break;
-                default:
-                    throw new Exception("Invalid language type.");
-            }
-        }
-    }
-
-    public sealed class CSharpInputOptions : RoslynOptions, IInputOptions
-    {
-        Array IInputOptions.LanguageVersions => Enum.GetValues<CSharpLanguageVersion>();
-        Enum IInputOptions.LanguageVersion
-        {
-            get => LanguageVersion;
-            set => LanguageVersion = (CSharpLanguageVersion)(value ?? CSharpLanguageVersion.Preview);
-        }
-
-        public override string LanguageName => LanguageNames.CSharp;
-        public CSharpLanguageVersion LanguageVersion { get; set; } = CSharpLanguageVersion.Preview;
-    }
-
-    public sealed class VisualBasicInputOptions : RoslynOptions, IInputOptions
-    {
-        Array IInputOptions.LanguageVersions => Enum.GetValues<VisualBasicLanguageVersion>();
-        Enum IInputOptions.LanguageVersion
-        {
-            get => LanguageVersion;
-            set => LanguageVersion = (VisualBasicLanguageVersion)(value ?? VisualBasicLanguageVersion.Latest);
-        }
-
-        public override string LanguageName => LanguageNames.VisualBasic;
-        public VisualBasicLanguageVersion LanguageVersion { get; set; } = VisualBasicLanguageVersion.Latest;
-    }
-
-    public sealed class ILInputOptions : InputOptions;
-
-    public interface IOutputOptions
-    {
-        bool IsCSharp => false;
-        Enum LanguageVersion { get => default; set { } }
-    }
-
-    public abstract class OutputOptions : IOutputOptions;
-
-    public sealed class CSharpOutputOptions : OutputOptions, IOutputOptions
-    {
-        public static List<LanguageVersion> LanguageVersions
-        {
-            get
-            {
-                List<LanguageVersion> list = [.. Enum.GetValues<LanguageVersion>()];
-                _ = list.Remove(LanguageVersion.Preview);
-                return list;
-            }
-        }
-
-        bool IOutputOptions.IsCSharp => true;
-        Enum IOutputOptions.LanguageVersion
-        {
-            get => LanguageVersion;
-            set => LanguageVersion = (LanguageVersion)(value ?? LanguageVersion.CSharp1);
-        }
-
-        public LanguageVersion LanguageVersion { get; set; } = LanguageVersion.CSharp1;
-    }
-
-    public sealed class ILOutputOptions : OutputOptions;
-
-    public sealed class RunOutputOptions : OutputOptions;
 }

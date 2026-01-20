@@ -1,5 +1,5 @@
-/// <reference types="./vite.env.d.ts" />
-import type { Diagnostic, ICodeActionObject, ICompletionItemObject } from "sharp-script";
+/// <reference types="./env.d.ts" />
+import type { Diagnostic, TextChanges, ICodeActionObject, ICompletionItemObject } from "sharp-script";
 import { AsyncLock, Comlink } from "./helpers/shared";
 
 if (typeof window === "undefined") {
@@ -90,22 +90,28 @@ const dotnet = {
     async initAsync() {
         return await DotNet.invokeMethodAsync("SharpScript", "InitAsync", new URL("_framework/", document.baseURI).toString(), getFingerprinting());
     },
-    async processAsync(code: string) {
-        const { diagnostics, ...result } = await DotNet.invokeMethodAsync("SharpScript", "ProcessAsync", code);
+    async resetCodeAsync(code: string) {
+        return await DotNet.invokeMethodAsync("SharpScript", "ResetCode", code);
+    },
+    async applyChangesAsync(changes: TextChanges) {
+        return await DotNet.invokeMethodAsync("SharpScript", "ApplyChanges", changes);
+    },
+    async processAsync() {
+        const { diagnostics, ...result } = await DotNet.invokeMethodAsync("SharpScript", "ProcessAsync");
         return {
             ...result,
             diagnostics: getDiagnostics(diagnostics)
         }
     },
-    async getAssemblyAsync(code: string) {
-        return await DotNet.invokeMethodAsync("SharpScript", "GetAssemblyAsync", code);
+    async getAssemblyAsync() {
+        return await DotNet.invokeMethodAsync("SharpScript", "GetAssemblyAsync");
     },
-    async getDiagnosticsAsync(code: string) {
-        const result = await DotNet.invokeMethodAsync("SharpScript", "GetDiagnosticsAsync", code);
+    async getDiagnosticsAsync() {
+        const result = await DotNet.invokeMethodAsync("SharpScript", "GetDiagnosticsAsync");
         return getDiagnostics(result);
     },
-    async getCompletionsAsync(code: string, position: number) {
-        const result = await DotNet.invokeMethodAsync("SharpScript", "GetCompletionsAsync", code, position);
+    async getCompletionsAsync(position: number) {
+        const result = await DotNet.invokeMethodAsync("SharpScript", "GetCompletionsAsync", position);
         if (result instanceof Array) {
             completions.forEach(x => x.dispose());
             completions = [];
@@ -120,14 +126,17 @@ const dotnet = {
         }
         return [];
     },
-    async getInfoTipAsync(code: string, position: number) {
-        return await DotNet.invokeMethodAsync("SharpScript", "GetInfoTipAsync", code, position);
+    async getInfoTipAsync(position: number) {
+        return await DotNet.invokeMethodAsync("SharpScript", "GetInfoTipAsync", position);
     },
-    async getAstAsync(code: string) {
-        return await DotNet.invokeMethodAsync("SharpScript", "GetAstAsync", code);
+    async getAstAsync() {
+        return await DotNet.invokeMethodAsync("SharpScript", "GetAstAsync");
     },
-    async getCSharpInfoTipLiteAsync(code: string, position: number) {
-        return await DotNet.invokeMethodAsync("SharpScript", "GetCSharpInfoTipLiteAsync", code, position);
+    async setCSharpInfoTipLiteAsync(code: string) {
+        return await DotNet.invokeMethodAsync("SharpScript", "SetCSharpInfoTipLite", code);
+    },
+    async getCSharpInfoTipLiteAsync(position: number) {
+        return await DotNet.invokeMethodAsync("SharpScript", "GetCSharpInfoTipLiteAsync", position);
     },
     async getLanguageTypesAsync() {
         return await locker.acquire("inputLanguage", () => DotNet.invokeMethodAsync("SharpScript", "GetLanguageTypes"));
@@ -186,8 +195,8 @@ const dotnet = {
             return await completion.invokeMethodAsync("GetChangeAsync");
         }
     },
-    async getAssemblyLinkAsync(code: string) {
-        const assembly = await this.getAssemblyAsync(code);
+    async getAssemblyLinkAsync() {
+        const assembly = await this.getAssemblyAsync();
         const file = new File([await assembly.arrayBuffer()], "SharpScript.Playground.zip");
         return URL.createObjectURL(file);
     }
