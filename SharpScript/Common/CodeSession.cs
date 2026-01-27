@@ -264,7 +264,7 @@ namespace SharpScript.Common
                     CodeFixProvider provider = providers[i];
                     try
                     {
-                        if (!_notWorkFixer.Contains(provider))
+                        if (_notWorkFixer.Contains(provider))
                         {
                             _ = providers.Remove(provider);
                         }
