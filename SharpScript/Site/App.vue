@@ -908,12 +908,13 @@
     }
 
     onMounted(async () => {
+        const importWorker = () => import("./worker");
         if (loadSettings()) {
-            dotnet = await import("./worker").then(x => x.dotnet);
+            dotnet = await importWorker().then(x => x.dotnet);
             noWorker = true;
         }
         else {
-            const url = new URL(/* @vite-ignore */ "./worker.js", import.meta.url);
+            const url = new URL(importWorker.toString().match(/import\("(\S+)"\)/)![1], import.meta.url);
             dotnet = Comlink.wrap<DotNetWorker>(new Worker(url.href, { type: "module" }));
         }
         addEventListener("hashchange", loadSettings);
