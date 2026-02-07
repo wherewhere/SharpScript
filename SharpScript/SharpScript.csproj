@@ -28,7 +28,16 @@
   </Target>
 
   <Target Name="NPMBuild" BeforeTargets="PreBuildEvent">
-    <Exec Command="npm run build" WorkingDirectory="Site" />
+    <PropertyGroup>
+      <NPMArguments Condition="$(_IsPublishing) == 'true'">$(NPMArguments) --mode publish</NPMArguments>
+    </PropertyGroup>
+    <ItemGroup Condition="$(_IsPublishing) == 'true'">
+      <Content Remove="wwwroot/assets/**/*" />
+    </ItemGroup>
+    <Exec Command="npm run build -- $(NPMArguments)" WorkingDirectory="Site" />
+    <ItemGroup Condition="$(_IsPublishing) == 'true'">
+      <Content Include="wwwroot/assets/**/*" />
+    </ItemGroup>
   </Target>
 
   <Target Name="GetFrameworkXmlDocumentation" AfterTargets="ResolveReferences">
