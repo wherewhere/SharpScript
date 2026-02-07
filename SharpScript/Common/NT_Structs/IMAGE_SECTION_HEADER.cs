@@ -1,4 +1,5 @@
-﻿using System.Runtime.InteropServices;
+﻿using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 
 namespace SharpScript.Common.NT_Structs
 {
@@ -14,13 +15,13 @@ namespace SharpScript.Common.NT_Structs
         /// For longer names, this member contains a forward slash (/) followed by an ASCII representation of a decimal number that is an offset into the string table.
         /// Executable images do not use a string table and do not support section names longer than eight characters.
         /// </summary>
-        public Object8<byte> Name;
+        public InlineArray8<byte> Name;
 
         public UnionType Misc;
 
         /// <summary>
         /// The address of the first byte of the section when loaded into memory, relative to the image base.
-        /// For object files, this is the address of the first byte before relocation is applied.
+        /// For InlineArray files, this is the address of the first byte before relocation is applied.
         /// </summary>
         public uint VirtualAddress;
 
@@ -57,7 +58,7 @@ namespace SharpScript.Common.NT_Structs
 
             /// <summary>
             /// The total size of the section when loaded into memory, in bytes. If this value is greater than the SizeOfRawData member, the section is filled with zeroes.
-            /// This field is valid only for executable images and should be set to 0 for object files.
+            /// This field is valid only for executable images and should be set to 0 for InlineArray files.
             /// </summary>
             [FieldOffset(0)]
             public uint VirtualSize;

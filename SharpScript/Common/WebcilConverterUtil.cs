@@ -12,9 +12,9 @@ namespace SharpScript.Common
 {
     internal static class WebcilConverterUtil
     {
-        private static readonly Object8<byte> SectionHeaderText = [0x2E, 0x74, 0x65, 0x78, 0x74, 0x00, 0x00, 0x00];     // .text
-        private static readonly Object8<byte> SectionHeaderRsRc = [0x2E, 0x72, 0x73, 0x72, 0x63, 0x00, 0x00, 0x00];     // .rsrc
-        private static readonly Object8<byte> SectionHeaderReloc = [0x2E, 0x72, 0x65, 0x6C, 0x6F, 0x63, 0x00, 0x00];    // .reloc
+        private static readonly InlineArray8<byte> SectionHeaderText = InlineArray8Creator<byte>([0x2E, 0x74, 0x65, 0x78, 0x74, 0x00, 0x00, 0x00]);     // .text
+        private static readonly InlineArray8<byte> SectionHeaderRsRc = InlineArray8Creator<byte>([0x2E, 0x72, 0x73, 0x72, 0x63, 0x00, 0x00, 0x00]);     // .rsrc
+        private static readonly InlineArray8<byte> SectionHeaderReloc = InlineArray8Creator<byte>([0x2E, 0x72, 0x65, 0x6C, 0x6F, 0x63, 0x00, 0x00]);    // .reloc
         private static readonly byte[] MSDOS =
         [
             0x0E, 0x1F, 0xBA, 0x0E, 0x00, 0xB4, 0x09, 0xCD, 0x21, 0xB8, 0x01, 0x4C, 0xCD, 0x21, 0x54, 0x68,
@@ -22,8 +22,8 @@ namespace SharpScript.Common
             0x74, 0x20, 0x62, 0x65, 0x20, 0x72, 0x75, 0x6E, 0x20, 0x69, 0x6E, 0x20, 0x44, 0x4F, 0x53, 0x20,
             0x6D, 0x6F, 0x64, 0x65, 0x2E, 0x0D, 0x0D, 0x0A, 0x24, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
         ];
-        private static readonly Object4<ushort> DOSReservedWords1 = new();  // [0, 0, 0, 0]
-        private static readonly Object10<ushort> DOSReservedWords2 = new(); // [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        private static readonly InlineArray4<ushort> DOSReservedWords1 = new();  // [0, 0, 0, 0]
+        private static readonly InlineArray10<ushort> DOSReservedWords2 = new(); // [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
         private static readonly DateTime Epoch = new(1970, 1, 1);
         private static readonly unsafe int SizeofDOSHeader = sizeof(IMAGE_DOS_HEADER);          // 64
         private static readonly unsafe int SizeofFileHeader = sizeof(IMAGE_FILE_HEADER);
@@ -157,24 +157,25 @@ namespace SharpScript.Common
                     LoaderFlags = 0,
                     NumberOfRvaAndSizes = 0x10,
                     DataDirectory =
-                    [
-                        new() { Size = 0x0000, VirtualAddress = 0x0000 },   // IMAGE_DIRECTORY_ENTRY_EXPORT
-                        new() { Size = 0x0000, VirtualAddress = 0x0000 },   // IMAGE_DIRECTORY_ENTRY_IMPORT (can be 0)
-                        new() { Size = (uint)webcilSectionHeaders[1].VirtualSize, VirtualAddress = (uint)webcilSectionHeaders[1].VirtualAddress },  // IMAGE_DIRECTORY_ENTRY_RESOURCE
-                        new() { Size = 0x0000, VirtualAddress = 0x0000 },   // IMAGE_DIRECTORY_ENTRY_EXCEPTION
-                        new() { Size = 0x0000, VirtualAddress = 0x0000 },   // IMAGE_DIRECTORY_ENTRY_SECURITY
-                        new() { Size = (uint)webcilSectionHeaders[2].VirtualSize, VirtualAddress = (uint)webcilSectionHeaders[2].VirtualAddress },  // IMAGE_DIRECTORY_ENTRY_BASERELOC
-                        new() { Size = 0x0000, VirtualAddress = 0x0000 },   // IMAGE_DIRECTORY_ENTRY_DEBUG (can be 0)
-                        new() { Size = 0x0000, VirtualAddress = 0x0000 },   // IMAGE_DIRECTORY_ENTRY_ARCHITECTURE
-                        new() { Size = 0x0000, VirtualAddress = 0x0000 },   // IMAGE_DIRECTORY_ENTRY_GLOBALPTR
-                        new() { Size = 0x0000, VirtualAddress = 0x0000 },   // IMAGE_DIRECTORY_ENTRY_TLS
-                        new() { Size = 0x0000, VirtualAddress = 0x0000 },   // IMAGE_DIRECTORY_ENTRY_LOAD_CONFIG
-                        new() { Size = 0x0000, VirtualAddress = 0x0000 },   // IMAGE_DIRECTORY_ENTRY_BOUND_IMPORT
-                        new() { Size = 0x0008, VirtualAddress = (uint)webcilSectionHeaders[0].VirtualAddress },     // IMAGE_DIRECTORY_ENTRY_IAT
-                        new() { Size = 0x0000, VirtualAddress = 0x0000 },   // IMAGE_DIRECTORY_ENTRY_DELAY_IMPORT
-                        new() { Size = 0x0048, VirtualAddress = (uint)webcilSectionHeaders[0].VirtualAddress + 8 }, // TODO ??? IMAGE_DIRECTORY_ENTRY_COM_DESCRIPTOR
-                        new() { Size = 0x0000, VirtualAddress = 0x0000 }    // ?
-                    ]
+                        InlineArray16Creator<IMAGE_DATA_DIRECTORY>(
+                        [
+                            new() { Size = 0x0000, VirtualAddress = 0x0000 },   // IMAGE_DIRECTORY_ENTRY_EXPORT
+                            new() { Size = 0x0000, VirtualAddress = 0x0000 },   // IMAGE_DIRECTORY_ENTRY_IMPORT (can be 0)
+                            new() { Size = (uint)webcilSectionHeaders[1].VirtualSize, VirtualAddress = (uint)webcilSectionHeaders[1].VirtualAddress },  // IMAGE_DIRECTORY_ENTRY_RESOURCE
+                            new() { Size = 0x0000, VirtualAddress = 0x0000 },   // IMAGE_DIRECTORY_ENTRY_EXCEPTION
+                            new() { Size = 0x0000, VirtualAddress = 0x0000 },   // IMAGE_DIRECTORY_ENTRY_SECURITY
+                            new() { Size = (uint)webcilSectionHeaders[2].VirtualSize, VirtualAddress = (uint)webcilSectionHeaders[2].VirtualAddress },  // IMAGE_DIRECTORY_ENTRY_BASERELOC
+                            new() { Size = 0x0000, VirtualAddress = 0x0000 },   // IMAGE_DIRECTORY_ENTRY_DEBUG (can be 0)
+                            new() { Size = 0x0000, VirtualAddress = 0x0000 },   // IMAGE_DIRECTORY_ENTRY_ARCHITECTURE
+                            new() { Size = 0x0000, VirtualAddress = 0x0000 },   // IMAGE_DIRECTORY_ENTRY_GLOBALPTR
+                            new() { Size = 0x0000, VirtualAddress = 0x0000 },   // IMAGE_DIRECTORY_ENTRY_TLS
+                            new() { Size = 0x0000, VirtualAddress = 0x0000 },   // IMAGE_DIRECTORY_ENTRY_LOAD_CONFIG
+                            new() { Size = 0x0000, VirtualAddress = 0x0000 },   // IMAGE_DIRECTORY_ENTRY_BOUND_IMPORT
+                            new() { Size = 0x0008, VirtualAddress = (uint)webcilSectionHeaders[0].VirtualAddress },     // IMAGE_DIRECTORY_ENTRY_IAT
+                            new() { Size = 0x0000, VirtualAddress = 0x0000 },   // IMAGE_DIRECTORY_ENTRY_DELAY_IMPORT
+                            new() { Size = 0x0048, VirtualAddress = (uint)webcilSectionHeaders[0].VirtualAddress + 8 }, // TODO ??? IMAGE_DIRECTORY_ENTRY_COM_DESCRIPTOR
+                            new() { Size = 0x0000, VirtualAddress = 0x0000 }    // ?
+                        ])
                 }
             };
             await peStream.WriteStructAsync(IMAGE_NT_HEADERS32, cancellationToken).ConfigureAwait(false);
@@ -335,5 +336,17 @@ namespace SharpScript.Common
         }
 
         private static byte[] StructToBytes<T>(T structData) where T : unmanaged => MemoryMarshal.CreateReadOnlySpan(in Unsafe.As<T, byte>(ref structData), Unsafe.SizeOf<T>()).ToArray();
+
+        private static InlineArray8<T> InlineArray8Creator<T>(params ReadOnlySpan<T> values)
+        {
+            ArgumentOutOfRangeException.ThrowIfNotEqual(values.Length, 8, nameof(values));
+            return Unsafe.As<T, InlineArray8<T>>(ref MemoryMarshal.GetReference(values));
+        }
+
+        private static InlineArray16<T> InlineArray16Creator<T>(params ReadOnlySpan<T> values)
+        {
+            ArgumentOutOfRangeException.ThrowIfNotEqual(values.Length, 16, nameof(values));
+            return Unsafe.As<T, InlineArray16<T>>(ref MemoryMarshal.GetReference(values));
+        }
     }
 }

@@ -1,4 +1,5 @@
-﻿using System.Runtime.InteropServices;
+﻿using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 
 namespace SharpScript.Common.NT_Structs
 {
@@ -82,6 +83,6 @@ namespace SharpScript.Common.NT_Structs
         /// </summary>
         public uint NumberOfRvaAndSizes;
 
-        public Object16<IMAGE_DATA_DIRECTORY> DataDirectory;
+        public InlineArray16<IMAGE_DATA_DIRECTORY> DataDirectory;
     }
 }
