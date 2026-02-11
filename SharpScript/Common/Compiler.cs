@@ -156,7 +156,7 @@ namespace SharpScript.Common
 
         public void ResetCode(string code) => CodeSession.ResetCode(code);
 
-        public void ApplyChanges(TextChanges changes) => CodeSession.ApplyChanges(changes);
+        public void ApplyChanges(params TextChanges[] changes) => CodeSession.ApplyChanges(changes);
 
         private async ValueTask<(CompilationResults streams, List<Diagnostic> diagnostics)> CompilateAsync(CancellationToken cancellationToken = default)
         {

@@ -264,7 +264,7 @@ declare module "*/blazor.webassembly.js" {
         const DotNet: {
             invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "InitAsync", baseUrl: string, fingerprinting: { [key: string]: string }): Promise<void>;
             invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "ResetCode", code: string): Promise<void>;
-            invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "ApplyChanges", changes: TextChanges): Promise<void>;
+            invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "ApplyChanges", changes: TextChanges[]): Promise<void>;
             invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "ProcessAsync"): Promise<CompileResult>;
             invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "GetAssemblyAsync"): Promise<{ arrayBuffer(): Promise<ArrayBuffer> }>;
             invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "GetDiagnosticsAsync"): Promise<Diagnostic[]>;

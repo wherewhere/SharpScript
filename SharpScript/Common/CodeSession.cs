@@ -219,7 +219,13 @@ namespace SharpScript.Common
 
         public void ResetCode(string code) => SourceCode = SourceText.From(code, Encoding.Default);
 
-        public void ApplyChanges(TextChanges changes) => SourceCode = SourceCode.WithChanges(changes);
+        public void ApplyChanges(params TextChanges[] changes)
+        {
+            foreach (TextChanges change in changes)
+            {
+                SourceCode = SourceCode.WithChanges(change);
+            }
+        }
 
         public async ValueTask<IReadOnlyList<TextChange>> RollbackWorkspaceChangesAsync(CancellationToken cancellationToken = default)
         {
@@ -740,7 +746,13 @@ namespace SharpScript.Common
 
         public void ResetCode(string _code) => code = SourceText.From(_code, Encoding.Default);
 
-        public void ApplyChanges(TextChanges changes) => code = code.WithChanges(changes);
+        public void ApplyChanges(params TextChanges[] changes)
+        {
+            foreach (TextChanges change in changes)
+            {
+                code = code.WithChanges(change);
+            }
+        }
 
         public ValueTask<CompilationResults> CompileAsync(ICollection<Diagnostic> results, CancellationToken cancellationToken = default)
         {
@@ -799,7 +811,7 @@ namespace SharpScript.Common
     {
         SourceText SourceCode { get; }
         void ResetCode(string code);
-        void ApplyChanges(TextChanges changes);
+        void ApplyChanges(params TextChanges[] changes);
         ValueTask<T> GetDiagnosticsAsync<T>(T results, CancellationToken cancellationToken = default) where T : ICollection<Diagnostic>;
         ValueTask<IEnumerable<RoslynCompletionItem>> GetCompletionsAsync(int position, CancellationToken cancellationToken = default) => ValueTask.FromResult<IEnumerable<RoslynCompletionItem>>([]);
         ValueTask<InfoTipItem> GetInfoTipAsync(int position, CancellationToken cancellationToken = default) => ValueTask.FromResult<InfoTipItem>(default);

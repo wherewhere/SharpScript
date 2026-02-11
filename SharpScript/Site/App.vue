@@ -354,9 +354,15 @@
         }
     }
 
-    async function applyChangesAsync(changes: TextChanges) {
+    let changeList: TextChanges[] = [];
+    async function applyChangesAsync() {
         try {
-            return await dotnet!.applyChangesAsync(changes);
+            if (changeList.length){
+                console.log(changeList)
+                const task = dotnet!.applyChangesAsync(changeList);
+                changeList = [];
+                return await task;
+            }
         }
         catch (e) {
             console.warn(e);
@@ -371,6 +377,7 @@
             setSettings();
             await (language.value === "IL" ? initDotNetAsync() : initCompilerAsync());
             await initEditerAsync();
+            await applyChangesAsync();
             await nextTick();
             const result = await dotnet!.processAsync();
             results.value = result;
@@ -421,6 +428,7 @@
 
     async function getDiagnosticsAsync() {
         try {
+            await applyChangesAsync();
             return await dotnet!.getDiagnosticsAsync();
         }
         catch (e) {
@@ -430,6 +438,7 @@
 
     async function getCompletionsAsync(position: number) {
         try {
+            await applyChangesAsync();
             return await dotnet!.getCompletionsAsync(position);
         }
         catch (e) {
@@ -439,6 +448,7 @@
 
     async function getInfoTipAsync(position: number) {
         try {
+            await applyChangesAsync();
             return await dotnet!.getInfoTipAsync(position);
         }
         catch (e) {
@@ -448,6 +458,7 @@
 
     async function getAstAsync() {
         try {
+            await applyChangesAsync();
             return await dotnet!.getAstAsync();
         }
         catch (e) {
@@ -505,6 +516,7 @@
             loading.value = true;
             const mes = message.value;
             message.value = t("message.compiling");
+            await applyChangesAsync();
             const href = await dotnet!.getAssemblyLinkAsync();
             const link = document.createElement('a');
             link.href = href;
@@ -585,7 +597,7 @@
             const editorHost = editor.value!;
             const editorView = editorHost.editor!;
             await resetCodeAsync(code.value);
-            onChange.value = async ({ changes }: ViewUpdate) => {
+            onChange.value = ({ changes }: ViewUpdate) => {
                 const events: TextChanges = [];
                 changes.iterChanges((fromA, toA, _, __, inserted) => {
                     events.push({
@@ -601,7 +613,7 @@
                     if (!("span" in b)) { return -1; }
                     return (b.span.start - a.span.start);
                 });
-                await applyChangesAsync(events);
+                changeList.push(events);
             };
             function getIndex(doc: Text, span: LinePosition) {
                 if (doc.lines <= span.line) {

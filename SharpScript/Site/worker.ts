@@ -93,7 +93,7 @@ const dotnet = {
     async resetCodeAsync(code: string) {
         return await DotNet.invokeMethodAsync("SharpScript", "ResetCode", code);
     },
-    async applyChangesAsync(changes: TextChanges) {
+    async applyChangesAsync(changes: TextChanges[]) {
         return await DotNet.invokeMethodAsync("SharpScript", "ApplyChanges", changes);
     },
     async processAsync() {

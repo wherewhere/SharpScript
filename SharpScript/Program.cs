@@ -40,7 +40,7 @@ namespace SharpScript
         public static void ResetCode(string code) => Compiler.ResetCode(code);
 
         [JSInvokable]
-        public static void ApplyChanges(TextChanges changes) => Compiler.ApplyChanges(changes);
+        public static void ApplyChanges(params TextChanges[] changes) => Compiler.ApplyChanges(changes);
 
         [JSInvokable]
         public static Task<CompileResult> ProcessAsync() => Compiler.ProcessAsync().AsTask();
