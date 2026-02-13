@@ -26,8 +26,9 @@ if (typeof window === "undefined") {
             return null;
         }
     } as any;
-    self.Node = { COMMENT_NODE: 8 } as any;
-    self.history = { state: {} } as any;
+    self.history = {} as any;
+    self.Element = function() { } as any;
+    self.Node = function() { } as any;
 }
 
 let diagnostics: ICodeActionObject[] = [], completions: ICompletionItemObject[] = [];

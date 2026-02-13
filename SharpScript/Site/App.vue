@@ -358,7 +358,6 @@
     async function applyChangesAsync() {
         try {
             if (changeList.length){
-                console.log(changeList)
                 const task = dotnet!.applyChangesAsync(changeList);
                 changeList = [];
                 return await task;
@@ -940,9 +939,9 @@
 
 <style lang="scss">
     @use "github:microsoft/fluentui-blazor?branch=dev&path=/src/Core/wwwroot/css/reboot.css";
+    @use "./styles/fonts";
 
     :root {
-        --font-monospace: "Cascadia Code NF", "Cascadia Code PL", "Cascadia Code", "Cascadia Next SC", "Cascadia Next TC", "Cascadia Next JP", Consolas, "Courier New", "Liberation Mono", SFMono-Regular, Menlo, Monaco, monospace;
         color-scheme: light;
 
         @media (prefers-color-scheme: dark) {

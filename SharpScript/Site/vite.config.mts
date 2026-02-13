@@ -5,6 +5,7 @@ import simpleHtmlPlugin from "vite-plugin-simple-html";
 import dotnetFrameworkStaticFiles from "./helpers/dotnet-framework-static-files";
 import githubImporter from "./helpers/github-importer";
 import cssnano from "cssnano";
+import getOutputOptions from "./helpers/output";
 
 export default defineConfig(({ mode }) => {
     return {
@@ -48,18 +49,9 @@ export default defineConfig(({ mode }) => {
             sourcemap: true,
             minify: "terser",
             rollupOptions: {
-                output: mode === "publish" ? {
-                    manualChunks: {
-                        "shared": ["/helpers/shared.ts"]
-                    }
-                } : {
-                    assetFileNames: "assets/[name].[ext]",
-                    chunkFileNames: "assets/[name].js",
-                    entryFileNames: "assets/[name].js",
-                    manualChunks: {
-                        "shared": ["/helpers/shared.ts"]
-                    }
-                }
+                output: getOutputOptions(mode, {
+                    "shared": ["/helpers/shared.ts"]
+                })
             },
             emptyOutDir: true,
             chunkSizeWarningLimit: 1024

@@ -47,7 +47,7 @@ namespace SharpScript.Common
         private bool _sourceUpdated;
         private MetadataReferenceCollection _addon = [];
         private Dictionary<string, string> _features = [];
-        private HashSet<CodeFixProvider> _notWorkFixer = [];
+        private readonly HashSet<CodeFixProvider> _notWorkFixer = [];
 
         internal readonly ILogger<RoslynCodeSession> _logger;
 
@@ -473,7 +473,9 @@ namespace SharpScript.Common
 
         private static void GetAnalyzers(string assemblyName, string language, out IEnumerable<DiagnosticAnalyzer> analyzers, out Dictionary<string, List<CodeFixProvider>> providers)
         {
-            Type[] types = Assembly.Load(new AssemblyName(assemblyName)).GetTypes();
+            Type[] types = language == LanguageNames.CSharp ?
+                [.. new[] { assemblyName, "Microsoft.Interop.ComInterfaceGenerator", "Microsoft.Interop.LibraryImportGenerator", "System.Text.RegularExpressions.Generator" }.Select(x => Assembly.Load(new AssemblyName(x)).GetTypes()).SelectMany(x => x)] :
+                Assembly.Load(new AssemblyName(assemblyName)).GetTypes();
 
             analyzers = types.Where(x => x is { IsAbstract: false } && x.IsSubclassOf(typeof(DiagnosticAnalyzer)) && x.GetCustomAttributes<DiagnosticAnalyzerAttribute>(true).Any(x => x.Languages.Contains(language)))
                              .Select(Activator.CreateInstance)
