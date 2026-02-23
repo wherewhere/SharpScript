@@ -27,8 +27,8 @@ if (typeof window === "undefined") {
         }
     } as any;
     self.history = {} as any;
-    self.Element = function() { } as any;
-    self.Node = function() { } as any;
+    self.Element = function () { } as any;
+    self.Node = function () { } as any;
 }
 
 let diagnostics: ICodeActionObject[] = [], completions: ICompletionItemObject[] = [];
@@ -54,7 +54,7 @@ function getDiagnostics(list: Diagnostic[]) {
 }
 
 function getFingerprinting() {
-    let fingerprinting: { [key: string]: string } = Blazor.runtime.config.resources.fingerprinting;
+    let fingerprinting: Record<string, string> = Blazor.runtime.config.resources.fingerprinting;
     if (!fingerprinting) {
         fingerprinting = {};
         for (const x of Blazor.runtime.config.resources.coreAssembly) {
@@ -133,6 +133,9 @@ const dotnet = {
     async getAstAsync() {
         return await DotNet.invokeMethodAsync("SharpScript", "GetAstAsync");
     },
+    async formatCodeAsync() {
+        return await DotNet.invokeMethodAsync("SharpScript", "FormatCodeAsync");
+    },
     async setCSharpInfoTipLiteAsync(code: string) {
         return await DotNet.invokeMethodAsync("SharpScript", "SetCSharpInfoTipLite", code);
     },
@@ -163,7 +166,7 @@ const dotnet = {
     async getInputLanguageVersionAsync() {
         return await locker.acquire("inputLanguage", () => DotNet.invokeMethodAsync("SharpScript", "GetInputLanguageVersion"));
     },
-    async setInputLanguageVersionAsync(version: string) {
+    async setInputLanguageVersionAsync(version?: string) {
         return await locker.acquire("inputLanguage", () => DotNet.invokeMethodAsync("SharpScript", "SetInputLanguageVersion", version));
     },
     async getOutputLanguageVersionsAsync() {
@@ -172,7 +175,7 @@ const dotnet = {
     async getOutputLanguageVersionAsync() {
         return await locker.acquire("outputLanguage", () => DotNet.invokeMethodAsync("SharpScript", "GetOutputLanguageVersion"));
     },
-    async setOutputLanguageVersionAsync(version: string) {
+    async setOutputLanguageVersionAsync(version?: string) {
         return await locker.acquire("outputLanguage", () => DotNet.invokeMethodAsync("SharpScript", "SetOutputLanguageVersion", version));
     },
     async invokeMethodAsync(assembly: string, method: string, ...args: any[]) {
@@ -198,8 +201,10 @@ const dotnet = {
     },
     async getAssemblyLinkAsync() {
         const assembly = await this.getAssemblyAsync();
-        const file = new File([await assembly.arrayBuffer()], "SharpScript.Playground.zip");
-        return URL.createObjectURL(file);
+        if (assembly) {
+            const file = new File([await assembly.arrayBuffer()], "SharpScript.Playground.zip");
+            return URL.createObjectURL(file);
+        }
     }
 };
 

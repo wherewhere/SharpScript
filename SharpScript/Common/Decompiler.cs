@@ -21,7 +21,7 @@ namespace SharpScript.Common
         {
             streams.Position = 0;
             using PEFile assemblyFile = new(string.Empty, streams.AssemblyStream);
-            PortablePdbDebugInfoProvider debugInfo = null;
+            PortablePdbDebugInfoProvider? debugInfo = null;
             try
             {
                 if (streams.SymbolStream is MemoryStream symbol)
@@ -57,7 +57,7 @@ namespace SharpScript.Common
         private static void SortTree(SyntaxTree root)
         {
             // Note: the sorting logic cannot be reused, but should match IL and Jit ASM ordering
-            AstNode firstMovedNode = null;
+            AstNode? firstMovedNode = null;
             foreach (AstNode node in root.Children)
             {
                 if (node == firstMovedNode) { break; }
@@ -89,7 +89,7 @@ namespace SharpScript.Common
         {
             streams.Position = 0;
             using PEFile assemblyFile = new(string.Empty, streams.AssemblyStream);
-            PortablePdbDebugInfoProvider debugInfo = null;
+            PortablePdbDebugInfoProvider? debugInfo = null;
             try
             {
                 if (streams.SymbolStream is MemoryStream symbol)
@@ -123,7 +123,7 @@ namespace SharpScript.Common
         private static void DecompileTypes(PEFile assemblyFile, PlainTextOutput output, ReflectionDisassembler disassembler, MetadataReader metadata)
         {
             const int MaxNonUserTypeHandles = 10;
-            TypeDefinitionHandle[] nonUserTypeHandlesLease = default;
+            TypeDefinitionHandle[] nonUserTypeHandlesLease = [];
             int nonUserTypeHandlesCount = -1;
 
             // user code (first)                

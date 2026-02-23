@@ -44,6 +44,9 @@ export default createI18n({
                     run: "Run",
                     syntaxTree: "Syntax Tree"
                 },
+                format: {
+                    title: "Format (Shift+Alt+F)"
+                },
                 download: {
                     title: "Download Assembly"
                 },
@@ -98,6 +101,9 @@ export default createI18n({
                     placeholder: "请选择输出",
                     run: "运行",
                     syntaxTree: "语法树"
+                },
+                format: {
+                    title: "格式化 (Shift+Alt+F)"
                 },
                 download: {
                     title: "下载程序集"

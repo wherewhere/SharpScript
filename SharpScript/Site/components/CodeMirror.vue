@@ -118,6 +118,7 @@
     }>();
 
     const root = useTemplateRef("root");
+    const keymapSet = new Compartment();
     const linterSet = new Compartment();
     const lintGutterSet = new Compartment();
     const autocompletionSet = new Compartment();
@@ -142,6 +143,7 @@
                 keymap.of([indentWithTab]),
                 indentUnit.of("    "),
                 autocompletionSet.of(empty),
+                keymapSet.of(empty),
                 linterSet.of(empty),
                 lintGutterSet.of(empty),
                 tooltipSet.of(language === "il" ? getILTooltip() : roslynTooltip ? roslynTooltip() : empty),
@@ -168,6 +170,7 @@
         get editor() {
             return editor;
         },
+        keymapSet,
         linterSet,
         lintGutterSet,
         autocompletionSet

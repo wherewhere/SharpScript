@@ -30,7 +30,7 @@ namespace SharpScript.Common
 
         private static Document _currentDocument;
 
-        public static QuickInfoService QuickInfoService
+        public static QuickInfoService? QuickInfoService
         {
             get
             {
@@ -57,7 +57,7 @@ namespace SharpScript.Common
                 .AddDocument(docId, "SharpScript.CodeSession.Document", SourceText);
             _ = Workspace.TryApplyChanges(solution);
             Workspace.OpenDocument(docId);
-            _currentDocument = Workspace.CurrentSolution.GetDocument(docId);
+            _currentDocument = Workspace.CurrentSolution.GetDocument(docId)!;
         }
 
         private static void EnsureUpToDate()
@@ -65,7 +65,7 @@ namespace SharpScript.Common
             if (!_outOfDate) { return; }
             Document document = _currentDocument.WithText(SourceText);
             _ = Workspace.TryApplyChanges(document.Project.Solution);
-            _currentDocument = Workspace.CurrentSolution.GetDocument(_currentDocument.Id);
+            _currentDocument = Workspace.CurrentSolution.GetDocument(_currentDocument.Id)!;
             _outOfDate = false;
         }
 
@@ -73,7 +73,7 @@ namespace SharpScript.Common
 
         public static async ValueTask<InfoTipItem> GetInfoTipAsync(int position, CancellationToken cancellationToken = default)
         {
-            QuickInfoItem info = await QuickInfoService.GetQuickInfoAsync(_currentDocument, position, cancellationToken).ConfigureAwait(false);
+            QuickInfoItem? info = await QuickInfoService!.GetQuickInfoAsync(_currentDocument, position, cancellationToken).ConfigureAwait(false);
             return info is null or { Sections.IsEmpty: true } ? default : new InfoTipItem(info);
         }
     }

@@ -6,9 +6,9 @@ using System.Threading.Tasks;
 
 namespace SharpScript.Models
 {
-    public sealed record CompilationResults(string AssemblyName, MemoryStream AssemblyStream, MemoryStream SymbolStream = null, MemoryStream DocumentationStream = null) : IDisposable, IAsyncDisposable
+    public sealed record CompilationResults(string AssemblyName, MemoryStream AssemblyStream, MemoryStream? SymbolStream = null, MemoryStream? DocumentationStream = null) : IDisposable, IAsyncDisposable
     {
-        public MetadataReferenceCollection References { get; init; }
+        public MetadataReferenceCollection? References { get; init; }
 
         public long Position
         {

@@ -15,7 +15,7 @@ namespace SharpScript.Models
         string Title { get; }
         DotNetObjectReference<ICodeAction> Action { get; }
         [JSInvokable]
-        Task<IReadOnlyList<TextChange>> InvokeAsync();
+        Task<IReadOnlyList<TextChange>?> InvokeAsync();
         void IDisposable.Dispose() { Action?.Dispose(); GC.SuppressFinalize(this); }
     }
 
@@ -25,7 +25,7 @@ namespace SharpScript.Models
         public DotNetObjectReference<ICodeAction> Action => DotNetObjectReference.Create<ICodeAction>(this);
 
         [JSInvokable]
-        public async Task<IReadOnlyList<TextChange>> InvokeAsync()
+        public async Task<IReadOnlyList<TextChange>?> InvokeAsync()
         {
             try
             {

@@ -5,6 +5,7 @@
     <CompressionEnabled>false</CompressionEnabled>
     <IsTrimmable>true</IsTrimmable>
     <NoWarn>$(NoWarn);CA1873;VSTHRD103</NoWarn>
+    <Nullable>enable</Nullable>
     <PublishTrimmed>false</PublishTrimmed>
     <RunNPMCompilation>true</RunNPMCompilation>
     <TargetFramework>net10.0-browser</TargetFramework>

@@ -38,7 +38,7 @@ namespace SharpScript.Common
 
         PortableExecutableReference IReadOnlyList<PortableExecutableReference>.this[int index] => _references[index];
 
-        public void Add(MemoryStream peStream, MetadataReferenceProperties properties = default, DocumentationProvider documentation = null, string filePath = null)
+        public void Add(MemoryStream peStream, MetadataReferenceProperties properties = default, DocumentationProvider? documentation = null, string? filePath = null)
         {
             _referenceBytes.Add(peStream.ToArray());
             _references.Add(MetadataReference.CreateFromStream(peStream, properties, documentation, filePath));

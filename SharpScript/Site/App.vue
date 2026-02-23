@@ -33,15 +33,22 @@
             </template>
             <template #panel2>
                 <div style="display: flex; justify-content: space-between; column-gap: 4px">
-                    <fluent-select :title="t('output.language.title')" :placeholder="t('output.language.placeholder')"
-                                   position="below" v-model="output" style="min-width: auto;">
-                        <fluent-option title="CSharp" value="CSharp">C#</fluent-option>
-                        <fluent-option title="IL" value="IL">IL</fluent-option>
-                        <fluent-option title="Run" value="Run">{{ t("output.language.run") }}</fluent-option>
-                        <fluent-option title="SyntaxTree" value="SyntaxTree" :disabled="language === 'IL'">
-                            {{ t("output.language.syntaxTree") }}
-                        </fluent-option>
-                    </fluent-select>
+                    <div style="display: flex; column-gap: 4px;">
+                        <fluent-select :title="t('output.language.title')"
+                                       :placeholder="t('output.language.placeholder')" position="below" v-model="output"
+                                       style="min-width: auto;">
+                            <fluent-option title="CSharp" value="CSharp">C#</fluent-option>
+                            <fluent-option title="IL" value="IL">IL</fluent-option>
+                            <fluent-option title="Run" value="Run">{{ t("output.language.run") }}</fluent-option>
+                            <fluent-option title="SyntaxTree" value="SyntaxTree" :disabled="language === 'IL'">
+                                {{ t("output.language.syntaxTree") }}
+                            </fluent-option>
+                        </fluent-select>
+                        <fluent-button v-if="isInitLinter && language !== 'IL'" :title="t('output.format.title')"
+                                       @click="formatEditorAsync" :disabled="loading">
+                            <CodeText16Regular style="fill: currentColor;" />
+                        </fluent-button>
+                    </div>
                     <div style="display: flex; column-gap: 4px;">
                         <fluent-button v-if="isInitLinter && !diagnostics.errors.length"
                                        :title="t('output.download.title')" @click="downloadAssemblyAsync" :disabled="loading">
@@ -118,7 +125,7 @@
 
 <script lang="ts" setup>
     import "./types";
-    import type { AstNodeItem, LinePosition, TextChanges } from "sharp-script";
+    import type { AstNodeItem, InfoTipItem, TextChanges } from "sharp-script";
     import type { setProperty, DotNetWorker, DiagnosticWrapper } from "./worker";
     import { computed, nextTick, onMounted, ref, shallowRef, useTemplateRef, watch, watchPostEffect } from "vue";
     import { useI18n } from "vue-i18n";
@@ -126,13 +133,14 @@
     import { compressToEncodedURIComponent, decompressFromEncodedURIComponent } from "lz-string";
     import { AsyncLock, Comlink } from "./helpers/shared";
     import { AnsiUp } from "ansi_up";
-    import type { Extension, Text } from "@codemirror/state";
-    import { autocompletion, ifNotIn, Completion, CompletionContext } from "@codemirror/autocomplete";
-    import { linter, lintGutter } from "@codemirror/lint";
-    import { hoverTooltip, type ViewUpdate } from "@codemirror/view";
-    import { mapTextTagsToType, renderParts } from "./helpers/render-parts";
-    import { getAssemblyAsync } from "./helpers/autocompletion";
-    import { createTooltip } from "./helpers/tooltips.js";
+    import type { Extension } from "@codemirror/state";
+    import { lintGutter } from "@codemirror/lint";
+    import { keymap, type ViewUpdate } from "@codemirror/view";
+    import { createCompletion } from "./editor/completion";
+    import { createLinter } from "./editor/diagnostics";
+    import { createFormatKeymap, formatAsync } from "./editor/formatting";
+    import { createTooltip } from "./editor/hover.js";
+    import { getCustomCompletionAsync } from "./helpers/fingerprinting.js";
     import { setTimeoutAsync } from "./helpers/utils.js";
     import { keywords } from "./package.json";
     import SplitPanels from "./components/SplitPanels.vue";
@@ -140,6 +148,7 @@
     import SyntaxTreeItem from "./components/SyntaxTreeItem.vue";
     import ToggleButton from "./components/ToggleButton.vue";
     import TriangleRight12Filled from "@fluentui/svg-icons/icons/triangle_right_12_filled.svg?component";
+    import CodeText16Regular from "@fluentui/svg-icons/icons/code_text_16_regular.svg?component";
     import ArrowDownload16Regular from "@fluentui/svg-icons/icons/arrow_download_16_regular.svg?component";
     import Sparkle16Regular from "@fluentui/svg-icons/icons/sparkle_16_regular.svg?component";
     import Alert16Regular from "@fluentui/svg-icons/icons/alert_16_regular.svg?component";
@@ -178,19 +187,19 @@
     const code = shallowRef('using System;\nConsole.WriteLine("Hello, World!");');
     const language = shallowRef("CSharp");
     const inputLanguages = ref(["Default", "CSharp1", "CSharp2", "CSharp3", "CSharp4", "CSharp5", "CSharp6", "CSharp7", "CSharp7_1", "CSharp7_2", "CSharp7_3", "CSharp8", "CSharp9", "CSharp10", "CSharp11", "CSharp12", "CSharp13", "CSharp14", "LatestMajor", "Preview", "Latest"]);
-    const inputLanguage = shallowRef("Preview");
+    const inputLanguage = shallowRef<string | undefined>("Preview");
     const isScript = shallowRef(false);
     const output = shallowRef<"CSharp" | "VisualBasic" | "IL" | "Run" | "SyntaxTree">("Run");
     const outputLanguages = ref<string[]>([]);
-    const outputLanguage = shallowRef("CSharp1");
+    const outputLanguage = shallowRef<string | undefined>("CSharp1");
     const isInitDotnet = shallowRef(false);
     const isInitLinter = shallowRef(false);
     const loading = shallowRef(false);
     const message = shallowRef('');
-    const results = ref({
-        decompiled: null as string | null,
-        outputs: [] as string[]
-    });
+    const results = ref<{
+        decompiled?: string,
+        outputs: string[]
+    }>({ outputs: [] });
     const diagnostics = ref({
         errors: [] as DiagnosticWrapper[],
         warnings: [] as DiagnosticWrapper[],
@@ -357,11 +366,20 @@
     let changeList: TextChanges[] = [];
     async function applyChangesAsync() {
         try {
-            if (changeList.length){
+            if (changeList.length) {
                 const task = dotnet!.applyChangesAsync(changeList);
                 changeList = [];
                 return await task;
             }
+        }
+        catch (e) {
+            console.warn(e);
+        }
+    }
+
+    async function formatCodeAsync() {
+        try {
+            return await dotnet!.formatCodeAsync();
         }
         catch (e) {
             console.warn(e);
@@ -432,6 +450,7 @@
         }
         catch (e) {
             console.warn(e);
+            return [];
         }
     }
 
@@ -442,6 +461,7 @@
         }
         catch (e) {
             console.warn(e);
+            return [];
         }
     }
 
@@ -452,6 +472,7 @@
         }
         catch (e) {
             console.warn(e);
+            return {} as InfoTipItem;
         }
     }
 
@@ -480,6 +501,7 @@
         }
         catch (e) {
             console.warn(e);
+            return {} as InfoTipItem;
         }
     }
 
@@ -510,6 +532,22 @@
         }
     }
 
+    async function formatEditorAsync() {
+        try {
+            loading.value = true;
+            const mes = message.value;
+            message.value = t("message.formatting");
+            await formatAsync(editor.value!.editor!, formatCodeAsync);
+            message.value = mes;
+        }
+        catch (e) {
+            console.warn(e);
+        }
+        finally {
+            loading.value = false;
+        }
+    }
+
     async function downloadAssemblyAsync() {
         try {
             loading.value = true;
@@ -517,10 +555,12 @@
             message.value = t("message.compiling");
             await applyChangesAsync();
             const href = await dotnet!.getAssemblyLinkAsync();
-            const link = document.createElement('a');
-            link.href = href;
-            link.download = "SharpScript.zip";
-            link.click();
+            if (href) {
+                const link = document.createElement('a');
+                link.href = href;
+                link.download = "SharpScript.zip";
+                link.click();
+            }
             message.value = mes;
         }
         catch (e) {
@@ -596,6 +636,7 @@
             const editorHost = editor.value!;
             const editorView = editorHost.editor!;
             await resetCodeAsync(code.value);
+
             onChange.value = ({ changes }: ViewUpdate) => {
                 const events: TextChanges = [];
                 changes.iterChanges((fromA, toA, _, __, inserted) => {
@@ -614,178 +655,40 @@
                 });
                 changeList.push(events);
             };
-            function getIndex(doc: Text, span: LinePosition) {
-                if (doc.lines <= span.line) {
-                    return doc.length;
-                }
-                const index = doc.line(span.line + 1).from + span.character;
-                if (index > doc.length) {
-                    return doc.length;
-                }
-                return index;
-            }
+
             editorView.dispatch({
-                effects: editorHost.linterSet.reconfigure(linter(async view => {
-                    if (isSyntaxTree) {
-                        getAstAsync().then(x => syntaxTree.value = x!);
-                    }
-                    let diags = await getDiagnosticsAsync();
-                    if (diags instanceof Array) {
-                        diagnostics.value = {
-                            errors: [],
-                            warnings: [],
-                            infos: []
-                        };
-                        if (language.value === "IL") {
-                            diags = diags.filter(x => x.severity !== "Info" || x.message !== "Operation completed successfully");
+                effects: editorHost.linterSet.reconfigure(createLinter(
+                    () => {
+                        if (isSyntaxTree) {
+                            getAstAsync().then(x => syntaxTree.value = x!);
                         }
-                        return diags.map(diagnostic => {
-                            return {
-                                from: getIndex(view.state.doc, diagnostic.location.start),
-                                to: getIndex(view.state.doc, diagnostic.location.end),
-                                severity: (() => {
-                                    switch (diagnostic.severity) {
-                                        case "Error":
-                                            diagnostics.value.errors.push(diagnostic);
-                                            return "error";
-                                        case "Warning":
-                                            diagnostics.value.warnings.push(diagnostic);
-                                            return "warning";
-                                        case "Info":
-                                        case "Hidden":
-                                        default:
-                                            if (diagnostic.tags.some(x => x.startsWith("EnforceOnBuild"))) {
-                                                return "hint";
-                                            }
-                                            else {
-                                                diagnostics.value.infos.push(diagnostic);
-                                                return "info";
-                                            }
-                                    }
-                                })(),
-                                markClass: diagnostic.tags.includes("Unnecessary") ? "cm-lintRange-unnecessary" : undefined,
-                                message: `${diagnostic.id ? `${diagnostic.id}: ` : ''}${diagnostic.message}`,
-                                actions: diagnostic.actions.map(x => {
-                                    return {
-                                        name: x.title,
-                                        async apply(view) {
-                                            const results = await diagnosticInvokeAsync(x.action);
-                                            if (results instanceof Array) {
-                                                view.dispatch({
-                                                    changes: results.map(x => {
-                                                        const span = x.span;
-                                                        return { from: span.start, to: span.end, insert: x.newText }
-                                                    })
-                                                });
-                                            }
-                                        }
-                                    }
-                                })
-                            }
-                        });
-                    }
-                    return [];
-                }))
+                    },
+                    getDiagnosticsAsync,
+                    diagnosticInvokeAsync,
+                    diagnostics,
+                    language
+                ))
             });
             editorView.dispatch({
                 effects: editorHost.lintGutterSet.reconfigure(lintGutter())
             });
-            async function customCompletionAsync(context: CompletionContext) {
-                if (language.value !== "IL") {
-                    const pos = context.pos;
-                    const line = context.state.doc.lineAt(pos);
-                    const text = line.text;
-                    if (text.startsWith("#r ") || text.startsWith("#R ")) {
-                        const path = text.substring(3).trim();
-                        const from = line.from + 3;
-                        const results: Completion[] = [];
-                        for (const assembly of await getAssemblyAsync(dotnet!.fingerprinting)) {
-                            if (assembly.startsWith(path)) {
-                                results.push({
-                                    label: assembly,
-                                    type: "assembly",
-                                    apply(view, completion) {
-                                        const label = completion.label;
-                                        view.dispatch({
-                                            changes: { from, to: line.to, insert: label },
-                                            selection: { anchor: from + label.length }
-                                        });
-                                    }
-                                });
-                            }
-                        }
-                        return results;
-                    }
-                }
-                return [];
-            }
+
             editorView.dispatch({
-                effects: editorHost.autocompletionSet.reconfigure(autocompletion({
-                    override: [ifNotIn([';', '{', '}'], async context => {
-                        const from = context.pos;
-                        const completions = await getCompletionsAsync(from);
-                        const matchContext = context.matchBefore(/[\w\d]+/) ?? { from };
-                        return {
-                            from: matchContext.from ?? from,
-                            options: [...completions!.map(item => {
-                                return {
-                                    label: item.displayText,
-                                    detail: item.inlineDescription,
-                                    type: mapTextTagsToType(item.tags),
-                                    async info() {
-                                        const results = await completionGetDescriptionAsync(item.self);
-                                        return renderParts(results!, true);
-                                    },
-                                    async apply(view, completion, from, to) {
-                                        const results = await completionGetChangeAsync(item.self);
-                                        if (results) {
-                                            const textChanges = results.textChanges;
-                                            if (textChanges instanceof Array) {
-                                                const selection = { anchor: results.newPosition ?? to };
-                                                const changes = textChanges.map((x, i) => {
-                                                    const span = x.span;
-                                                    if (typeof results.newPosition !== "number") {
-                                                        if (i == 0) {
-                                                            selection.anchor = from;
-                                                        }
-                                                        selection.anchor += x.newText?.length ?? 0;
-                                                        if (span.start < from) {
-                                                            selection.anchor -= Math.min(from, span.end) - span.start;
-                                                        }
-                                                    }
-                                                    return { from: span.start, to: span.end, insert: x.newText };
-                                                });
-                                                view.dispatch({ changes });
-                                                if (selection.anchor <= view.state.doc.length) {
-                                                    view.dispatch({ selection });
-                                                }
-                                            }
-                                        }
-                                        else {
-                                            const label = completion.label;
-                                            return view.dispatch({
-                                                changes: { from, to, insert: label },
-                                                selection: { anchor: from + label.length }
-                                            });
-                                        }
-                                    }
-                                } as Completion;
-                            }),
-                            ...await customCompletionAsync(context)],
-                            filter: false
-                        };
-                    })]
-                }))
+                effects: editorHost.autocompletionSet.reconfigure(createCompletion(
+                    getCompletionsAsync,
+                    completionGetDescriptionAsync,
+                    completionGetChangeAsync,
+                    getCustomCompletionAsync(language, await dotnet!.fingerprinting)
+                ))
             });
 
-            roslynTooltip.value.input = () => hoverTooltip(async (_, pos) => {
-                const tooltip = await getInfoTipAsync(pos);
-                return createTooltip(tooltip!, pos);
+            roslynTooltip.value.input = () => createTooltip(getInfoTipAsync);
+            roslynTooltip.value.output = () => createTooltip(getCSharpInfoTipLiteAsync);
+
+            editorView.dispatch({
+                effects: editorHost.keymapSet.reconfigure(keymap.of(createFormatKeymap(formatCodeAsync)))
             });
-            roslynTooltip.value.output = () => hoverTooltip(async (_, pos) => {
-                const tooltip = await getCSharpInfoTipLiteAsync(pos);
-                return createTooltip(tooltip!, pos);
-            });
+
             isInitLinter.value = true;
         }
     }
@@ -816,8 +719,8 @@
         }
     }
 
-    function getVersion(version: string) {
-        return version.replace("VisualBasic", "VB ").replace("CSharp", "C# ").replace('_', '.');
+    function getVersion(version?: string) {
+        return version ? version.replace("VisualBasic", "VB ").replace("CSharp", "C# ").replace('_', '.') : '';
     }
 
     function getDefaultCode(language: string) {
@@ -875,7 +778,7 @@
     }
 
     function setSettings() {
-        const settings: { [key: string]: string } = {};
+        const settings: Record<string, string> = {};
         if (noWorker) {
             settings.noworker = "true";
         }
@@ -891,18 +794,18 @@
         if (settings.language !== "IL") {
             if (settings.language === "VisualBasic") {
                 if (inputLanguage.value !== "Latest") {
-                    settings.version = inputLanguage.value;
+                    settings.version = inputLanguage.value!;
                 }
             }
             else {
                 if (inputLanguage.value !== "Preview") {
-                    settings.version = inputLanguage.value;
+                    settings.version = inputLanguage.value!;
                 }
             }
         }
         if (settings.output === "CSharp") {
             if (outputLanguage.value !== "CSharp1") {
-                settings.csversion = outputLanguage.value;
+                settings.csversion = outputLanguage.value!;
             }
         }
         if (code.value) {
@@ -959,6 +862,10 @@
         height: 100%;
         overflow: hidden;
         background: var(--neutral-fill-stealth-rest);
+
+        @media (max-width: 767px) {
+            font-size: calc(var(--type-ramp-base-font-size) - 2px);
+        }
     }
 </style>
 

@@ -1,3 +1,4 @@
+using ICSharpCode.Decompiler.CSharp;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using Microsoft.CodeAnalysis.Text;
 using Microsoft.Extensions.DependencyInjection;
@@ -10,6 +11,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using SourceCodeKind = Microsoft.CodeAnalysis.SourceCodeKind;
 
@@ -23,7 +25,7 @@ namespace SharpScript
             set;
         }
 
-        private static WebAssemblyHost Current { get; set; }
+        private static WebAssemblyHost? Current { get; set; }
 
         private static Task Main(string[] args)
         {
@@ -43,10 +45,13 @@ namespace SharpScript
         public static void ApplyChanges(params TextChanges[] changes) => Compiler.ApplyChanges(changes);
 
         [JSInvokable]
+        public static Task<IList<TextChange>?> FormatCodeAsync() => Compiler.FormatCodeAsync().AsTask();
+
+        [JSInvokable]
         public static Task<CompileResult> ProcessAsync() => Compiler.ProcessAsync().AsTask();
 
         [JSInvokable]
-        public static Task<DotNetStreamReference> GetAssemblyAsync() => Compiler.GetAssemblyAsync().AsTask().ContinueWith(x => x.Result is MemoryStream stream ? new DotNetStreamReference(stream) : null);
+        public static Task<DotNetStreamReference?> GetAssemblyAsync() => Compiler.GetAssemblyAsync().AsTask().ContinueWith(x => x.Result is MemoryStream stream ? new DotNetStreamReference(stream) : null);
 
         [JSInvokable]
         public static Task<List<Diagnostic>> GetDiagnosticsAsync() => Compiler.GetDiagnosticsAsync().AsTask();
@@ -58,7 +63,7 @@ namespace SharpScript
         public static Task<InfoTipItem> GetInfoTipAsync(int position) => Compiler.GetInfoTipAsync(position).AsTask();
 
         [JSInvokable]
-        public static Task<AstNodeItem> GetAstAsync() => Compiler.GetAstAsync().AsTask();
+        public static Task<AstNodeItem?> GetAstAsync() => Compiler.GetAstAsync().AsTask();
 
         [JSInvokable]
         public static void SetCSharpInfoTipLite(string code) => InfoTipServer.SetSourceCode(code);
@@ -89,7 +94,7 @@ namespace SharpScript
         {
             if (((IInputOptions)Compiler.InputOptions).LanguageVersions is Array array)
             {
-                foreach (object @enum in array)
+                foreach (Enum @enum in array.OfType<Enum>())
                 {
                     yield return @enum.ToString();
                 }
@@ -97,17 +102,17 @@ namespace SharpScript
         }
 
         [JSInvokable]
-        public static string GetInputLanguageVersion() => Compiler.InputLanguageVersion;
+        public static string? GetInputLanguageVersion() => Compiler.InputLanguageVersion;
 
         [JSInvokable]
-        public static void SetInputLanguageVersion(string version) => Compiler.InputLanguageVersion = version;
+        public static void SetInputLanguageVersion(string? version) => Compiler.InputLanguageVersion = version;
 
         [JSInvokable]
         public static IEnumerable<string> GetOutputLanguageVersions()
         {
             if (((IOutputOptions)Compiler.OutputOptions).IsCSharp)
             {
-                foreach (object @enum in CSharpOutputOptions.LanguageVersions)
+                foreach (LanguageVersion @enum in CSharpOutputOptions.LanguageVersions)
                 {
                     yield return @enum.ToString();
                 }
@@ -115,9 +120,9 @@ namespace SharpScript
         }
 
         [JSInvokable]
-        public static string GetOutputLanguageVersion() => Compiler.OutputLanguageVersion;
+        public static string? GetOutputLanguageVersion() => Compiler.OutputLanguageVersion;
 
         [JSInvokable]
-        public static void SetOutputLanguageVersion(string version) => Compiler.OutputLanguageVersion = version;
+        public static void SetOutputLanguageVersion(string? version) => Compiler.OutputLanguageVersion = version;
     }
 }

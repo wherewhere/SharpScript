@@ -2,6 +2,7 @@
 using Microsoft.CodeAnalysis;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using System.Reflection.Metadata;
@@ -40,7 +41,7 @@ namespace SharpScript.Common
         public IList<Variable> GetVariables(MethodDefinitionHandle method) =>
             [.. EnumerateLocals(method).Select(local => new Variable(local.Index, _reader.GetString(local.Name)))];
 
-        public bool TryGetName(MethodDefinitionHandle method, int index, out string name)
+        public bool TryGetName(MethodDefinitionHandle method, int index, [NotNullWhen(true)] out string? name)
         {
             foreach (LocalVariable local in EnumerateLocals(method).Where(local => local.Index == index))
             {

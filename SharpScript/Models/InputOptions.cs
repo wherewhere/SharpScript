@@ -2,6 +2,7 @@
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.VisualBasic;
 using System;
+using System.Diagnostics.CodeAnalysis;
 using CSharpLanguageVersion = Microsoft.CodeAnalysis.CSharp.LanguageVersion;
 using VisualBasicLanguageVersion = Microsoft.CodeAnalysis.VisualBasic.LanguageVersion;
 
@@ -17,9 +18,9 @@ namespace SharpScript.Models
 
     public interface IInputOptions
     {
-        string LanguageName => null;
-        Array LanguageVersions => null;
-        Enum LanguageVersion { get => null; set { } }
+        string? LanguageName => null;
+        Array? LanguageVersions => null;
+        Enum? LanguageVersion { get => null; set { } }
     }
 
     public abstract class InputOptions : IInputOptions;
@@ -72,8 +73,9 @@ namespace SharpScript.Models
     public sealed class CSharpInputOptions : RoslynOptions, IInputOptions
     {
         Array IInputOptions.LanguageVersions => Enum.GetValues<CSharpLanguageVersion>();
-        Enum IInputOptions.LanguageVersion
+        Enum? IInputOptions.LanguageVersion
         {
+            [return: NotNull]
             get => LanguageVersion;
             set => LanguageVersion = (CSharpLanguageVersion)(value ?? CSharpLanguageVersion.Preview);
         }
@@ -85,8 +87,9 @@ namespace SharpScript.Models
     public sealed class VisualBasicInputOptions : RoslynOptions, IInputOptions
     {
         Array IInputOptions.LanguageVersions => Enum.GetValues<VisualBasicLanguageVersion>();
-        Enum IInputOptions.LanguageVersion
+        Enum? IInputOptions.LanguageVersion
         {
+            [return: NotNull]
             get => LanguageVersion;
             set => LanguageVersion = (VisualBasicLanguageVersion)(value ?? VisualBasicLanguageVersion.Latest);
         }

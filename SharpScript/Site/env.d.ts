@@ -92,7 +92,7 @@ declare module "sharp-script" {
     }
 
     export type ICodeActionObject = {
-        invokeMethodAsync(methodIdentifier: "InvokeAsync"): Promise<TextChange[]>;
+        invokeMethodAsync(methodIdentifier: "InvokeAsync"): Promise<TextChange[] | undefined>;
     } & DotNetObject;
 
     export interface ICodeAction {
@@ -101,9 +101,9 @@ declare module "sharp-script" {
     }
 
     export type Diagnostic = {
-        readonly id: string;
+        readonly id?: string;
         readonly location: LinePositionSpan;
-        readonly message: string;
+        readonly message?: string;
         readonly severity: DiagnosticSeverity;
         readonly tags: string[];
         readonly actions: ICodeAction[];
@@ -111,7 +111,7 @@ declare module "sharp-script" {
 
     export type CompileResult = {
         readonly diagnostics: Diagnostic[];
-        readonly decompiled: string | null;
+        readonly decompiled?: string;
         readonly outputs: string[];
     };
 
@@ -186,7 +186,7 @@ declare module "sharp-script" {
         & Partial<Omit<AstValueItem, "type">>;
 
     export type AstNodeItem = {
-        readonly property: string;
+        readonly property?: string;
         readonly kind: string;
         readonly span: TextSpan;
         readonly children: AstItemChild[];
@@ -257,20 +257,21 @@ declare module "*/blazor.webassembly.js" {
     global {
         const Blazor: {
             runtime: {
-                config: { [key: string]: any }
+                config: Record<string, any>;
             };
-            start(options?: { [key: string]: any }): Promise<void>;
+            start(options?: Record<string, any>): Promise<void>;
         };
         const DotNet: {
-            invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "InitAsync", baseUrl: string, fingerprinting: { [key: string]: string }): Promise<void>;
+            invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "InitAsync", baseUrl: string, fingerprinting: Record<string, string>): Promise<void>;
             invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "ResetCode", code: string): Promise<void>;
             invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "ApplyChanges", changes: TextChanges[]): Promise<void>;
+            invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "FormatCodeAsync"): Promise<TextChanges | undefined>;
             invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "ProcessAsync"): Promise<CompileResult>;
-            invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "GetAssemblyAsync"): Promise<{ arrayBuffer(): Promise<ArrayBuffer> }>;
+            invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "GetAssemblyAsync"): Promise<{ arrayBuffer(): Promise<ArrayBuffer> } | undefined>;
             invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "GetDiagnosticsAsync"): Promise<Diagnostic[]>;
             invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "GetCompletionsAsync", position: number): Promise<ICompletionItem[]>;
             invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "GetInfoTipAsync", position: number): Promise<InfoTipItem>;
-            invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "GetAstAsync"): Promise<AstNodeItem>;
+            invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "GetAstAsync"): Promise<AstNodeItem | undefined>;
             invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "SetCSharpInfoTipLite", code: string): Promise<void>;
             invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "GetCSharpInfoTipLiteAsync", position: number): Promise<InfoTipItem>;
             invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "GetLanguageTypes"): Promise<string[]>;
@@ -280,11 +281,11 @@ declare module "*/blazor.webassembly.js" {
             invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "GetOutputTypes"): Promise<string[]>;
             invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "SetOutputType", type: string): Promise<void>;
             invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "GetInputLanguageVersions"): Promise<string[]>;
-            invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "GetInputLanguageVersion"): Promise<string>;
-            invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "SetInputLanguageVersion", version: string): Promise<void>;
+            invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "GetInputLanguageVersion"): Promise<string | undefined>;
+            invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "SetInputLanguageVersion", version?: string): Promise<void>;
             invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "GetOutputLanguageVersions"): Promise<string[]>;
-            invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "GetOutputLanguageVersion"): Promise<string>;
-            invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "SetOutputLanguageVersion", version: string): Promise<void>;
+            invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "GetOutputLanguageVersion"): Promise<string | undefined>;
+            invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "SetOutputLanguageVersion", version?: string): Promise<void>;
             /**
              * Invokes the specified .NET public method asynchronously.
              *

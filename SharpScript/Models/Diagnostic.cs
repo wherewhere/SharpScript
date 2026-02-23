@@ -5,16 +5,16 @@ using RoslynDiagnostic = Microsoft.CodeAnalysis.Diagnostic;
 
 namespace SharpScript.Models
 {
-    public sealed class Diagnostic(DiagnosticSeverity severity, string message)
+    public sealed class Diagnostic(DiagnosticSeverity severity, string? message)
     {
-        public string ID { get; }
+        public string? ID { get; }
         public LinePositionSpan Location { get; }
-        public string Message => message;
+        public string? Message => message;
         public string Severity => severity.ToString();
         public string[] Tags { get; } = [];
         public ICodeAction[] Actions { get; } = [];
 
-        public Diagnostic(Exception exception) : this(DiagnosticSeverity.Error, exception.Message) { }
+        public Diagnostic(Exception? exception) : this(DiagnosticSeverity.Error, exception?.Message) { }
 
         public Diagnostic(RoslynDiagnostic diagnostic, params RoslynCodeAction[] actions) : this(diagnostic.Severity, diagnostic.GetMessage())
         {

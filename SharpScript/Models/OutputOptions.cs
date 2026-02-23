@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using LanguageVersion = ICSharpCode.Decompiler.CSharp.LanguageVersion;
 
 namespace SharpScript.Models
@@ -16,7 +17,7 @@ namespace SharpScript.Models
     public interface IOutputOptions
     {
         bool IsCSharp => false;
-        Enum LanguageVersion { get => default; set { } }
+        Enum? LanguageVersion { get => default; set { } }
     }
 
     public abstract class OutputOptions : IOutputOptions;
@@ -34,8 +35,9 @@ namespace SharpScript.Models
         }
 
         bool IOutputOptions.IsCSharp => true;
-        Enum IOutputOptions.LanguageVersion
+        Enum? IOutputOptions.LanguageVersion
         {
+            [return: NotNull]
             get => LanguageVersion;
             set => LanguageVersion = (LanguageVersion)(value ?? LanguageVersion.CSharp1);
         }

@@ -20,7 +20,7 @@ namespace SharpScript.Models
 
         public class JsonConverter : JsonConverter<AstItemBase>
         {
-            public override AstItemBase Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+            public override AstItemBase? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
             {
                 JsonElement element = JsonDocument.ParseValue(ref reader).RootElement;
                 if (element.TryGetProperty("type", out JsonElement typeElement) && typeElement.ValueKind == JsonValueKind.String)
@@ -83,41 +83,41 @@ namespace SharpScript.Models
 
         public override string Type => "node";
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        public string Property { get; protected init; }
-        public string Kind { get; protected init; }
+        public string? Property { get; protected init; }
+        public string Kind { get; protected init; } = string.Empty;
         public TextSpan Span { get; protected init; }
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        public IReadOnlyList<AstItemBase> Children { get; protected init; }
+        public IReadOnlyList<AstItemBase> Children { get; protected init; } = [];
 
-        public AstNodeItem(SyntaxNode node, SemanticModel model, string specialParentPropertyName = null) : this()
+        public AstNodeItem(SyntaxNode node, SemanticModel model, string? specialParentPropertyName = null) : this()
         {
             Kind = _kindNames[node.RawKind];
             Span = node.Span;
 
-            string parentPropertyName = specialParentPropertyName ?? GetParentPropertyName(node);
+            string? parentPropertyName = specialParentPropertyName ?? GetParentPropertyName(node);
             if (parentPropertyName != null)
             {
                 Property = parentPropertyName;
             }
 
             List<AstItemBase> children = [];
-            IOperation operation = model.GetOperation(node);
+            IOperation? operation = model.GetOperation(node);
             if (operation != null)
             {
                 children.Add(new AstOperationItem(operation));
             }
             foreach (SyntaxNodeOrToken child in node.ChildNodesAndTokens())
             {
-                children.Add(child.IsNode ? new AstNodeItem(child.AsNode(), model) : new AstTokenItem(child.AsToken(), model));
+                children.Add(child.IsNode ? new AstNodeItem(child.AsNode()!, model) : new AstTokenItem(child.AsToken(), model));
             }
             Children = children;
         }
 
-        public static string GetParentPropertyName(SyntaxToken token) => GetParentPropertyName(token, token.Parent, _compiledSyntaxTokenGetParentPropertyName);
+        public static string? GetParentPropertyName(SyntaxToken token) => GetParentPropertyName(token, token.Parent, _compiledSyntaxTokenGetParentPropertyName);
 
-        public static string GetParentPropertyName(SyntaxNode node) => GetParentPropertyName(node, node.Parent, _compiledSyntaxNodeGetParentPropertyName);
+        public static string? GetParentPropertyName(SyntaxNode node) => GetParentPropertyName(node, node.Parent, _compiledSyntaxNodeGetParentPropertyName);
 
-        private static string GetParentPropertyName<T>(T value, SyntaxNode parent, ConcurrentDictionary<Type, Lazy<Func<T, SyntaxNode, string>>> compiledCache)
+        private static string? GetParentPropertyName<T>(T value, SyntaxNode? parent, ConcurrentDictionary<Type, Lazy<Func<T, SyntaxNode, string>>> compiledCache)
         {
             if (parent == null)
             { return null; }
@@ -154,7 +154,7 @@ namespace SharpScript.Models
 
     public sealed class AstOperationItem(IOperation operation) : AstItemBase
     {
-        private Action<IOperation, Dictionary<string, string>> _cache;
+        private Action<IOperation, Dictionary<string, string>>? _cache;
 
         public override string Type => "operation";
         public string Property => "Operation";
@@ -224,7 +224,7 @@ namespace SharpScript.Models
                 valueToWrite);
         }
 
-        private static readonly MethodInfo ObjectToString = typeof(object).GetMethod(nameof(ToString));
+        private static readonly MethodInfo ObjectToString = typeof(object).GetMethod(nameof(ToString))!;
         private static readonly Expression Skipped = Expression.Constant("<skipped>");
         private static Expression SlowGetValueToWrite(Expression value)
         {
@@ -271,14 +271,14 @@ namespace SharpScript.Models
     {
         public override string Type => "token";
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        public string Value { get; protected init; }
+        public string Value { get; protected init; } = string.Empty;
 
         public AstTokenItem(SyntaxToken token, SemanticModel model) : this()
         {
             Kind = _kindNames[token.RawKind];
             Span = token.FullSpan;
 
-            string parentPropertyName = GetParentPropertyName(token);
+            string? parentPropertyName = GetParentPropertyName(token);
             if (parentPropertyName != null)
             {
                 Property = parentPropertyName;
@@ -317,7 +317,7 @@ namespace SharpScript.Models
 
             if (trivia.HasStructure)
             {
-                Children = [new AstNodeItem(trivia.GetStructure(), model, "Structure")];
+                Children = [new AstNodeItem(trivia.GetStructure()!, model, "Structure")];
             }
             else
             {

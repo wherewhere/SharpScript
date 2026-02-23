@@ -5,6 +5,7 @@ using Microsoft.CodeAnalysis.Completion;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Emit;
+using Microsoft.CodeAnalysis.Formatting;
 using Microsoft.CodeAnalysis.QuickInfo;
 using Microsoft.CodeAnalysis.Text;
 using Microsoft.Extensions.Logging;
@@ -32,12 +33,12 @@ namespace SharpScript.Common
 {
     public sealed partial class RoslynCodeSession : ICodeSession
     {
-        private static IDictionary<string, string> _fingerprinting;
-        private static string _baseUrl;
+        private static IDictionary<string, string>? _fingerprinting;
+        private static string? _baseUrl;
 
         private readonly Dictionary<string, List<CodeFixProvider>> _providers;
         private readonly ImmutableArray<DiagnosticAnalyzer> _analyzers;
-        private readonly GeneratorDriver _generator;
+        private readonly GeneratorDriver? _generator;
         private readonly RoslynOptions _options;
         private readonly string _language;
         private readonly bool _isConsole;
@@ -81,7 +82,7 @@ namespace SharpScript.Common
                     _outOfDate = true;
                 }
             }
-        }
+        } = SourceText.From(string.Empty);
 
         private Document _currentDocument;
         public Document CurrentDocument
@@ -93,24 +94,23 @@ namespace SharpScript.Common
             }
         }
 
-        private CompletionService _completionService;
-        public CompletionService CompletionService
+        public CompletionService? CompletionService
         {
             get
             {
                 EnsureUpToDate();
-                _completionService ??= CompletionService.GetService(_currentDocument);
+                field ??= CompletionService.GetService(_currentDocument);
 
-                if (_completionService == null)
+                if (field == null)
                 {
                     _logger.LogWarning("Could not find completion service for document '{name}'.", _currentDocument.Name);
                 }
 
-                return _completionService;
+                return field;
             }
         }
 
-        public QuickInfoService QuickInfoService
+        public QuickInfoService? QuickInfoService
         {
             get
             {
@@ -125,9 +125,9 @@ namespace SharpScript.Common
                 return field;
             }
         }
-        
+
         [DynamicDependency(DynamicallyAccessedMemberTypes.All, typeof(RuntimeFeature))]
-        public RoslynCodeSession(SourceText code, RoslynOptions options, bool isConsole, ILogger<RoslynCodeSession> logger = null)
+        public RoslynCodeSession(SourceText code, RoslynOptions options, bool isConsole, ILogger<RoslynCodeSession>? logger = null)
         {
             _options = options;
             _isConsole = isConsole;
@@ -146,7 +146,7 @@ namespace SharpScript.Common
                 .AddDocument(docId, "SharpScript.CodeSession.Document", code);
             _ = Workspace.TryApplyChanges(solution);
             Workspace.OpenDocument(docId);
-            _currentDocument = Workspace.CurrentSolution.GetDocument(docId);
+            _currentDocument = Workspace.CurrentSolution.GetDocument(docId)!;
             string assemblyName;
             switch (_language)
             {
@@ -175,6 +175,7 @@ namespace SharpScript.Common
             }
         }
 
+        [MemberNotNull(nameof(_baseUrl), nameof(_fingerprinting))]
         public static async ValueTask InitAsync(string baseUrl, IDictionary<string, string> fingerprinting, ILogger<RoslynCodeSession> logger)
         {
             _baseUrl = baseUrl;
@@ -206,7 +207,7 @@ namespace SharpScript.Common
             if (!_outOfDate) { return; }
             Document document = _currentDocument.WithText(SourceText);
             _ = Workspace.TryApplyChanges(document.Project.Solution);
-            _currentDocument = Workspace.CurrentSolution.GetDocument(_currentDocument.Id);
+            _currentDocument = Workspace.CurrentSolution.GetDocument(_currentDocument.Id)!;
             _outOfDate = false;
         }
 
@@ -227,6 +228,17 @@ namespace SharpScript.Common
             }
         }
 
+        public async ValueTask<IList<TextChange>?> FormatCodeAsync(CancellationToken cancellationToken = default)
+        {
+            await EnsureUpToDateAsync(cancellationToken).ConfigureAwait(false);
+            SyntaxNode? node = await CurrentDocument.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
+            if (node != null)
+            {
+                return Formatter.GetFormattedTextChanges(node, Workspace, cancellationToken: cancellationToken);
+            }
+            return null;
+        }
+
         public async ValueTask<IReadOnlyList<TextChange>> RollbackWorkspaceChangesAsync(CancellationToken cancellationToken = default)
         {
             Project oldProject = _currentDocument.Project;
@@ -236,9 +248,9 @@ namespace SharpScript.Common
                 return [];
             }
 
-            SourceText newText = await newProject.GetDocument(_currentDocument.Id).GetTextAsync(cancellationToken).ConfigureAwait(false);
+            SourceText newText = await newProject.GetDocument(_currentDocument.Id)!.GetTextAsync(cancellationToken).ConfigureAwait(false);
             Workspace.TryApplyChanges(oldProject.Solution);
-            _currentDocument = Workspace.CurrentSolution.GetDocument(_currentDocument.Id);
+            _currentDocument = Workspace.CurrentSolution.GetDocument(_currentDocument.Id)!;
 
             return newText.GetTextChanges(SourceText);
         }
@@ -246,8 +258,8 @@ namespace SharpScript.Common
         public async ValueTask<T> GetDiagnosticsAsync<T>(T results, CancellationToken cancellationToken = default) where T : ICollection<Diagnostic>
         {
             await EnsureUpToDateAsync(cancellationToken).ConfigureAwait(false);
-            Compilation compilation = await CurrentDocument.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false);
-            ImmutableArray<RoslynDiagnostic> diagnostics = await compilation.WithGeneratorDriver(_generator, cancellationToken).WithAnalyzers(_analyzers).GetAllDiagnosticsAsync(cancellationToken).ConfigureAwait(false);
+            Compilation? compilation = await CurrentDocument.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false);
+            ImmutableArray<RoslynDiagnostic> diagnostics = await compilation!.WithGeneratorDriver(_generator, cancellationToken).WithAnalyzers(_analyzers).GetAllDiagnosticsAsync(cancellationToken).ConfigureAwait(false);
             IEnumerable<RoslynDiagnostic> filtered = !_isConsole && _options is CSharpInputOptions { LanguageVersion: >= CSharpLanguageVersion.CSharp9 } ? diagnostics.Where(x => x is not { Id: "CS8805", Severity: DiagnosticSeverity.Error }) : diagnostics;
             Diagnostic[] array = await Task.WhenAll(filtered.Select(async diagnostic =>
             {
@@ -262,7 +274,7 @@ namespace SharpScript.Common
         {
             List<CodeAction> codeActions = [];
             CodeFixContext context = new(_currentDocument, diagnostic, (x, _) => codeActions.Add(x), cancellationToken);
-            if (_providers.TryGetValue(diagnostic.Id, out List<CodeFixProvider> providers))
+            if (_providers.TryGetValue(diagnostic.Id, out List<CodeFixProvider>? providers))
             {
                 for (int i = providers.Count; --i >= 0;)
                 {
@@ -342,26 +354,26 @@ namespace SharpScript.Common
         }
 
         public Task<ImmutableArray<TaggedText>> GetCompletionDescriptionAsync(CompletionItem item, CancellationToken cancellationToken = default) =>
-            _completionService.GetDescriptionAsync(_currentDocument, item, cancellationToken).ContinueWith(x => x.Result.TaggedParts, TaskScheduler.Default);
+            CompletionService!.GetDescriptionAsync(_currentDocument, item, cancellationToken).ContinueWith(x => x.Result!.TaggedParts, TaskScheduler.Default);
 
         public Task<CompletionChange> GetCompletionChangeAsync(CompletionItem item, CancellationToken cancellationToken = default) =>
-            _completionService.GetChangeAsync(_currentDocument, item, cancellationToken: cancellationToken).ContinueWith(x => new CompletionChange(x.Result), TaskScheduler.Default);
+            CompletionService!.GetChangeAsync(_currentDocument, item, cancellationToken: cancellationToken).ContinueWith(x => new CompletionChange(x.Result), TaskScheduler.Default);
 
         public async ValueTask<InfoTipItem> GetInfoTipAsync(int position, CancellationToken cancellationToken = default)
         {
             await EnsureUpToDateAsync(cancellationToken).ConfigureAwait(false);
-            QuickInfoItem info = await QuickInfoService.GetQuickInfoAsync(_currentDocument, position, cancellationToken).ConfigureAwait(false);
+            QuickInfoItem? info = await QuickInfoService!.GetQuickInfoAsync(_currentDocument, position, cancellationToken).ConfigureAwait(false);
             return info is null or { Sections.IsEmpty: true } ? default : new InfoTipItem(info);
         }
 
-        public async ValueTask<CompilationResults> CompileAsync(ICollection<Diagnostic> results, CancellationToken cancellationToken = default)
+        public async ValueTask<CompilationResults?> CompileAsync(ICollection<Diagnostic> results, CancellationToken cancellationToken = default)
         {
             MemoryStream assemblyStream = new();
             MemoryStream symbolStream = new();
             MemoryStream documentationStream = new();
             await EnsureUpToDateAsync(cancellationToken).ConfigureAwait(false);
-            Compilation compilation = await CurrentDocument.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false);
-            EmitResult emitResult = compilation.WithGeneratorDriver(_generator, cancellationToken).Emit(assemblyStream, symbolStream, documentationStream, cancellationToken: cancellationToken);
+            Compilation? compilation = await CurrentDocument.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false);
+            EmitResult emitResult = compilation!.WithGeneratorDriver(_generator, cancellationToken).Emit(assemblyStream, symbolStream, documentationStream, cancellationToken: cancellationToken);
             if (emitResult.Success)
             {
                 _ = assemblyStream.Seek(0, SeekOrigin.Begin);
@@ -377,13 +389,13 @@ namespace SharpScript.Common
                     if (_currentDocument.Project.CompilationOptions is CompilationOptions options)
                     {
                         Solution solution = Workspace.CurrentSolution.WithProjectCompilationOptions(_currentDocument.Project.Id, options.WithOutputKind(OutputKind.ConsoleApplication));
-                        Document currentDocument = solution.GetDocument(_currentDocument.Id);
+                        Document? currentDocument = solution.GetDocument(_currentDocument.Id);
                         await Task.WhenAll(assemblyStream.DisposeAsync().AsTask(), symbolStream.DisposeAsync().AsTask(), documentationStream.DisposeAsync().AsTask()).ConfigureAwait(false);
                         assemblyStream = new();
                         symbolStream = new();
                         documentationStream = new();
-                        compilation = await currentDocument.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false);
-                        emitResult = compilation.WithGeneratorDriver(_generator, cancellationToken).Emit(assemblyStream, symbolStream, documentationStream, cancellationToken: cancellationToken);
+                        compilation = await currentDocument!.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false);
+                        emitResult = compilation!.WithGeneratorDriver(_generator, cancellationToken).Emit(assemblyStream, symbolStream, documentationStream, cancellationToken: cancellationToken);
                         if (emitResult.Success)
                         {
                             _ = assemblyStream.Seek(0, SeekOrigin.Begin);
@@ -401,7 +413,7 @@ namespace SharpScript.Common
         private static async ValueTask<MetadataReferenceCollection> GetMetadataReferencesAsync(ILogger<RoslynCodeSession> logger, IDictionary<string, string> fingerprinting, params string[] assemblies)
         {
             MetadataReferenceCollection references = [];
-            using HttpClient client = new() { BaseAddress = new Uri(_baseUrl) };
+            using HttpClient client = new() { BaseAddress = new Uri(_baseUrl!) };
             await Task.WhenAll(assemblies.Select(async assembly =>
             {
                 try
@@ -409,11 +421,11 @@ namespace SharpScript.Common
                     string fileName = $"{assembly}.wasm";
                     if (fingerprinting.FirstOrDefault(x => x.Value.Equals(fileName, StringComparison.OrdinalIgnoreCase)) is { Key.Length: > 0 } result)
                     {
-                        Task<XmlDocumentationProvider> documentTask = CreateDocumentationAsync(client, assembly, logger);
+                        Task<XmlDocumentationProvider?> documentTask = CreateDocumentationAsync(client, assembly, logger);
                         byte[] stream = await client.GetByteArrayAsync(result.Key).ConfigureAwait(false);
                         await using MemoryStream array = await WebcilConverterUtil.ConvertFromWebcilAsync(stream).ConfigureAwait(false);
                         references.Add(array, documentation: await documentTask.ConfigureAwait(false), filePath: assembly);
-                        static async Task<XmlDocumentationProvider> CreateDocumentationAsync(HttpClient client, string assembly, ILogger<RoslynCodeSession> logger)
+                        static async Task<XmlDocumentationProvider?> CreateDocumentationAsync(HttpClient client, string assembly, ILogger<RoslynCodeSession> logger)
                         {
                         start:
                             try
@@ -491,7 +503,7 @@ namespace SharpScript.Common
             {
                 foreach (string id in provider.FixableDiagnosticIds)
                 {
-                    if (!providers.TryGetValue(id, out List<CodeFixProvider> list))
+                    if (!providers.TryGetValue(id, out List<CodeFixProvider>? list))
                     {
                         list = [];
                         providers.Add(id, list);
@@ -520,14 +532,14 @@ namespace SharpScript.Common
             return generator.AddGenerators([.. generators]);
         }
 
-        public async ValueTask<AstNodeItem> GetAstAsync(CancellationToken cancellationToken = default)
+        public async ValueTask<AstNodeItem?> GetAstAsync(CancellationToken cancellationToken = default)
         {
             await EnsureUpToDateAsync(cancellationToken).ConfigureAwait(false);
             Document document = CurrentDocument;
-            SyntaxNode syntaxRoot = await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
+            SyntaxNode? syntaxRoot = await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
             if (syntaxRoot != null)
             {
-                SemanticModel semanticModel = await document.GetSemanticModelAsync(cancellationToken).ConfigureAwait(false);
+                SemanticModel? semanticModel = await document.GetSemanticModelAsync(cancellationToken).ConfigureAwait(false);
                 if (semanticModel != null)
                 {
                     return new AstNodeItem(syntaxRoot, semanticModel);
@@ -542,8 +554,8 @@ namespace SharpScript.Common
             {
                 MetadataReferenceCollection references = [];
                 Dictionary<string, string> features = [];
-                string assemblyName = null;
-                HttpClient client = null;
+                string? assemblyName = null;
+                HttpClient? client = null;
                 TextLineCollection lines = SourceCode.Lines;
                 List<TextChange> changes = new(lines.Count);
                 using (_ = await _addonLocker.WaitAsync())
@@ -552,7 +564,7 @@ namespace SharpScript.Common
                     {
                         foreach (TextLine text in lines)
                         {
-                            string line = text.Text.ToString();
+                            string line = text.Text?.ToString() ?? string.Empty;
                             if (line.StartsWith("#r ", StringComparison.OrdinalIgnoreCase))
                             {
                                 ReadOnlySpan<char> temp = line.AsSpan()[3..];
@@ -593,19 +605,19 @@ namespace SharpScript.Common
                             Solution solution = Workspace.CurrentSolution
                                 .AddProject(projectId, oldProject.Name, assemblyName, oldProject.Language)
                                 .AddMetadataReferences(projectId, oldProject.MetadataReferences)
-                                .WithProjectCompilationOptions(projectId, oldProject.CompilationOptions)
-                                .WithProjectParseOptions(projectId, oldProject.ParseOptions)
+                                .WithProjectCompilationOptions(projectId, oldProject.CompilationOptions!)
+                                .WithProjectParseOptions(projectId, oldProject.ParseOptions!)
                                 .AddDocument(docId, "SharpScript.CodeSession.Document", SourceText);
                             _ = Workspace.TryApplyChanges(solution);
                             Workspace.OpenDocument(docId);
-                            _currentDocument = Workspace.CurrentSolution.GetDocument(docId);
+                            _currentDocument = Workspace.CurrentSolution.GetDocument(docId)!;
                         }
                         if (!references.SequenceEqual(_addon))
                         {
                             _addon = references;
                             Solution solution = Workspace.CurrentSolution.WithProjectMetadataReferences(_currentDocument.Project.Id, References.Concat(references));
                             _ = Workspace.TryApplyChanges(solution);
-                            _currentDocument = Workspace.CurrentSolution.GetDocument(_currentDocument.Id);
+                            _currentDocument = Workspace.CurrentSolution.GetDocument(_currentDocument.Id)!;
                         }
                         if (!features.SequenceEqual(_features))
                         {
@@ -614,7 +626,7 @@ namespace SharpScript.Common
                             {
                                 Solution solution = Workspace.CurrentSolution.WithProjectParseOptions(_currentDocument.Project.Id, options.WithFeatures(features));
                                 _ = Workspace.TryApplyChanges(solution);
-                                _currentDocument = Workspace.CurrentSolution.GetDocument(_currentDocument.Id);
+                                _currentDocument = Workspace.CurrentSolution.GetDocument(_currentDocument.Id)!;
                             }
                         }
                     }
@@ -632,7 +644,7 @@ namespace SharpScript.Common
                     _addon = [];
                     Solution solution = Workspace.CurrentSolution.WithProjectMetadataReferences(_currentDocument.Project.Id, References);
                     _ = Workspace.TryApplyChanges(solution);
-                    _currentDocument = Workspace.CurrentSolution.GetDocument(_currentDocument.Id);
+                    _currentDocument = Workspace.CurrentSolution.GetDocument(_currentDocument.Id)!;
                 }
                 if (_features.Count > 0)
                 {
@@ -641,7 +653,7 @@ namespace SharpScript.Common
                     {
                         Solution solution = Workspace.CurrentSolution.WithProjectParseOptions(_currentDocument.Project.Id, options.WithFeatures(_features));
                         _ = Workspace.TryApplyChanges(solution);
-                        _currentDocument = Workspace.CurrentSolution.GetDocument(_currentDocument.Id);
+                        _currentDocument = Workspace.CurrentSolution.GetDocument(_currentDocument.Id)!;
                     }
                 }
             }
@@ -650,11 +662,11 @@ namespace SharpScript.Common
 
         private async ValueTask AddReferenceAsync(string path, MetadataReferenceCollection references, CancellationToken cancellationToken = default)
         {
-            if (!string.IsNullOrEmpty(path) && !References.Any(x => x.Display.Equals(path, StringComparison.OrdinalIgnoreCase)))
+            if (!string.IsNullOrEmpty(path) && !References.Any(x => path.Equals(x.Display, StringComparison.OrdinalIgnoreCase)))
             {
                 try
                 {
-                    int index = _addon.FindIndex(x => x.Display.Equals(path, StringComparison.OrdinalIgnoreCase));
+                    int index = _addon.FindIndex(x => path.Equals(x.Display, StringComparison.OrdinalIgnoreCase));
                     if (index != -1)
                     {
                         references.Add(_addon[index]);
@@ -662,14 +674,14 @@ namespace SharpScript.Common
                     else
                     {
                         string fileName = $"{path}.wasm";
-                        using HttpClient client = new() { BaseAddress = new Uri(_baseUrl) };
-                        if (_fingerprinting.FirstOrDefault(x => x.Value.Equals(fileName, StringComparison.OrdinalIgnoreCase)) is { Key.Length: > 0 } result)
+                        using HttpClient client = new() { BaseAddress = new Uri(_baseUrl!) };
+                        if (_fingerprinting!.FirstOrDefault(x => x.Value.Equals(fileName, StringComparison.OrdinalIgnoreCase)) is { Key.Length: > 0 } result)
                         {
-                            Task<XmlDocumentationProvider> documentTask = CreateDocumentationAsync(client, path, _logger, cancellationToken);
+                            Task<XmlDocumentationProvider?> documentTask = CreateDocumentationAsync(client, path, _logger, cancellationToken);
                             byte[] stream = await client.GetByteArrayAsync(result.Key, cancellationToken).ConfigureAwait(false);
                             await using MemoryStream array = await WebcilConverterUtil.ConvertFromWebcilAsync(stream, cancellationToken: cancellationToken).ConfigureAwait(false);
                             references.Add(array, documentation: await documentTask.ConfigureAwait(false), filePath: path);
-                            static async Task<XmlDocumentationProvider> CreateDocumentationAsync(HttpClient client, string assembly, ILogger<RoslynCodeSession> logger, CancellationToken cancellationToken = default)
+                            static async Task<XmlDocumentationProvider?> CreateDocumentationAsync(HttpClient client, string assembly, ILogger<RoslynCodeSession> logger, CancellationToken cancellationToken = default)
                             {
                                 try
                                 {
@@ -756,7 +768,7 @@ namespace SharpScript.Common
             }
         }
 
-        public ValueTask<CompilationResults> CompileAsync(ICollection<Diagnostic> results, CancellationToken cancellationToken = default)
+        public ValueTask<CompilationResults?> CompileAsync(ICollection<Diagnostic> results, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             Logger logger = new(results);
@@ -767,14 +779,14 @@ namespace SharpScript.Common
                 if (driver.Assemble([code.ToString()], assemblyStream))
                 {
                     _ = assemblyStream.Seek(0, SeekOrigin.Begin);
-                    return ValueTask.FromResult(new CompilationResults("SharpScript.Playground", assemblyStream, null));
+                    return ValueTask.FromResult<CompilationResults?>(new CompilationResults("SharpScript.Playground", assemblyStream, null));
                 }
             }
             catch (Exception ex) when (ex.GetType().Name.StartsWith("yy"))
             {
-                return ValueTask.FromResult<CompilationResults>(null);
+                return ValueTask.FromResult<CompilationResults?>(null);
             }
-            return ValueTask.FromResult<CompilationResults>(null);
+            return ValueTask.FromResult<CompilationResults?>(null);
         }
 
         public ValueTask<T> GetDiagnosticsAsync<T>(T results, CancellationToken cancellationToken = default) where T : ICollection<Diagnostic>
@@ -814,11 +826,12 @@ namespace SharpScript.Common
         SourceText SourceCode { get; }
         void ResetCode(string code);
         void ApplyChanges(params TextChanges[] changes);
+        ValueTask<IList<TextChange>?> FormatCodeAsync(CancellationToken cancellationToken = default) => ValueTask.FromResult<IList<TextChange>?>([]);
         ValueTask<T> GetDiagnosticsAsync<T>(T results, CancellationToken cancellationToken = default) where T : ICollection<Diagnostic>;
         ValueTask<IEnumerable<RoslynCompletionItem>> GetCompletionsAsync(int position, CancellationToken cancellationToken = default) => ValueTask.FromResult<IEnumerable<RoslynCompletionItem>>([]);
         ValueTask<InfoTipItem> GetInfoTipAsync(int position, CancellationToken cancellationToken = default) => ValueTask.FromResult<InfoTipItem>(default);
-        ValueTask<AstNodeItem> GetAstAsync(CancellationToken cancellationToken = default) => ValueTask.FromResult<AstNodeItem>(default);
-        ValueTask<CompilationResults> CompileAsync(ICollection<Diagnostic> results, CancellationToken cancellationToken = default);
+        ValueTask<AstNodeItem?> GetAstAsync(CancellationToken cancellationToken = default) => ValueTask.FromResult<AstNodeItem?>(default);
+        ValueTask<CompilationResults?> CompileAsync(ICollection<Diagnostic> results, CancellationToken cancellationToken = default);
     }
 
     public enum CharacterOperation
@@ -830,7 +843,7 @@ namespace SharpScript.Common
 
     file static class Extensions
     {
-        public static Compilation WithGeneratorDriver<T>(this Compilation compilation, T driver, CancellationToken cancellationToken = default) where T : GeneratorDriver
+        public static Compilation WithGeneratorDriver<T>(this Compilation compilation, T? driver, CancellationToken cancellationToken = default) where T : GeneratorDriver
         {
             if (driver == null)
             {

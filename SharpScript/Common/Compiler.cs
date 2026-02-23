@@ -27,7 +27,7 @@ namespace SharpScript.Common
 
         private readonly ILogger<Compiler> _logger = factory.CreateLogger<Compiler>();
 
-        private ICodeSession _codeSession;
+        private ICodeSession? _codeSession;
         public ICodeSession CodeSession
         {
             get
@@ -45,7 +45,7 @@ namespace SharpScript.Common
                             break;
                     }
                 }
-                return _codeSession;
+                return _codeSession!;
             }
         }
 
@@ -71,12 +71,12 @@ namespace SharpScript.Common
 
         public InputOptions InputOptions { get; set; } = new CSharpInputOptions();
 
-        public string InputLanguageVersion
+        public string? InputLanguageVersion
         {
             get => ((IInputOptions)InputOptions).LanguageVersion?.ToString();
             set
             {
-                if (((IInputOptions)InputOptions).LanguageVersion?.GetType() is Type @enum)
+                if (!string.IsNullOrWhiteSpace(value) && ((IInputOptions)InputOptions).LanguageVersion?.GetType() is Type @enum)
                 {
                     ((IInputOptions)InputOptions).LanguageVersion = (Enum)Enum.Parse(@enum, value, true);
                     UpdateCodeSession(outputType == OutputType.Run);
@@ -124,12 +124,12 @@ namespace SharpScript.Common
 
         public OutputOptions OutputOptions { get; set; } = new RunOutputOptions();
 
-        public string OutputLanguageVersion
+        public string? OutputLanguageVersion
         {
             get => ((IOutputOptions)OutputOptions).LanguageVersion?.ToString();
             set
             {
-                if (((IOutputOptions)OutputOptions).LanguageVersion?.GetType() is Type @enum)
+                if (!string.IsNullOrWhiteSpace(value) && ((IOutputOptions)OutputOptions).LanguageVersion?.GetType() is Type @enum)
                 {
                     ((IOutputOptions)OutputOptions).LanguageVersion = (Enum)Enum.Parse(@enum, value, true);
                 }
@@ -158,12 +158,14 @@ namespace SharpScript.Common
 
         public void ApplyChanges(params TextChanges[] changes) => CodeSession.ApplyChanges(changes);
 
-        private async ValueTask<(CompilationResults streams, List<Diagnostic> diagnostics)> CompilateAsync(CancellationToken cancellationToken = default)
+        public ValueTask<IList<TextChange>?> FormatCodeAsync(CancellationToken cancellationToken = default) => CodeSession.FormatCodeAsync(cancellationToken);
+
+        private async ValueTask<(CompilationResults? streams, List<Diagnostic> diagnostics)> CompilateAsync(CancellationToken cancellationToken = default)
         {
             List<Diagnostic> results = [];
             try
             {
-                CompilationResults streams = await CodeSession.CompileAsync(results, cancellationToken).ConfigureAwait(false);
+                CompilationResults? streams = await CodeSession.CompileAsync(results, cancellationToken).ConfigureAwait(false);
                 return (streams, results);
             }
             catch (AggregateException aex) when (aex.InnerExceptions?.Count > 1)
@@ -215,20 +217,11 @@ namespace SharpScript.Common
             return results;
         }
 
-        public ValueTask<IEnumerable<RoslynCompletionItem>> GetCompletionsAsync(int position, CancellationToken cancellationToken = default) =>
-            InputOptions is RoslynOptions
-                ? CodeSession.GetCompletionsAsync(position, cancellationToken)
-                : ValueTask.FromResult<IEnumerable<RoslynCompletionItem>>([]);
+        public ValueTask<IEnumerable<RoslynCompletionItem>> GetCompletionsAsync(int position, CancellationToken cancellationToken = default) => CodeSession.GetCompletionsAsync(position, cancellationToken);
 
-        public ValueTask<InfoTipItem> GetInfoTipAsync(int position, CancellationToken cancellationToken = default) =>
-            InputOptions is RoslynOptions
-                ? CodeSession.GetInfoTipAsync(position, cancellationToken)
-                : ValueTask.FromResult<InfoTipItem>(default);
+        public ValueTask<InfoTipItem> GetInfoTipAsync(int position, CancellationToken cancellationToken = default) => CodeSession.GetInfoTipAsync(position, cancellationToken);
 
-        public ValueTask<AstNodeItem> GetAstAsync(CancellationToken cancellationToken = default) =>
-            InputOptions is RoslynOptions
-                ? CodeSession.GetAstAsync(cancellationToken)
-                : ValueTask.FromResult<AstNodeItem>(default);
+        public ValueTask<AstNodeItem?> GetAstAsync(CancellationToken cancellationToken = default) => CodeSession.GetAstAsync(cancellationToken);
 
         private async ValueTask<string> DecompileAsync(CompilationResults streams, CancellationToken cancellationToken = default)
         {
@@ -262,11 +255,11 @@ namespace SharpScript.Common
                     if (assembly.EntryPoint is MethodInfo main)
                     {
                         main = GetEntryPoint(main);
-                        string[][] args = main.GetParameters().Length > 0 ? [[]] : null;
+                        string[][]? args = main.GetParameters().Length > 0 ? [[]] : null;
                         TextWriter temp = Console.Out;
                         StringBuilder output = new();
                         await using StringWriter writer = new(output);
-                        object @return;
+                        object? @return;
                         try
                         {
                             Console.SetOut(writer);
@@ -302,8 +295,8 @@ namespace SharpScript.Common
                         {
                             try
                             {
-                                byte[] bytes = main.GetMethodBody()?.GetILAsByteArray();
-                                MethodBase method = bytes switch
+                                byte[]? bytes = main.GetMethodBody()?.GetILAsByteArray();
+                                MethodBase? method = bytes switch
                                 {
                                     [
                                         (byte)ILOpCode.Ldarg_0,
@@ -342,10 +335,12 @@ namespace SharpScript.Common
                                     ] => CreateScriptMain(main, bytes),
                                     _ => null,
                                 };
-                                static DynamicMethod CreateScriptMain(MethodInfo main, byte[] bytes)
+                                static DynamicMethod? CreateScriptMain(MethodInfo main, byte[] bytes)
                                 {
-                                    ConstructorInfo constructor = main.Module.ResolveMethod(BitConverter.ToInt32(bytes.AsSpan(1, 4))) as ConstructorInfo;
-                                    MethodInfo initialize = main.Module.ResolveMethod(BitConverter.ToInt32(bytes.AsSpan(6, 4))) as MethodInfo;
+                                    ConstructorInfo? constructor = main.Module.ResolveMethod(BitConverter.ToInt32(bytes.AsSpan(1, 4))) as ConstructorInfo;
+                                    if (constructor == null) { return null; }
+                                    MethodInfo? initialize = main.Module.ResolveMethod(BitConverter.ToInt32(bytes.AsSpan(6, 4))) as MethodInfo;
+                                    if (initialize == null) { return null; }
                                     DynamicMethod method = new(main.Name, initialize.ReturnType, [], main.Module);
                                     ILGenerator generator = method.GetILGenerator();
                                     generator.Emit(OpCodes.Newobj, constructor);
@@ -388,7 +383,7 @@ namespace SharpScript.Common
         {
             try
             {
-                (CompilationResults assemblyStream, List<Diagnostic> diagnostics) = await CompilateAsync(cancellationToken).ConfigureAwait(false);
+                (CompilationResults? assemblyStream, List<Diagnostic> diagnostics) = await CompilateAsync(cancellationToken).ConfigureAwait(false);
                 if (assemblyStream != null)
                 {
                     switch (OutputType)
@@ -412,11 +407,11 @@ namespace SharpScript.Common
             return new CompileResult([], null);
         }
 
-        public async ValueTask<MemoryStream> GetAssemblyAsync(CancellationToken cancellationToken = default)
+        public async ValueTask<MemoryStream?> GetAssemblyAsync(CancellationToken cancellationToken = default)
         {
             try
             {
-                (CompilationResults results, _) = await CompilateAsync(cancellationToken).ConfigureAwait(false);
+                (CompilationResults? results, _) = await CompilateAsync(cancellationToken).ConfigureAwait(false);
                 if (results is { AssemblyStream: MemoryStream assemblyStream })
                 {
                     results.Position = 0;
@@ -453,5 +448,5 @@ namespace SharpScript.Common
         }
     }
 
-    public record struct CompileResult(List<Diagnostic> Diagnostics, string Decompiled, params List<string> Outputs);
+    public record struct CompileResult(List<Diagnostic> Diagnostics, string? Decompiled, params List<string> Outputs);
 }

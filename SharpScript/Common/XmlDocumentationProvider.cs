@@ -3,6 +3,7 @@ using ICSharpCode.Decompiler.TypeSystem;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Runtime.Serialization;
 using System.Text;
@@ -16,19 +17,19 @@ namespace SharpScript.Common
 
         private sealed class XmlDocumentationCache
         {
-            private readonly KeyValuePair<string, string>[] entries;
+            private readonly KeyValuePair<string, string?>[] entries;
             private int pos;
 
             public XmlDocumentationCache(int size = 50)
             {
                 if (size <= 0)
                 { throw new ArgumentOutOfRangeException(nameof(size), size, "Value must be positive"); }
-                entries = new KeyValuePair<string, string>[size];
+                entries = new KeyValuePair<string, string?>[size];
             }
 
-            internal bool TryGet(string key, out string value)
+            internal bool TryGet(string key, out string? value)
             {
-                foreach (KeyValuePair<string, string> pair in entries)
+                foreach (KeyValuePair<string, string?> pair in entries)
                 {
                     if (pair.Key == key)
                     {
@@ -40,9 +41,9 @@ namespace SharpScript.Common
                 return false;
             }
 
-            internal void Add(string key, string value)
+            internal void Add(string key, string? value)
             {
-                entries[pos++] = new KeyValuePair<string, string>(key, value);
+                entries[pos++] = new KeyValuePair<string, string?>(key, value);
                 if (pos == entries.Length)
                 { pos = 0; }
             }
@@ -76,7 +77,7 @@ namespace SharpScript.Common
         private XmlDocumentationCache cache = new();
 
         private readonly byte[] file;
-        private readonly Encoding encoding;
+        private readonly Encoding? encoding;
         private volatile IndexEntry[] index; // SORTED array of index entries
 
         #region Constructor / Redirection support
@@ -110,6 +111,7 @@ namespace SharpScript.Common
 
         #region Load / Create Index
 
+        [MemberNotNull(nameof(index))]
         private void ReadXmlDoc(XmlTextReader reader)
         {
             //lastWriteDate = File.GetLastWriteTimeUtc(fileName);
@@ -133,9 +135,9 @@ namespace SharpScript.Common
             index = [.. indexList]; // volatile write
         }
 
-        private sealed class LinePositionMapper(MemoryStream fs, Encoding encoding)
+        private sealed class LinePositionMapper(MemoryStream fs, Encoding? encoding)
         {
-            private readonly Decoder decoder = encoding.GetDecoder();
+            private readonly Decoder decoder = (encoding ?? Encoding.Default).GetDecoder();
             private int currentLine = 1;
             private char prevChar;
 
@@ -181,7 +183,7 @@ namespace SharpScript.Common
                         if (reader.LocalName == "member")
                         {
                             int pos = linePosMapper.GetPositionForLine(reader.LineNumber) + Math.Max(reader.LinePosition - 2, 0);
-                            string memberAttr = reader.GetAttribute("name");
+                            string? memberAttr = reader.GetAttribute("name");
                             if (memberAttr != null)
                             { indexList.Add(new IndexEntry(GetHashCode(memberAttr), pos)); }
                             reader.Skip();
@@ -217,7 +219,7 @@ namespace SharpScript.Common
         /// <summary>
         /// Get the documentation for the specified member.
         /// </summary>
-        public string GetDocumentation(IEntity entity)
+        public string? GetDocumentation(IEntity entity)
         {
             ArgumentNullException.ThrowIfNull(entity);
             return GetDocumentation(entity.GetIdString());
@@ -226,7 +228,7 @@ namespace SharpScript.Common
         /// <summary>
         /// Get the documentation for the member with the specified documentation key.
         /// </summary>
-        private string GetDocumentation(string key)
+        private string? GetDocumentation(string key)
         {
             ArgumentNullException.ThrowIfNull(key);
 
@@ -245,7 +247,7 @@ namespace SharpScript.Common
             XmlDocumentationCache cache = this.cache;
             lock (cache)
             {
-                if (!cache.TryGet(key, out string val))
+                if (!cache.TryGet(key, out string? val))
                 {
                     try
                     {
@@ -278,7 +280,7 @@ namespace SharpScript.Common
 
         #region Load / Read XML
 
-        private string LoadDocumentation(string key, int positionInFile)
+        private string? LoadDocumentation(string key, int positionInFile)
         {
             using MemoryStream fs = new(file);
             fs.Position = positionInFile;
@@ -289,7 +291,7 @@ namespace SharpScript.Common
             {
                 if (r.NodeType == XmlNodeType.Element)
                 {
-                    string memberAttr = r.GetAttribute("name");
+                    string? memberAttr = r.GetAttribute("name");
                     return memberAttr == key ? r.ReadInnerXml() : null;
                 }
             }
@@ -298,13 +300,13 @@ namespace SharpScript.Common
 
         #endregion
 
-        public virtual void OnDeserialization(object sender) => cache = new XmlDocumentationCache();
+        public virtual void OnDeserialization(object? sender) => cache = new XmlDocumentationCache();
 
         /// <summary>
         /// Creates an <see cref="IDocumentationProvider"/> from bytes representing XML documentation data.
         /// </summary>
         /// <param name="xmlDocCommentBytes">The XML document bytes.</param>
         /// <returns>An <see cref="IDocumentationProvider"/>.</returns>
-        public static ContentBasedXmlDocumentationProvider CreateFromBytes(byte[] xmlDocCommentBytes) => xmlDocCommentBytes?.Length > 0 ? new(xmlDocCommentBytes) : null;
+        public static ContentBasedXmlDocumentationProvider? CreateFromBytes(byte[]? xmlDocCommentBytes) => xmlDocCommentBytes?.Length > 0 ? new(xmlDocCommentBytes) : null;
     }
 }
