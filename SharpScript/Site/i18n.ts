@@ -77,6 +77,7 @@ export default createI18n({
                 loadingDotnet: "Loading .NET...",
                 initWebWorker: "Initializing Web Worker...",
                 downloadReferences: "Downloading references...",
+                formatting: "Formatting Code..."
             }
         },
         "zh-CN": {
@@ -134,7 +135,8 @@ export default createI18n({
                 initLinter: "正在初始化分析器...",
                 loadingDotnet: "正在加载 .NET...",
                 initWebWorker: "正在初始化 Web Worker...",
-                downloadReferences: "正在下载引用..."
+                downloadReferences: "正在下载引用...",
+                formatting: "正在格式化代码..."
             }
         }
     }

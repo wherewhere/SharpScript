@@ -2,24 +2,24 @@
     <div class="content">
         <SplitPanels class="split-view" :direction="direction">
             <template #panel1>
-                <div style="display: flex; justify-content: space-between; column-gap: 4px">
-                    <div style="display: flex; column-gap: 4px;">
-                        <fluent-select :title="t('input.language.title')" :placeholder="t('input.language.placeholder')"
-                                       position="below" v-model="language" style="min-width: auto;">
+                <div class="toolbar">
+                    <div class="toolgroup">
+                        <fluent-select class="auto-select" :title="t('input.language.title')"
+                                       :placeholder="t('input.language.placeholder')" position="below" v-model="language">
                             <fluent-option title="CSharp" value="CSharp">C#</fluent-option>
                             <fluent-option title="VisualBasic" value="VisualBasic">VB</fluent-option>
                             <fluent-option title="IL" value="IL">IL</fluent-option>
                         </fluent-select>
                         <ToggleButton v-model="isScript">{{ t("input.language.script") }}</ToggleButton>
                     </div>
-                    <div style="display: flex; column-gap: 4px;">
+                    <div class="toolgroup">
                         <fluent-button :title="loading ? message : t('input.process.title')" @click="processAsync"
                                        :disabled="loading || isSyntaxTree">
                             <fluent-progress-ring v-if="loading"
                                                   style="width: 12px; height: 12px;"></fluent-progress-ring>
                             <TriangleRight12Filled v-else style="fill: currentColor;" />
                         </fluent-button>
-                        <fluent-select v-if="inputLanguages.length" v-model="inputLanguage" style="min-width: 105px;"
+                        <fluent-select class="input-select" v-if="inputLanguages.length" v-model="inputLanguage"
                                        :title="t('input.version.title')" position="below"
                                        :placeholder="t('input.version.placeholder')">
                             <fluent-option v-for="item in inputLanguages" :title="item" :value="item">
@@ -32,11 +32,10 @@
                             :roslyn-tooltip="roslynTooltip.input!" @change="onChange" ref="editor" />
             </template>
             <template #panel2>
-                <div style="display: flex; justify-content: space-between; column-gap: 4px">
-                    <div style="display: flex; column-gap: 4px;">
-                        <fluent-select :title="t('output.language.title')"
-                                       :placeholder="t('output.language.placeholder')" position="below" v-model="output"
-                                       style="min-width: auto;">
+                <div class="toolbar">
+                    <div class="toolgroup">
+                        <fluent-select class="auto-select" :title="t('output.language.title')"
+                                       :placeholder="t('output.language.placeholder')" position="below" v-model="output">
                             <fluent-option title="CSharp" value="CSharp">C#</fluent-option>
                             <fluent-option title="IL" value="IL">IL</fluent-option>
                             <fluent-option title="Run" value="Run">{{ t("output.language.run") }}</fluent-option>
@@ -49,7 +48,7 @@
                             <CodeText16Regular style="fill: currentColor;" />
                         </fluent-button>
                     </div>
-                    <div style="display: flex; column-gap: 4px;">
+                    <div class="toolgroup">
                         <fluent-button v-if="isInitLinter && !diagnostics.errors.length"
                                        :title="t('output.download.title')" @click="downloadAssemblyAsync" :disabled="loading">
                             <ArrowDownload16Regular style="fill: currentColor;" />
@@ -58,7 +57,7 @@
                                        :disabled="loading">
                             <Sparkle16Regular style="fill: currentColor;" />
                         </fluent-button>
-                        <fluent-select v-if="outputLanguages.length" v-model="outputLanguage" style="min-width: 92px;"
+                        <fluent-select class="output-select" v-if="outputLanguages.length" v-model="outputLanguage"
                                        position="below" :title="t('output.version.title')"
                                        :placeholder="t('output.version.placeholder')">
                             <fluent-option v-for="item in outputLanguages" :title="item" :value="item">
@@ -353,6 +352,17 @@
             }
         }
     )
+
+    const inputMinWidth = computed(() => {
+        switch (language.value) {
+            case "CSharp":
+                return "var(--cs-select-min-width)";
+            case "VisualBasic":
+                return "var(--vb-select-min-width)";
+            default:
+                return "auto";
+        }
+    });
 
     async function resetCodeAsync(code: string) {
         try {
@@ -832,11 +842,11 @@
             dotnet = Comlink.wrap<DotNetWorker>(new Worker(url.href, { type: "module" }));
         }
         addEventListener("hashchange", loadSettings);
-        const scheme = matchMedia("(max-width: 767px)");
-        if (scheme) {
-            scheme.addEventListener("change", e => direction.value = e.matches ? "column" : "row");
-            direction.value = scheme.matches ? "column" : "row";
+        function onResize() {
+            direction.value = innerWidth < innerHeight ? "column" : "row";
         }
+        addEventListener("resize", onResize);
+        onResize();
     });
 </script>
 
@@ -844,8 +854,16 @@
     @use "github:microsoft/fluentui-blazor?branch=dev&path=/src/Core/wwwroot/css/reboot.css";
     @use "./styles/fonts";
 
+    $base-transition: color 0.083s ease-in-out, background-color 0.083s ease-in-out, border-color 0.083s ease-in-out;
+
     :root {
+        --small-gap-size: calc(var(--design-unit) * 1px);
+        --large-gap-size: calc(var(--design-unit) * 2px);
         color-scheme: light;
+
+        @media (max-width: 767px) {
+            --large-gap-size: calc(var(--design-unit) * 1.5px);
+        }
 
         @media (prefers-color-scheme: dark) {
             color-scheme: dark;
@@ -853,7 +871,7 @@
     }
 
     * {
-        transition: background-color 0.083s ease-in-out;
+        transition: $base-transition;
     }
 
     body,
@@ -864,18 +882,41 @@
         background: var(--neutral-fill-stealth-rest);
 
         @media (max-width: 767px) {
-            font-size: calc(var(--type-ramp-base-font-size) - 2px);
+            --type-ramp-base-font-size: 12px;
+            --type-ramp-base-line-height: 16px;
+            --type-ramp-base-font-variations: "wght" 400, "opsz" 10.5;
+            --base-height-multiplier: 7;
         }
     }
 </style>
 
 <style lang="scss" scoped>
+    .content {
+        --cs-select-min-width: 105px;
+        --vb-select-min-width: 99px;
+
+        @media (max-width: 767px) {
+            --cs-select-min-width: 81px;
+            --vb-select-min-width: 77px;
+        }
+    }
+
     :deep(pre.unset) {
         margin-top: 0;
         margin-bottom: 0;
         font-size: inherit;
         font-family: inherit;
         white-space: pre-wrap;
+    }
+
+    .toolbar,
+    .toolgroup {
+        display: flex;
+        column-gap: var(--small-gap-size);
+    }
+
+    .toolbar {
+        justify-content: space-between;
     }
 
     .loading-progress {
@@ -888,6 +929,22 @@
         position: absolute;
     }
 
+    .auto-select {
+        min-width: auto;
+    }
+
+    .input-select {
+        min-width: v-bind(inputMinWidth);
+    }
+
+    .output-select {
+        min-width: 92px;
+
+        @media (max-width: 767px) {
+            min-width: 70px;
+        }
+    }
+
     .no-selected-indicator :deep(fluent-tree-item[selected])::after {
         display: none;
     }
@@ -898,25 +955,33 @@
 
     .content {
         height: 100%;
-        padding: 8px 8px 0 8px;
+        padding: var(--large-gap-size) var(--large-gap-size) 0 var(--large-gap-size);
     }
+
+    $status-bar-height: calc((var(--base-height-multiplier) + var(--density)) * var(--design-unit) * 1px);
 
     div.status-bar {
         display: flex;
-        height: 30px;
-        padding: 4px 4px 6px 4px;
+        height: $status-bar-height;
+        padding-left: calc(var(--layer-corner-radius) * 0.5px - 1px);
+        padding-right: calc(var(--layer-corner-radius) * 0.5px);
         font-family: var(--font-monospace);
         justify-content: space-between;
+        align-items: center;
+
+        >div {
+            transform: translateY(-1px);
+        }
     }
 
     div.split-view {
-        height: calc(100% - 30px);
-        gap: 8px;
+        height: calc(100% - $status-bar-height);
+        gap: var(--large-gap-size);
 
         :deep(.slotted) {
             display: flex;
             flex-direction: column;
-            row-gap: 8px;
+            row-gap: var(--large-gap-size);
 
             &::-webkit-scrollbar {
                 display: none;
@@ -951,11 +1016,11 @@
                     display: flex;
                     flex-direction: column;
                     font-family: var(--font-monospace);
-                    padding: 0 12px;
+                    padding: 0 calc(var(--small-gap-size) * 3);
                     width: 100%;
 
                     &>div {
-                        padding: 4px 0;
+                        padding: var(--small-gap-size) 0;
                     }
                 }
             }
