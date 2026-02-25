@@ -1,5 +1,6 @@
+import "../types";
 import { useHead, useScript } from "@unhead/vue";
-import Clarity from "@microsoft/clarity";
+import { injectScript } from "@microsoft/clarity/src/utils";
 
 declare global {
     interface Window {
@@ -29,7 +30,7 @@ export function useAnalytics() {
         async: true
     });
 
-    Clarity.init("m7ua7korsz");
+    injectScript("m7ua7korsz");
 
     window._hmt = window._hmt || [];
     useScript({

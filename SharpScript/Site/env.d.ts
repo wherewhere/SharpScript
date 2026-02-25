@@ -246,6 +246,10 @@ declare module "async-lock" {
     export = AsyncLock;
 }
 
+declare module "@microsoft/clarity/src/utils" {
+    export function injectScript(projectId: string): void;
+}
+
 declare module "bilibili-card:*" {
     import { ComponentOptions } from "vue";
     const component: ComponentOptions;
