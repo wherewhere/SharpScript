@@ -19,6 +19,12 @@
     <link rel="icon" type="image/png" sizes="200x200"
           href="https://cdn.jsdelivr.net/gh/wherewhere/SharpScript@main/SharpScript/Assets/StoreLogo.scale-400.png" />
     <style>
+        .body,
+        body,
+        #vue-app div.cover {
+            background: #fbfbfb;
+        }
+
         #vue-app div.cover {
             position: fixed;
             top: 0;
@@ -28,20 +34,16 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            background: #fbfbfb;
             z-index: 3;
-
-            @media (prefers-color-scheme: dark) {
-                background: #272727;
-            }
         }
 
         .pace {
             pointer-events: none;
             -webkit-user-select: none;
             user-select: none;
+        }
 
-            .pace-progress {
+            .pace .pace-progress {
                 background: #036ac4;
                 position: fixed;
                 z-index: 4;
@@ -50,15 +52,23 @@
                 width: 100%;
                 height: 3px;
                 transition: all 0.2s ease-in-out;
-
-                @media (prefers-color-scheme: dark) {
-                    background: #60c9fc;
-                }
             }
-        }
 
         .pace-inactive {
             display: none;
+        }
+
+        @media (prefers-color-scheme:dark) {
+
+            #vue-app div.cover,
+            .body,
+            body {
+                background: #272727;
+            }
+
+            .pace .pace-progress {
+                background: #60c9fc;
+            }
         }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/pace-js" async></script>

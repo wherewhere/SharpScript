@@ -55,6 +55,7 @@
     "@fluentui/svg-icons": "^1.0.0",
     "@fluentui/web-components": "^2.0.0",
     "@fontsource/cascadia-code": "^5.0.0",
+    "@microsoft/clarity": "^1.0.0",
     "@replit/codemirror-lang-csharp": "^6.0.0",
     "@uiw/codemirror-theme-vscode": "^4.0.0",
     "@unhead/vue": "^2.0.0",

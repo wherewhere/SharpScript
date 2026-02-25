@@ -14,7 +14,7 @@
                     </div>
                     <div class="toolgroup">
                         <fluent-button :title="loading ? message : t('input.process.title')" @click="processAsync"
-                                       :disabled="loading || isSyntaxTree">
+                                       :disabled="loading || isSyntaxTree" class="icon-button">
                             <fluent-progress-ring v-if="loading"
                                                   style="width: 12px; height: 12px;"></fluent-progress-ring>
                             <TriangleRight12Filled v-else style="fill: currentColor;" />
@@ -130,6 +130,7 @@
     import { useI18n } from "vue-i18n";
     import { useSeoMeta } from "@unhead/vue";
     import { compressToEncodedURIComponent, decompressFromEncodedURIComponent } from "lz-string";
+    import { useAnalytics } from "./helpers/analytics";
     import { AsyncLock, Comlink } from "./helpers/shared";
     import { AnsiUp } from "ansi_up";
     import type { Extension } from "@codemirror/state";
@@ -138,9 +139,9 @@
     import { createCompletion } from "./editor/completion";
     import { createLinter } from "./editor/diagnostics";
     import { createFormatKeymap, formatAsync } from "./editor/formatting";
-    import { createTooltip } from "./editor/hover.js";
-    import { getCustomCompletionAsync } from "./helpers/fingerprinting.js";
-    import { setTimeoutAsync } from "./helpers/utils.js";
+    import { createTooltip } from "./editor/hover";
+    import { getCustomCompletionAsync } from "./helpers/fingerprinting";
+    import { setTimeoutAsync } from "./helpers/utils";
     import { keywords } from "./package.json";
     import SplitPanels from "./components/SplitPanels.vue";
     import CodeMirror from "./components/CodeMirror.vue";
@@ -182,6 +183,7 @@
         articleAuthor: [author],
         articleTag: keywords
     });
+    useAnalytics();
 
     const code = shallowRef('using System;\nConsole.WriteLine("Hello, World!");');
     const language = shallowRef("CSharp");
@@ -854,7 +856,7 @@
     @use "github:microsoft/fluentui-blazor?branch=dev&path=/src/Core/wwwroot/css/reboot.css";
     @use "./styles/fonts";
 
-    $base-transition: color 0.083s ease-in-out, background-color 0.083s ease-in-out, border-color 0.083s ease-in-out;
+    $base-transition: background-color 0.083s ease-in-out;
 
     :root {
         --small-gap-size: calc(var(--design-unit) * 1px);
@@ -951,6 +953,11 @@
 
     :deep(fluent-select)::part(listbox) {
         max-height: calc(var(--base-height-multiplier) * 30px);
+    }
+
+    fluent-button.icon-button::part(control) {
+        padding: 0;
+        line-height: 0;
     }
 
     .content {
