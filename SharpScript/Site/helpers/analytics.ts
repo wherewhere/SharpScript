@@ -1,5 +1,5 @@
 import "../types";
-import { useHead, useScript } from "@unhead/vue";
+import { useHead } from "@unhead/vue";
 import { injectScript } from "@microsoft/clarity/src/utils";
 
 declare global {
