@@ -183,7 +183,16 @@
         articleAuthor: [author],
         articleTag: keywords
     });
-    useAnalytics();
+
+    let noreferrer = false;
+    const hash = location.hash.substring(1);
+    if (hash) {
+        const params = new URLSearchParams(hash);
+        if (params.has("noreferrer")) {
+            noreferrer = params.get("noreferrer") !== "false";;
+        }
+    }
+    useAnalytics(noreferrer);
 
     const code = shallowRef('using System;\nConsole.WriteLine("Hello, World!");');
     const language = shallowRef("CSharp");
@@ -783,6 +792,9 @@
             if (params.has("code")) {
                 code.value = decompressFromEncodedURIComponent(params.get("code")!);
             }
+            if (params.has("noreferrer")) {
+                noreferrer = params.get("noreferrer") !== "false";;
+            }
             if (params.has("noworker")) {
                 return params.get("noworker") !== "false";
             }
@@ -791,6 +803,9 @@
 
     function setSettings() {
         const settings: Record<string, string> = {};
+        if (noreferrer) {
+            settings.noreferrer = "true";
+        }
         if (noWorker) {
             settings.noworker = "true";
         }
