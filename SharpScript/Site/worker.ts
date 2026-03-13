@@ -1,6 +1,6 @@
 /// <reference types="./env.d.ts" />
 import type { Diagnostic, TextChanges, ICodeActionObject, ICompletionItemObject } from "sharp-script";
-import { AsyncLock, Comlink } from "./helpers/shared";
+import { importAsync, AsyncLock, Comlink } from "./helpers/shared";
 
 if (typeof window === "undefined") {
     self.window = self;
@@ -84,8 +84,7 @@ const dotnet = {
         return getFingerprinting();
     },
     async startAsync() {
-        const url = "../_framework/blazor.webassembly.js";
-        await import(/* @vite-ignore */ url);
+        await importAsync("../_framework/blazor.webassembly.js");
         await Blazor.start();
     },
     async initAsync() {

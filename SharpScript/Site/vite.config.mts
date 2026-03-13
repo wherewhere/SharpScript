@@ -49,6 +49,9 @@ export default defineConfig(({ mode }) => {
             sourcemap: true,
             minify: "terser",
             rolldownOptions: {
+                checks: {
+                    pluginTimings: false
+                },
                 output: getOutputOptions(mode, {
                     groups: [{
                         name: "shared",
