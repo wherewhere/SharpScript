@@ -46,7 +46,7 @@
     "mime": "^4.0.0",
     "sass": "^1.0.0",
     "terser": "^5.0.0",
-    "vite": "^7.0.0",
+    "vite": "^8.0.0",
     "vite-plugin-simple-html": "^1.0.0",
     "vite-svg-loader": "^5.0.0"
   },

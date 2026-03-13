@@ -1,4 +1,4 @@
-import type { ManualChunksOption, OutputOptions } from "rollup";
+import type { CodeSplittingOptions, OutputOptions } from "rolldown";
 import { extname } from "path";
 import Mime from "mime";
 
@@ -14,8 +14,8 @@ function getType(path?: string) {
     }
 }
 
-export default function getOutputOptions(mode: string, manualChunks?: ManualChunksOption): OutputOptions {
-    const output: OutputOptions = { manualChunks };
+export default function getOutputOptions(mode: string, codeSplitting?: boolean | CodeSplittingOptions): OutputOptions {
+    const output: OutputOptions = { codeSplitting };
     if (mode === "publish") {
         output.assetFileNames = (chunkInfo) => {
             const type = getType(chunkInfo.name);

@@ -48,9 +48,12 @@ export default defineConfig(({ mode }) => {
             outDir: "../wwwroot",
             sourcemap: true,
             minify: "terser",
-            rollupOptions: {
+            rolldownOptions: {
                 output: getOutputOptions(mode, {
-                    "shared": ["/helpers/shared.ts"]
+                    groups: [{
+                        name: "shared",
+                        test: "/helpers/shared.ts"
+                    }]
                 })
             },
             emptyOutDir: true,

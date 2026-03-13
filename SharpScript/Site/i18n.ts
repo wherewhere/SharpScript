@@ -7,7 +7,7 @@ export default createI18n({
         const supportLanguageCodes =
             [
                 ["en", "en-au", "en-ca", "en-gb", "en-ie", "en-in", "en-nz", "en-sg", "en-us", "en-za", "en-bz", "en-hk", "en-id", "en-jm", "en-kz", "en-mt", "en-my", "en-ph", "en-pk", "en-tt", "en-vn", "en-zw", "en-053", "en-021", "en-029", "en-011", "en-018", "en-014"],
-                ["zh-Hans", "zh-cn", "zh-hans-cn", "zh-sg", "zh-hans-sg"]
+                ["zh-hans", "zh-cn", "zh-hans-cn", "zh-sg", "zh-hans-sg"]
             ];
         const fallbackLanguage = "en-US";
         const languages = navigator.languages || [navigator.language || fallbackLanguage];
