@@ -15,14 +15,19 @@
     <PackageReference Include="ICSharpCode.Decompiler" Version="10.0.0.8282-preview2" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.5" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="10.0.5" PrivateAssets="all" />
-    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Features" Version="5.4.0-2.26104.118" />
-    <PackageReference Include="Microsoft.CodeAnalysis.VisualBasic.Features" Version="5.4.0-2.26104.118" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Features" Version="5.6.0-2.26170.1" />
+    <PackageReference Include="Microsoft.CodeAnalysis.VisualBasic.Features" Version="5.6.0-2.26170.1" />
     <PackageReference Include="Mobius.ILasm" Version="0.1.0" />
     <PackageReference Include="System.Security.Permissions" Version="10.0.5" />
   </ItemGroup>
 
   <ItemGroup>
     <Reference Include="$(NetCoreTargetingPackRoot)\Microsoft.NETCore.App.Ref\$(BundledNETCoreAppPackageVersion)\analyzers\dotnet\cs\*.dll" Aliases="AnalyzersCSharp" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="Properties\PatchCoreLib.targets.cs" />
+    <None Include="Properties\PatchCoreLib.targets.cs" />
   </ItemGroup>
 
   <Target Name="NPMRestore" AfterTargets="Restore">
@@ -56,5 +61,7 @@
   <Target Name="CopyDocumentationsToPublishDirectory" AfterTargets="CopyFilesToPublishDirectory" DependsOnTargets="GetFrameworkXmlDocumentation">
     <Copy SourceFiles="@(OutputDocuments)" DestinationFolder="$(PublishDir)wwwroot\_framework" />
   </Target>
+
+  <Import Project="Properties\PatchCoreLib.targets" />
 
 </Project>
