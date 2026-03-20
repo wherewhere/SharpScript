@@ -1,7 +1,7 @@
 <Project>
   <PropertyGroup>
     <_CoreLibAssemblyName>System.Private.CoreLib.dll</_CoreLibAssemblyName>
-    <_PatchedCoreLibDir>$(ArtifactsPath)\patches\$(MSBuildProjectName)</_PatchedCoreLibDir>
+    <_PatchedCoreLibDir>$(BaseIntermediateOutputPath)\$(Configuration)\$(TargetFramework)\patches</_PatchedCoreLibDir>
     <_PatchedCoreLibPath>$(_PatchedCoreLibDir)\$(_CoreLibAssemblyName)</_PatchedCoreLibPath>
   </PropertyGroup>
 
