@@ -246,6 +246,8 @@ namespace SharpScript.Common
             List<string> results = [];
             try
             {
+                SynchronizationContext? previousContext = SynchronizationContext.Current;
+                SynchronizationContext.SetSynchronizationContext(null);
                 AssemblyLoadContext context = new("ExecutorContext", isCollectible: true);
                 try
                 {
@@ -333,6 +335,17 @@ namespace SharpScript.Common
                                         (byte)ILOpCode.Call, _, _, _, _,
                                         (byte)ILOpCode.Ret
                                     ] => CreateScriptMain(main, bytes),
+                                    [
+                                        (byte)ILOpCode.Ldarg_0,
+                                        (byte)ILOpCode.Call, _, _, _, _,
+                                        (byte)ILOpCode.Call, _, _, _, _,
+                                        (byte)ILOpCode.Ret
+                                    ] => main.Module.ResolveMethod(BitConverter.ToInt32(bytes.AsSpan(2, 4))),
+                                    [
+                                        (byte)ILOpCode.Call, _, _, _, _,
+                                        (byte)ILOpCode.Call, _, _, _, _,
+                                        (byte)ILOpCode.Ret
+                                    ] => main.Module.ResolveMethod(BitConverter.ToInt32(bytes.AsSpan(1, 4))),
                                     _ => null,
                                 };
                                 static DynamicMethod? CreateScriptMain(MethodInfo main, byte[] bytes)
@@ -361,6 +374,7 @@ namespace SharpScript.Common
                 finally
                 {
                     context.Unload();
+                    SynchronizationContext.SetSynchronizationContext(previousContext);
                     await streams.DisposeAsync().ConfigureAwait(false);
                 }
             }

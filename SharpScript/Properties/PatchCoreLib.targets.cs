@@ -45,7 +45,7 @@ using (PEReader peReader = new(peStream))
     MethodDefinitionHandle writeBarrier = FindMethodDefinition(reader, volatileType, "WriteBarrier", 0);
     MethodDefinitionHandle memoryBarrier = FindMethodDefinition(reader, interlockedType, "MemoryBarrier", 0);
 
-    //var throwIfSingleThreaded = FindMethodDefinition(reader, threadType, "ThrowIfSingleThreaded", 0);
+    //MethodDefinitionHandle throwIfSingleThreaded = FindMethodDefinition(reader, threadType, "ThrowIfSingleThreaded", 0);
 
     // Workaround for https://github.com/jjonescz/DotNetLab/issues/129.
     PatchMethodBody(bytes, peReader, readBarrier, memoryBarrier, "Volatile.ReadBarrier");

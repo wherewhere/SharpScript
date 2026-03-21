@@ -28,7 +28,7 @@
                         </fluent-select>
                     </div>
                 </div>
-                <CodeMirror class="editor" v-model:value="code" :language="getLauguage()"
+                <CodeMirror class="editor" v-model:value="code" :language="getLauguage()" :readonly="loading"
                             :roslyn-tooltip="roslynTooltip.input!" @change="onChange" ref="editor" />
             </template>
             <template #panel2>

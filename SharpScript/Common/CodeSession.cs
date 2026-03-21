@@ -564,7 +564,7 @@ namespace SharpScript.Common
                     {
                         foreach (TextLine text in lines)
                         {
-                            string line = text.Text?.ToString() ?? string.Empty;
+                            string line = text.ToString() ?? string.Empty;
                             if (line.StartsWith("#r ", StringComparison.OrdinalIgnoreCase))
                             {
                                 ReadOnlySpan<char> temp = line.AsSpan()[3..];
