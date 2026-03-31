@@ -147,21 +147,28 @@ namespace SharpScript.Common
             _ = Workspace.TryApplyChanges(solution);
             Workspace.OpenDocument(docId);
             _currentDocument = Workspace.CurrentSolution.GetDocument(docId)!;
-            string assemblyName;
+            List<string> assemblyNames = ["Microsoft.CodeAnalysis.NetAnalyzers"];
             switch (_language)
             {
                 case LanguageNames.CSharp:
                     _comment = "//";
-                    assemblyName = "Microsoft.CodeAnalysis.CSharp.Features";
+                    assemblyNames.AddRange(
+                        "Microsoft.CodeAnalysis.CSharp.Features",
+                        "Microsoft.CodeAnalysis.CSharp.NetAnalyzers",
+                        "Microsoft.Interop.ComInterfaceGenerator",
+                        "Microsoft.Interop.LibraryImportGenerator",
+                        "System.Text.RegularExpressions.Generator");
                     break;
                 case LanguageNames.VisualBasic:
                     _comment = "' ";
-                    assemblyName = "Microsoft.CodeAnalysis.VisualBasic.Features";
+                    assemblyNames.AddRange(
+                        "Microsoft.CodeAnalysis.VisualBasic.Features",
+                        "Microsoft.CodeAnalysis.VisualBasic.NetAnalyzers");
                     break;
                 default:
                     throw new NotSupportedException($"Language '{_language}' is not supported.");
             }
-            GetAnalyzers(assemblyName, _language, out IEnumerable<DiagnosticAnalyzer> analyzers, out _providers);
+            GetAnalyzers(assemblyNames, _language, out IEnumerable<DiagnosticAnalyzer> analyzers, out _providers);
             _analyzers = [.. analyzers];
             if (_language == LanguageNames.CSharp)
             {
@@ -483,12 +490,9 @@ namespace SharpScript.Common
             return references;
         }
 
-        private static void GetAnalyzers(string assemblyName, string language, out IEnumerable<DiagnosticAnalyzer> analyzers, out Dictionary<string, List<CodeFixProvider>> providers)
+        private static void GetAnalyzers(List<string> assemblyNames, string language, out IEnumerable<DiagnosticAnalyzer> analyzers, out Dictionary<string, List<CodeFixProvider>> providers)
         {
-            Type[] types = language == LanguageNames.CSharp ?
-                [.. new[] { assemblyName, "Microsoft.Interop.ComInterfaceGenerator", "Microsoft.Interop.LibraryImportGenerator", "System.Text.RegularExpressions.Generator" }.Select(x => Assembly.Load(new AssemblyName(x)).GetTypes()).SelectMany(x => x)] :
-                Assembly.Load(new AssemblyName(assemblyName)).GetTypes();
-
+            Type[] types = [.. assemblyNames.Select(x => Assembly.Load(new AssemblyName(x)).GetTypes()).SelectMany(x => x)];
             analyzers = types.Where(x => x is { IsAbstract: false } && x.IsSubclassOf(typeof(DiagnosticAnalyzer)) && x.GetCustomAttributes<DiagnosticAnalyzerAttribute>(true).Any(x => x.Languages.Contains(language)))
                              .Select(Activator.CreateInstance)
                              .OfType<DiagnosticAnalyzer>();
