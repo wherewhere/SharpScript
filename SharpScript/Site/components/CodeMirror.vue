@@ -4,35 +4,42 @@
 
 <script lang="ts" setup>
     import type { lang } from "../types";
-    import { onMounted, onUnmounted, useTemplateRef, watch } from "vue";
+    import { onMounted, onUnmounted, toRaw, useTemplateRef, watch } from "vue";
     import { basicSetup, EditorView } from "codemirror";
-    import { indentWithTab } from "@codemirror/commands";
-    import { Compartment, EditorState, Facet, type Extension } from "@codemirror/state";
-    import { indentUnit } from "@codemirror/language";
-    import { hoverTooltip, keymap, type ViewUpdate } from "@codemirror/view";
-    import { csharp } from "@replit/codemirror-lang-csharp";
-    import { cil } from "mirrorsharp-codemirror-6-preview/codemirror/languages/cil";
-    import { vb } from "mirrorsharp-codemirror-6-preview/codemirror/languages/vb";
+    import { Compartment, EditorState, type Extension } from "@codemirror/state";
+    import { indentUnit, LanguageSupport, StreamLanguage } from "@codemirror/language";
+    import { keymap, type ViewUpdate } from "@codemirror/view";
+    import { lintGutter } from "@codemirror/lint";
     import { vscodeDark, vscodeLight } from "@uiw/codemirror-theme-vscode";
-    import instructions from "../assets/instructions.json";
+    import { vscodeKeymap } from "@replit/codemirror-vscode-keymap";
 
-    const { language, readonly, roslynTooltip } = defineProps<{
+    const { language, readonly, lintGutter: lintGutterProp, keymap: keymapProp, linter, roslynTooltip, roslynCompletion } = defineProps<{
         language?: lang;
         readonly?: boolean;
+        lintGutter?: boolean;
+        linter?: Extension;
+        keymap?: Extension;
         roslynTooltip?: () => Extension;
+        roslynCompletion?: () => Promise<Extension>;
     }>();
     const value = defineModel<string>("value");
 
     let changed = false;
     const languageSet = new Compartment();
     const readonlySet = new Compartment();
+    const lintGutterSet = new Compartment();
+    const linterSet = new Compartment();
+    const keymapSet = new Compartment();
+    const empty: Extension = [];
     watch(
         () => language,
-        (newValue, oldValue) => {
+        async (newValue, oldValue) => {
             if (newValue !== oldValue) {
-                const lang = getLauguage(newValue!)!;
+                console.log(newValue);
+                const lang = await getLauguageAsync(newValue!);
                 editor!.dispatch({ effects: languageSet.reconfigure(lang) });
-                updateTooltip();
+                updateTooltipAsync();
+                updateCompletionAsync();
             }
         });
     watch(
@@ -51,10 +58,40 @@
             }
         });
     watch(
-        () => roslynTooltip,
+        () => lintGutterProp,
         (newValue, oldValue) => {
             if (newValue !== oldValue) {
-                updateTooltip();
+                editor!.dispatch({ effects: lintGutterSet.reconfigure(newValue ? lintGutter() : empty) });
+            }
+        });
+    watch(
+        () => linter,
+        (newValue, oldValue) => {
+            if (newValue !== oldValue) {
+                editor!.dispatch({ effects: linterSet.reconfigure(toRaw(newValue) || empty) });
+            }
+        });
+    watch(
+        () => keymapProp,
+        (newValue, oldValue) => {
+            if (newValue !== oldValue) {
+                editor!.dispatch({ effects: keymapSet.reconfigure(toRaw(newValue) || empty) });
+            }
+        });
+    watch(
+        () => roslynTooltip,
+        (newValue, oldValue) => {
+            if (newValue !== oldValue && language !== "il") {
+                console.log(newValue)
+                editor!.dispatch({ effects: tooltipSet.reconfigure(newValue ? newValue() : empty) });
+            }
+        });
+    watch(
+        () => roslynCompletion,
+        async (newValue, oldValue) => {
+            if (newValue !== oldValue && language !== "il") {
+                console.log(newValue)
+                editor!.dispatch({ effects: autocompletionSet.reconfigure(newValue ? await newValue() : empty) });
             }
         });
 
@@ -65,52 +102,50 @@
     }
 
     const tooltipSet = new Compartment();
-    function updateTooltip() {
-        editor!.dispatch({ effects: tooltipSet.reconfigure(language === "il" ? getILTooltip() : roslynTooltip ? roslynTooltip() : Facet.define<undefined>().of(undefined)) });
+    async function getTooltipAsync() {
+        var a = language === "il" ? await import("codemirror-lang-msil").then(m => m.msilTooltip()) : roslynTooltip ? roslynTooltip() : empty;
+        console.log(a);
+        return a;
+    }
+    async function updateTooltipAsync() {
+        editor!.dispatch({ effects: tooltipSet.reconfigure(await getTooltipAsync()) });
     }
 
-    function getLauguage(lang: lang) {
+    const autocompletionSet = new Compartment();
+    async function getCompletionAsync() {
+        return language !== "il" && roslynCompletion ? await roslynCompletion() : empty;
+    }
+    async function updateCompletionAsync() {
+        editor!.dispatch({ effects: autocompletionSet.reconfigure(await getCompletionAsync()) });
+    }
+
+    async function getLauguageAsync(lang: lang) {
         switch (lang) {
             case "il":
-                return cil;
+                const { msil } = await import("codemirror-lang-msil");
+                return msil();
             case "csharp":
-                return csharp();
+                const { csharpLanguage } = await import("@replit/codemirror-lang-csharp");
+                const keywords = ["abstract", "as", "async", "await", "base", "break", "case", "catch", "checked", "class", "const", "continue",
+                    "default", "delegate", "do", "else", "enum", "event", "explicit", "extern", "finally", "fixed", "for",
+                    "foreach", "goto", "if", "implicit", "in", "init", "interface", "internal", "is", "lock", "namespace", "new",
+                    "operator", "out", "override", "params", "private", "protected", "public", "readonly", "record", "ref", "required", "return", "sealed",
+                    "sizeof", "stackalloc", "static", "struct", "switch", "this", "throw", "try", "typeof", "unchecked",
+                    "unsafe", "using", "virtual", "void", "volatile", "while", "add", "alias", "ascending", "descending", "dynamic", "from", "get",
+                    "global", "group", "into", "join", "let", "orderby", "partial", "remove", "select", "set", "value", "var", "yield"];
+                const types = ["Action", "Boolean", "Byte", "Char", "DateTime", "DateTimeOffset", "Decimal", "Double", "Func",
+                    "Guid", "Int16", "Int32", "Int64", "Object", "SByte", "Single", "String", "Task", "TimeSpan", "UInt16", "UInt32",
+                    "UInt64", "bool", "byte", "char", "decimal", "double", "short", "int", "long", "object",
+                    "sbyte", "float", "string", "ushort", "uint", "ulong"];
+                const atoms = ["true", "false", "null"];
+                return new LanguageSupport(csharpLanguage, csharpLanguage.data.of({
+                    autocomplete: keywords.concat(types).concat(atoms)
+                }));
             case "vb":
-                return vb;
+                return StreamLanguage.define(await import("@codemirror/legacy-modes/mode/vb").then(m => m.vb));
+            default:
+                return empty;
         }
-    }
-
-    function getILTooltip() {
-        return hoverTooltip(async (view, pos) => {
-            const node = view.domAtPos(pos).node;
-            if (node instanceof Text) {
-                if (node.parentElement!.classList.contains("ͼr")) {
-                    const text = node.textContent as keyof typeof instructions;
-                    if (text) {
-                        const desc = instructions[text];
-                        if (desc) {
-                            return {
-                                pos,
-                                create() {
-                                    const dom = document.createElement("div")
-                                    dom.classList.add("mirrorsharp-infotip");
-                                    const name = document.createElement("span");
-                                    name.className = "tok-keyword";
-                                    name.textContent = text;
-                                    const description = document.createElement("div");
-                                    description.className = "CodeMirror-infotip-description";
-                                    description.textContent = desc;
-                                    dom.appendChild(name);
-                                    dom.appendChild(description);
-                                    return { dom };
-                                }
-                            };
-                        }
-                    }
-                }
-            }
-            return null;
-        });
     }
 
     const emit = defineEmits<{
@@ -118,12 +153,8 @@
     }>();
 
     const root = useTemplateRef("root");
-    const keymapSet = new Compartment();
-    const linterSet = new Compartment();
-    const lintGutterSet = new Compartment();
-    const autocompletionSet = new Compartment();
     const scheme = matchMedia("(prefers-color-scheme: dark)");
-    onMounted(() => {
+    onMounted(async () => {
         function getTheme() {
             if (typeof scheme !== "undefined") {
                 scheme.addEventListener("change", updateTheme);
@@ -133,21 +164,20 @@
             }
             return themeSet.of(vscodeLight);
         };
-        const empty = Facet.define<undefined>().of(undefined);
         editor = new EditorView({
             doc: value.value,
             parent: root.value!,
             extensions: [
                 basicSetup,
                 getTheme(),
-                keymap.of([indentWithTab]),
+                keymap.of(vscodeKeymap),
                 indentUnit.of("    "),
                 autocompletionSet.of(empty),
-                keymapSet.of(empty),
-                linterSet.of(empty),
-                lintGutterSet.of(empty),
-                tooltipSet.of(language === "il" ? getILTooltip() : roslynTooltip ? roslynTooltip() : empty),
-                languageSet.of(getLauguage(language || "csharp")!),
+                keymapSet.of(keymapProp || empty),
+                linterSet.of(linter || empty),
+                lintGutterSet.of(lintGutterProp ? lintGutter() : empty),
+                tooltipSet.of(await getTooltipAsync()),
+                languageSet.of(await getLauguageAsync(language || "csharp")),
                 readonlySet.of(EditorState.readOnly.of(!!readonly)),
                 EditorView.updateListener.of(e => {
                     if (e.docChanged) {
@@ -169,11 +199,7 @@
     defineExpose({
         get editor() {
             return editor;
-        },
-        keymapSet,
-        linterSet,
-        lintGutterSet,
-        autocompletionSet
+        }
     });
 </script>
 
@@ -491,7 +517,8 @@
                 content: url("data:image/svg+xml,%3csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2016%2016'%3e%3cdefs%3e%3cstyle%3e.canvas{fill:%20none;%20opacity:%200;}.light-blue{fill:%20%23005dba;%20opacity:%201;}.light-blue-10{fill:%20%23005dba;%20opacity:%200.1;}.light-defaultgrey-10{fill:%20%23212121;%20opacity:%200.1;}.light-defaultgrey{fill:%20%23212121;%20opacity:%201;}.cls-1{opacity:0.75;}%3c/style%3e%3c/defs%3e%3ctitle%3eIconLightInterfaceInternal%3c/title%3e%3cg%20id='canvas'%20class='canvas'%3e%3cpath%20class='canvas'%20d='M16,16H0V0H16Z'%20/%3e%3c/g%3e%3cg%20id='level-1'%3e%3cg%20class='cls-1'%3e%3cpath%20class='light-blue'%20d='M8.5,6V7h-4V6Z'%20/%3e%3c/g%3e%3cpath%20class='light-blue-10'%20d='M4.5,6.5a2,2,0,1,1-2-2A2,2,0,0,1,4.5,6.5Zm6,1.5a3.469,3.469,0,0,0-1.393.293,3,3,0,1,1,4.947-.237A3.236,3.236,0,0,0,12,8.344,3.472,3.472,0,0,0,10.5,8Z'%20/%3e%3cpath%20class='light-blue'%20d='M2.5,4A2.5,2.5,0,1,0,5,6.5,2.5,2.5,0,0,0,2.5,4Zm0,4A1.5,1.5,0,1,1,4,6.5,1.5,1.5,0,0,1,2.5,8Zm6.607.293a3.54,3.54,0,0,0-.448.236,3.507,3.507,0,1,1,5.891-.347A3.613,3.613,0,0,0,13.5,8l-.014,0A2.478,2.478,0,0,0,14,6.5a2.5,2.5,0,0,0-5,0,2.478,2.478,0,0,0,.618,1.628A3.543,3.543,0,0,0,9.107,8.293Z'%20/%3e%3cpath%20class='light-defaultgrey-10'%20d='M15.5,11.5a1.99,1.99,0,0,1-.148.75l-.138.265c-.2.331-3.214,2.81-3.214,2.81s-3.018-2.479-3.214-2.81l-.138-.265A1.993,1.993,0,0,1,12,10.19a1.992,1.992,0,0,1,3.5,1.31Z'%20/%3e%3cpath%20class='light-defaultgrey'%20d='M13.5,9a2.478,2.478,0,0,0-1.5.509A2.491,2.491,0,0,0,8,11.5a2.543,2.543,0,0,0,.2.979l.152.293a33.618,33.618,0,0,0,3.327,2.94l.317.261.317-.261a31.686,31.686,0,0,0,3.342-2.968l.156-.306A2.5,2.5,0,0,0,13.5,9ZM14.9,12.047l-.1.192c-.167.218-1.5,1.364-2.8,2.438-1.3-1.074-2.63-2.217-2.771-2.39l-.117-.224a1.493,1.493,0,0,1,2.512-1.544l.376.43.376-.43A1.494,1.494,0,0,1,14.9,12.047Z'%20/%3e%3c/g%3e%3c/svg%3e")
             }
 
-            &.cm-completionIcon-keyword {
+            &.cm-completionIcon-keyword,
+            &.cm-completionIcon-keyword-intrinsic {
                 content: url("data:image/svg+xml,%3csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2016%2016'%3e%3cdefs%3e%3cstyle%3e.canvas{fill:%20none;%20opacity:%200;}.light-blue-10{fill:%20%23005dba;%20opacity:%200.1;}.light-blue{fill:%20%23005dba;%20opacity:%201;}.light-defaultgrey{fill:%20%23212121;%20opacity:%201;}%3c/style%3e%3c/defs%3e%3ctitle%3eIconLightIntelliSenseKeyword%3c/title%3e%3cg%20id='canvas'%20class='canvas'%3e%3cpath%20class='canvas'%20d='M16,16H0V0H16Z'%20/%3e%3c/g%3e%3cg%20id='level-1'%3e%3cpath%20class='light-blue-10'%20d='M10.5,2.5v3h-9v-3Z'%20/%3e%3cpath%20class='light-blue'%20d='M10.5,2h-9L1,2.5v3l.5.5h9l.5-.5v-3ZM10,5H2V3h8Z'%20/%3e%3cpath%20class='light-defaultgrey'%20d='M8,11v1H1V11Zm1,0v1h6V11ZM1,9H9V8H1Zm0,6H11V14H1Zm9-6h5V8H10Zm2-4h3V4H12Z'%20/%3e%3c/g%3e%3c/svg%3e")
             }
 
@@ -744,7 +771,8 @@
                     content: url("data:image/svg+xml,%3csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2016%2016'%3e%3cdefs%3e%3cstyle%3e.canvas{fill:%20none;%20opacity:%200;}.light-blue{fill:%20%23005dba;%20opacity:%201;}.light-blue-10{fill:%20%23005dba;%20opacity:%200.1;}.light-defaultgrey-10{fill:%20%23212121;%20opacity:%200.1;}.light-defaultgrey{fill:%20%23212121;%20opacity:%201;}.cls-1{opacity:0.75;}.invert{filter:invert(1)}.brighten{filter:brightness(1.4)}%3c/style%3e%3c/defs%3e%3ctitle%3eIconLightInterfaceInternal%3c/title%3e%3cg%20id='canvas'%20class='canvas'%3e%3cpath%20class='canvas'%20d='M16,16H0V0H16Z'%20%3e%3c/path%3e%3c/g%3e%3cg%20id='level-1'%3e%3cg%20class='cls-1'%3e%3cpath%20class='light-blue%20brighten'%20d='M8.5,6V7h-4V6Z'%3e%3c/path%3e%3c/g%3e%3cpath%20class='light-blue-10%20brighten'%20d='M4.5,6.5a2,2,0,1,1-2-2A2,2,0,0,1,4.5,6.5Zm6,1.5a3.469,3.469,0,0,0-1.393.293,3,3,0,1,1,4.947-.237A3.236,3.236,0,0,0,12,8.344,3.472,3.472,0,0,0,10.5,8Z'%3e%3c/path%3e%3cpath%20class='light-blue%20brighten'%20d='M2.5,4A2.5,2.5,0,1,0,5,6.5,2.5,2.5,0,0,0,2.5,4Zm0,4A1.5,1.5,0,1,1,4,6.5,1.5,1.5,0,0,1,2.5,8Zm6.607.293a3.54,3.54,0,0,0-.448.236,3.507,3.507,0,1,1,5.891-.347A3.613,3.613,0,0,0,13.5,8l-.014,0A2.478,2.478,0,0,0,14,6.5a2.5,2.5,0,0,0-5,0,2.478,2.478,0,0,0,.618,1.628A3.543,3.543,0,0,0,9.107,8.293Z'%3e%3c/path%3e%3cpath%20class='light-defaultgrey-10%20invert'%20d='M15.5,11.5a1.99,1.99,0,0,1-.148.75l-.138.265c-.2.331-3.214,2.81-3.214,2.81s-3.018-2.479-3.214-2.81l-.138-.265A1.993,1.993,0,0,1,12,10.19a1.992,1.992,0,0,1,3.5,1.31Z'%3e%3c/path%3e%3cpath%20class='light-defaultgrey%20invert'%20d='M13.5,9a2.478,2.478,0,0,0-1.5.509A2.491,2.491,0,0,0,8,11.5a2.543,2.543,0,0,0,.2.979l.152.293a33.618,33.618,0,0,0,3.327,2.94l.317.261.317-.261a31.686,31.686,0,0,0,3.342-2.968l.156-.306A2.5,2.5,0,0,0,13.5,9ZM14.9,12.047l-.1.192c-.167.218-1.5,1.364-2.8,2.438-1.3-1.074-2.63-2.217-2.771-2.39l-.117-.224a1.493,1.493,0,0,1,2.512-1.544l.376.43.376-.43A1.494,1.494,0,0,1,14.9,12.047Z'%3e%3c/path%3e%3c/g%3e%3c/svg%3e")
                 }
 
-                &.cm-completionIcon-keyword {
+                &.cm-completionIcon-keyword,
+                &.cm-completionIcon-keyword-intrinsic {
                     content: url("data:image/svg+xml,%3csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2016%2016'%3e%3cdefs%3e%3cstyle%3e.canvas{fill:%20none;%20opacity:%200;}.light-blue-10{fill:%20%23005dba;%20opacity:%200.1;}.light-blue{fill:%20%23005dba;%20opacity:%201;}.light-defaultgrey{fill:%20%23212121;%20opacity:%201;}.invert{filter:invert(1)}.brighten{filter:brightness(1.4)}%3c/style%3e%3c/defs%3e%3ctitle%3eIconLightIntelliSenseKeyword%3c/title%3e%3cg%20id='canvas'%20class='canvas'%3e%3cpath%20class='canvas'%20d='M16,16H0V0H16Z'%20%3e%3c/path%3e%3c/g%3e%3cg%20id='level-1'%3e%3cpath%20class='light-blue-10%20brighten'%20d='M10.5,2.5v3h-9v-3Z'%3e%3c/path%3e%3cpath%20class='light-blue%20brighten'%20d='M10.5,2h-9L1,2.5v3l.5.5h9l.5-.5v-3ZM10,5H2V3h8Z'%3e%3c/path%3e%3cpath%20class='light-defaultgrey%20invert'%20d='M8,11v1H1V11Zm1,0v1h6V11ZM1,9H9V8H1Zm0,6H11V14H1Zm9-6h5V8H10Zm2-4h3V4H12Z'%3e%3c/path%3e%3c/g%3e%3c/svg%3e")
                 }
 

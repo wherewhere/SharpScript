@@ -29,7 +29,8 @@
                     </div>
                 </div>
                 <CodeMirror class="editor" v-model:value="code" :language="getLauguage()" :readonly="loading"
-                            :roslyn-tooltip="roslynTooltip.input!" @change="onChange" ref="editor" />
+                            :lint-gutter="lintGutter" :linter="linter" :keymap="keymapProp" ref="editor"
+                            :roslyn-tooltip="roslynTooltip.input" :roslyn-completion="roslynCompletion" @change="onChange" />
             </template>
             <template #panel2>
                 <div class="toolbar">
@@ -69,7 +70,7 @@
                 <div class="editor">
                     <CodeMirror v-if="isDecompile && results.decompiled && !diagnostics.errors.length"
                                 v-model:value="results.decompiled" :language="getOutputLanguage()"
-                                :roslyn-tooltip="roslynTooltip.output!" :readonly="true" style="flex: 1;" />
+                                :roslyn-tooltip="roslynTooltip.output" :readonly="true" style="flex: 1;" />
                     <div class="output" v-else>
                         <fluent-tree-view class="no-selected-indicator" v-if="isSyntaxTree && syntaxTree"
                                           style="flex: 1; margin: 12px 0;">
@@ -134,12 +135,12 @@
     import { AsyncLock, Comlink } from "./helpers/shared";
     import { AnsiUp } from "ansi_up";
     import type { Extension } from "@codemirror/state";
-    import { lintGutter } from "@codemirror/lint";
     import { keymap, type ViewUpdate } from "@codemirror/view";
     import { createCompletion } from "./editor/completion";
     import { createLinter } from "./editor/diagnostics";
     import { createFormatKeymap, formatAsync } from "./editor/formatting";
     import { createTooltip } from "./editor/hover";
+    import { csharpExample, vbExample, ilExample } from "./helpers/examples";
     import { getCustomCompletionAsync } from "./helpers/fingerprinting";
     import { setTimeoutAsync } from "./helpers/utils";
     import { keywords } from "./package.json";
@@ -194,7 +195,7 @@
     }
     useAnalytics(noreferrer);
 
-    const code = shallowRef('using System;\nConsole.WriteLine("Hello, World!");');
+    const code = shallowRef(csharpExample);
     const language = shallowRef("CSharp");
     const inputLanguages = ref(["Default", "CSharp1", "CSharp2", "CSharp3", "CSharp4", "CSharp5", "CSharp6", "CSharp7", "CSharp7_1", "CSharp7_2", "CSharp7_3", "CSharp8", "CSharp9", "CSharp10", "CSharp11", "CSharp12", "CSharp13", "CSharp14", "LatestMajor", "Preview", "Latest"]);
     const inputLanguage = shallowRef<string | undefined>("Preview");
@@ -217,16 +218,20 @@
     });
     const syntaxTree = shallowRef<AstNodeItem>();
     const locker = new AsyncLock();
+    const linter = ref<Extension | undefined>();
+    const lintGutter = ref(false);
+    const roslynCompletion = ref<(() => Promise<Extension>) | undefined>();
     const roslynTooltip = ref({
-        input: null as (() => Extension) | null,
-        output: null as (() => Extension) | null
+        input: undefined as (() => Extension) | undefined,
+        output: undefined as (() => Extension) | undefined
     });
+    const keymapProp = ref<Extension | undefined>();
     const direction = shallowRef<"row" | "column">("row");
     const isRun = computed(() => output.value === "Run");
     const isSyntaxTree = computed(() => output.value === "SyntaxTree");
     const isDecompile = computed(() => !isRun.value && !isSyntaxTree.value);
 
-    let dotnet: DotNetWorker | null = null;
+    let dotnet: DotNetWorker | undefined;
     watch(
         language,
         async (newValue, oldValue) => {
@@ -677,38 +682,30 @@
                 changeList.push(events);
             };
 
-            editorView.dispatch({
-                effects: editorHost.linterSet.reconfigure(createLinter(
-                    () => {
-                        if (isSyntaxTree) {
-                            getAstAsync().then(x => syntaxTree.value = x!);
-                        }
-                    },
-                    getDiagnosticsAsync,
-                    diagnosticInvokeAsync,
-                    diagnostics,
-                    language
-                ))
-            });
-            editorView.dispatch({
-                effects: editorHost.lintGutterSet.reconfigure(lintGutter())
-            });
+            linter.value = createLinter(
+                () => {
+                    if (isSyntaxTree) {
+                        getAstAsync().then(x => syntaxTree.value = x!);
+                    }
+                },
+                getDiagnosticsAsync,
+                diagnosticInvokeAsync,
+                diagnostics,
+                language
+            );
+            lintGutter.value = true;
 
-            editorView.dispatch({
-                effects: editorHost.autocompletionSet.reconfigure(createCompletion(
-                    getCompletionsAsync,
-                    completionGetDescriptionAsync,
-                    completionGetChangeAsync,
-                    getCustomCompletionAsync(language, await dotnet!.fingerprinting)
-                ))
-            });
+            roslynCompletion.value = async () => createCompletion(
+                getCompletionsAsync,
+                completionGetDescriptionAsync,
+                completionGetChangeAsync,
+                getCustomCompletionAsync(language, await dotnet!.fingerprinting)
+            );
 
             roslynTooltip.value.input = () => createTooltip(getInfoTipAsync);
             roslynTooltip.value.output = () => createTooltip(getCSharpInfoTipLiteAsync);
 
-            editorView.dispatch({
-                effects: editorHost.keymapSet.reconfigure(keymap.of(createFormatKeymap(formatCodeAsync)))
-            });
+            keymapProp.value = keymap.of(createFormatKeymap(formatCodeAsync));
 
             isInitLinter.value = true;
         }
@@ -747,11 +744,11 @@
     function getDefaultCode(language: string) {
         switch (language) {
             case "CSharp":
-                return 'using System;\nConsole.WriteLine("Hello, World!");';
+                return csharpExample;
             case "VisualBasic":
-                return 'Imports System\nPublic Module Program\n    Public Sub Main()\n        Console.WriteLine("Hello, World!")\n    End Sub\nEnd Module';
+                return vbExample;
             case "IL":
-                return `.assembly ' ' {\n}\n.assembly extern System.Console {\n}\n.method static void Main() {\n    .entrypoint\n    ldstr "Hello, World!"\n    call void [System.Console]System.Console::WriteLine(string)\n    ret\n}`;
+                return ilExample;
             default:
                 return '';
         }

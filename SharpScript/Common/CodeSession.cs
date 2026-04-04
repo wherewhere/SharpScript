@@ -22,6 +22,7 @@ using System.Net.Http;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using CompletionChange = SharpScript.Models.CompletionChange;
@@ -758,7 +759,7 @@ namespace SharpScript.Common
         }
     }
 
-    public sealed class ILCodeSession(SourceText code, bool isConsole) : ICodeSession
+    public sealed partial class ILCodeSession(SourceText code, bool isConsole) : ICodeSession
     {
         SourceText ICodeSession.SourceCode => code;
 
@@ -811,17 +812,43 @@ namespace SharpScript.Common
             }
         }
 
-        private class Logger(ICollection<Diagnostic> results) : Mobius.ILasm.interfaces.ILogger
+        private partial class Logger(ICollection<Diagnostic> results) : Mobius.ILasm.interfaces.ILogger
         {
             public void Info(string message) => results.Add(new Diagnostic(DiagnosticSeverity.Info, message));
 
-            public void Warning(string message) => results.Add(new Diagnostic(DiagnosticSeverity.Warning, message));
+            public void Warning(string message)
+            {
+                if (MissingReferenceRegex.Match(message) is { Success: true, Groups: [_, { Value: { Length: > 0 } value }] })
+                {
+                    Task<IReadOnlyList<TextChange>?> InvokeAsync()
+                    {
+                        return Task.FromResult<IReadOnlyList<TextChange>?>([
+                            new TextChange(
+                                new TextSpan(0, 0),
+                                $$"""
+                                .assembly extern {{value}} {
+                                }
+
+                                """)
+                        ]);
+                    }
+                    ILCodeAction action = new("adding", InvokeAsync);
+                    results.Add(new Diagnostic(DiagnosticSeverity.Warning, message.Replace(", adding.", "."), action));
+                }
+                else
+                {
+                    results.Add(new Diagnostic(DiagnosticSeverity.Warning, message));
+                }
+            }
 
             public void Error(string message) => results.Add(new Diagnostic(DiagnosticSeverity.Error, message));
 
             public void Warning(Mono.ILASM.Location location, string message) => results.Add(new Diagnostic(location, DiagnosticSeverity.Warning, message));
 
             public void Error(Mono.ILASM.Location location, string message) => results.Add(new Diagnostic(location, DiagnosticSeverity.Error, message));
+
+            [GeneratedRegex(@"^Reference to undeclared extern assembly '(.*)', adding\.$")]
+            private static partial Regex MissingReferenceRegex { get; }
         }
     }
 

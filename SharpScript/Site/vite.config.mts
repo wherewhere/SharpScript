@@ -56,11 +56,25 @@ export default defineConfig(({ mode }) => {
                     groups: [{
                         name: "shared",
                         test: "/helpers/shared.ts"
+                    }, {
+                        name: "lezer",
+                        test: "@lezer"
+                    }, {
+                        name: "codemirror",
+                        test: "/codemirror/"
+                    }, {
+                        name: "msil",
+                        test: "codemirror-lang-msil"
+                    }, {
+                        name: "csharp",
+                        test: "@replit/codemirror-lang-csharp"
+                    }, {
+                        name: "vb",
+                        test: "@codemirror/legacy-modes/mode/vb"
                     }]
                 })
             },
-            emptyOutDir: true,
-            chunkSizeWarningLimit: 1024
+            emptyOutDir: true
         },
         worker: {
             format: "es"

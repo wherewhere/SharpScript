@@ -13,7 +13,7 @@ namespace SharpScript.Models
     public interface ICodeAction : IDisposable
     {
         string Title { get; }
-        DotNetObjectReference<ICodeAction> Action { get; }
+        DotNetObjectReference<ICodeAction> Action => DotNetObjectReference.Create(this);
         [JSInvokable]
         Task<IReadOnlyList<TextChange>?> InvokeAsync();
         void IDisposable.Dispose() { Action?.Dispose(); GC.SuppressFinalize(this); }
@@ -22,7 +22,6 @@ namespace SharpScript.Models
     public sealed class RoslynCodeAction(CodeAction action, RoslynCodeSession session) : ICodeAction
     {
         public string Title => action.Title;
-        public DotNetObjectReference<ICodeAction> Action => DotNetObjectReference.Create<ICodeAction>(this);
 
         [JSInvokable]
         public async Task<IReadOnlyList<TextChange>?> InvokeAsync()
@@ -42,5 +41,15 @@ namespace SharpScript.Models
                 return null;
             }
         }
+    }
+
+    public sealed class ILCodeAction(string title, Func<Task<IReadOnlyList<TextChange>?>> invoker) : ICodeAction
+    {
+        public string Title => title;
+
+        public DotNetObjectReference<ICodeAction> Action => DotNetObjectReference.Create<ICodeAction>(this);
+
+        [JSInvokable]
+        public Task<IReadOnlyList<TextChange>?> InvokeAsync() => invoker();
     }
 }
