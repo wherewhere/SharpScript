@@ -35,8 +35,7 @@
         () => language,
         async (newValue, oldValue) => {
             if (newValue !== oldValue) {
-                console.log(newValue);
-                const lang = await getLauguageAsync(newValue!);
+                const lang = await getLanguageAsync(newValue!);
                 editor!.dispatch({ effects: languageSet.reconfigure(lang) });
                 updateTooltipAsync();
                 updateCompletionAsync();
@@ -82,7 +81,6 @@
         () => roslynTooltip,
         (newValue, oldValue) => {
             if (newValue !== oldValue && language !== "il") {
-                console.log(newValue)
                 editor!.dispatch({ effects: tooltipSet.reconfigure(newValue ? newValue() : empty) });
             }
         });
@@ -90,7 +88,6 @@
         () => roslynCompletion,
         async (newValue, oldValue) => {
             if (newValue !== oldValue && language !== "il") {
-                console.log(newValue)
                 editor!.dispatch({ effects: autocompletionSet.reconfigure(newValue ? await newValue() : empty) });
             }
         });
@@ -103,9 +100,7 @@
 
     const tooltipSet = new Compartment();
     async function getTooltipAsync() {
-        var a = language === "il" ? await import("codemirror-lang-msil").then(m => m.msilTooltip()) : roslynTooltip ? roslynTooltip() : empty;
-        console.log(a);
-        return a;
+        return language === "il" ? await import("codemirror-lang-msil").then(m => m.msilTooltip()) : roslynTooltip ? roslynTooltip() : empty;
     }
     async function updateTooltipAsync() {
         editor!.dispatch({ effects: tooltipSet.reconfigure(await getTooltipAsync()) });
@@ -119,7 +114,7 @@
         editor!.dispatch({ effects: autocompletionSet.reconfigure(await getCompletionAsync()) });
     }
 
-    async function getLauguageAsync(lang: lang) {
+    async function getLanguageAsync(lang?: lang) {
         switch (lang) {
             case "il":
                 const { msil } = await import("codemirror-lang-msil");
@@ -172,13 +167,13 @@
                 getTheme(),
                 keymap.of(vscodeKeymap),
                 indentUnit.of("    "),
-                autocompletionSet.of(empty),
                 keymapSet.of(keymapProp || empty),
                 linterSet.of(linter || empty),
                 lintGutterSet.of(lintGutterProp ? lintGutter() : empty),
-                tooltipSet.of(await getTooltipAsync()),
-                languageSet.of(await getLauguageAsync(language || "csharp")),
                 readonlySet.of(EditorState.readOnly.of(!!readonly)),
+                tooltipSet.of(empty),
+                languageSet.of(empty),
+                autocompletionSet.of(empty),
                 EditorView.updateListener.of(e => {
                     if (e.docChanged) {
                         changed = true;
@@ -186,6 +181,13 @@
                         emit("change", e);
                     }
                 })
+            ]
+        });
+        editor.dispatch({
+            effects: [
+                tooltipSet.reconfigure(await getTooltipAsync()),
+                languageSet.reconfigure(await getLanguageAsync(language)),
+                autocompletionSet.reconfigure(await getCompletionAsync())
             ]
         });
     });
@@ -518,6 +520,7 @@
             }
 
             &.cm-completionIcon-keyword,
+            &.cm-completionIcon-intrinsic,
             &.cm-completionIcon-keyword-intrinsic {
                 content: url("data:image/svg+xml,%3csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2016%2016'%3e%3cdefs%3e%3cstyle%3e.canvas{fill:%20none;%20opacity:%200;}.light-blue-10{fill:%20%23005dba;%20opacity:%200.1;}.light-blue{fill:%20%23005dba;%20opacity:%201;}.light-defaultgrey{fill:%20%23212121;%20opacity:%201;}%3c/style%3e%3c/defs%3e%3ctitle%3eIconLightIntelliSenseKeyword%3c/title%3e%3cg%20id='canvas'%20class='canvas'%3e%3cpath%20class='canvas'%20d='M16,16H0V0H16Z'%20/%3e%3c/g%3e%3cg%20id='level-1'%3e%3cpath%20class='light-blue-10'%20d='M10.5,2.5v3h-9v-3Z'%20/%3e%3cpath%20class='light-blue'%20d='M10.5,2h-9L1,2.5v3l.5.5h9l.5-.5v-3ZM10,5H2V3h8Z'%20/%3e%3cpath%20class='light-defaultgrey'%20d='M8,11v1H1V11Zm1,0v1h6V11ZM1,9H9V8H1Zm0,6H11V14H1Zm9-6h5V8H10Zm2-4h3V4H12Z'%20/%3e%3c/g%3e%3c/svg%3e")
             }
@@ -772,6 +775,7 @@
                 }
 
                 &.cm-completionIcon-keyword,
+                &.cm-completionIcon-intrinsic,
                 &.cm-completionIcon-keyword-intrinsic {
                     content: url("data:image/svg+xml,%3csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2016%2016'%3e%3cdefs%3e%3cstyle%3e.canvas{fill:%20none;%20opacity:%200;}.light-blue-10{fill:%20%23005dba;%20opacity:%200.1;}.light-blue{fill:%20%23005dba;%20opacity:%201;}.light-defaultgrey{fill:%20%23212121;%20opacity:%201;}.invert{filter:invert(1)}.brighten{filter:brightness(1.4)}%3c/style%3e%3c/defs%3e%3ctitle%3eIconLightIntelliSenseKeyword%3c/title%3e%3cg%20id='canvas'%20class='canvas'%3e%3cpath%20class='canvas'%20d='M16,16H0V0H16Z'%20%3e%3c/path%3e%3c/g%3e%3cg%20id='level-1'%3e%3cpath%20class='light-blue-10%20brighten'%20d='M10.5,2.5v3h-9v-3Z'%3e%3c/path%3e%3cpath%20class='light-blue%20brighten'%20d='M10.5,2h-9L1,2.5v3l.5.5h9l.5-.5v-3ZM10,5H2V3h8Z'%3e%3c/path%3e%3cpath%20class='light-defaultgrey%20invert'%20d='M8,11v1H1V11Zm1,0v1h6V11ZM1,9H9V8H1Zm0,6H11V14H1Zm9-6h5V8H10Zm2-4h3V4H12Z'%3e%3c/path%3e%3c/g%3e%3c/svg%3e")
                 }
