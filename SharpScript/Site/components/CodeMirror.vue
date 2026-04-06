@@ -134,7 +134,7 @@
                     "sbyte", "float", "string", "ushort", "uint", "ulong"];
                 const atoms = ["true", "false", "null"];
                 return new LanguageSupport(csharpLanguage, csharpLanguage.data.of({
-                    autocomplete: keywords.concat(types).concat(atoms)
+                    autocomplete: keywords.concat(types, atoms)
                 }));
             case "vb":
                 return StreamLanguage.define(await import("@codemirror/legacy-modes/mode/vb").then(m => m.vb));
