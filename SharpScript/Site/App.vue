@@ -197,36 +197,19 @@
 
     const code = shallowRef(csharpExample);
     const language = shallowRef("CSharp");
-    const inputLanguages = ref(["Default", "CSharp1", "CSharp2", "CSharp3", "CSharp4", "CSharp5", "CSharp6", "CSharp7", "CSharp7_1", "CSharp7_2", "CSharp7_3", "CSharp8", "CSharp9", "CSharp10", "CSharp11", "CSharp12", "CSharp13", "CSharp14", "LatestMajor", "Preview", "Latest"]);
+    const inputLanguages = ref<readonly string[]>(["Default", "CSharp1", "CSharp2", "CSharp3", "CSharp4", "CSharp5", "CSharp6", "CSharp7", "CSharp7_1", "CSharp7_2", "CSharp7_3", "CSharp8", "CSharp9", "CSharp10", "CSharp11", "CSharp12", "CSharp13", "CSharp14", "LatestMajor", "Preview", "Latest"]);
     const inputLanguage = shallowRef<string | undefined>("Preview");
     const isScript = shallowRef(false);
     const output = shallowRef<"CSharp" | "VisualBasic" | "IL" | "Run" | "SyntaxTree">("Run");
-    const outputLanguages = ref<string[]>([]);
+    const outputLanguages = ref<readonly string[]>([]);
     const outputLanguage = shallowRef<string | undefined>("CSharp1");
-    const isInitDotnet = shallowRef(false);
-    const isInitLinter = shallowRef(false);
     const loading = shallowRef(false);
     const message = shallowRef('');
     const results = ref<{
         decompiled?: string,
-        outputs: string[]
+        outputs: readonly string[]
     }>({ outputs: [] });
-    const diagnostics = ref({
-        errors: [] as DiagnosticWrapper[],
-        warnings: [] as DiagnosticWrapper[],
-        infos: [] as DiagnosticWrapper[]
-    });
-    const syntaxTree = shallowRef<AstNodeItem>();
-    const locker = new AsyncLock();
-    const linter = ref<Extension | undefined>();
-    const lintGutter = ref(false);
-    const roslynCompletion = ref<(() => Promise<Extension>) | undefined>();
-    const roslynTooltip = ref({
-        input: undefined as (() => Extension) | undefined,
-        output: undefined as (() => Extension) | undefined
-    });
-    const keymapProp = ref<Extension | undefined>();
-    const direction = shallowRef<"row" | "column">("row");
+
     const isRun = computed(() => output.value === "Run");
     const isSyntaxTree = computed(() => output.value === "SyntaxTree");
     const isDecompile = computed(() => !isRun.value && !isSyntaxTree.value);
@@ -249,8 +232,8 @@
                     inputLanguage.value = await dotnet!.getInputLanguageVersionAsync();
                     message.value = mes;
                 }
-                catch (e) {
-                    message.value = t("message.error", `${e}`);
+                catch (e: any) {
+                    message.value = t("message.error", e?.message || `${e}`);
                     console.error(e);
                 }
                 finally {
@@ -272,8 +255,8 @@
                     await dotnet!.setInputLanguageVersionAsync(newValue);
                     message.value = mes;
                 }
-                catch (e) {
-                    message.value = t("message.error", `${e}`);
+                catch (e: any) {
+                    message.value = t("message.error", e?.message || `${e}`);
                     console.error(e);
                 }
                 finally {
@@ -295,8 +278,8 @@
                     await dotnet!.setSourceCodeKind(newValue ? "Script" : "Regular");
                     message.value = mes;
                 }
-                catch (e) {
-                    message.value = t("message.error", `${e}`);
+                catch (e: any) {
+                    message.value = t("message.error", e?.message || `${e}`);
                     console.error(e);
                 }
                 finally {
@@ -326,8 +309,8 @@
                     }
                     message.value = mes;
                 }
-                catch (e) {
-                    message.value = t("message.error", `${e}`);
+                catch (e: any) {
+                    message.value = t("message.error", e?.message || `${e}`);
                     console.error(e);
                 }
                 finally {
@@ -349,8 +332,8 @@
                     await dotnet!.setOutputLanguageVersionAsync(newValue);
                     message.value = mes;
                 }
-                catch (e) {
-                    message.value = t("message.error", `${e}`);
+                catch (e: any) {
+                    message.value = t("message.error", e?.message || `${e}`);
                     console.error(e);
                 }
                 finally {
@@ -412,6 +395,11 @@
         }
     }
 
+    const diagnostics = ref({
+        errors: [] as DiagnosticWrapper[],
+        warnings: [] as DiagnosticWrapper[],
+        infos: [] as DiagnosticWrapper[]
+    });
     async function processAsync() {
         try {
             loading.value = true;
@@ -448,15 +436,16 @@
             });
             message.value = mes;
         }
-        catch (e) {
-            message.value = t("message.error", `${e}`);
+        catch (e: any) {
+            const mesg = e?.message || `${e}`;
+            message.value = t("message.error", mesg);
             diagnostics.value.errors.push({
                 id: '',
                 location: {
                     start: { line: 0, character: 0 },
                     end: { line: 0, character: 0 }
                 },
-                message: `${e}`,
+                message: mesg,
                 severity: "Error",
                 actions: [],
                 tags: []
@@ -558,6 +547,7 @@
         }
     }
 
+    const editor = useTemplateRef("editor");
     async function formatEditorAsync() {
         try {
             loading.value = true;
@@ -589,8 +579,8 @@
             }
             message.value = mes;
         }
-        catch (e) {
-            message.value = t("message.error", `${e}`);
+        catch (e: any) {
+            message.value = t("message.error", e?.message || `${e}`);
             console.error(e);
         }
         finally {
@@ -616,6 +606,8 @@
         }
     }
 
+    const isInitDotnet = shallowRef(false);
+    const locker = new AsyncLock();
     let noWorker = false;
     async function initDotNetAsync() {
         if (!isInitDotnet.value) {
@@ -655,12 +647,19 @@
         }
     }
 
+    const isInitLinter = shallowRef(false);
+    const syntaxTree = shallowRef<AstNodeItem>();
     const onChange = shallowRef((_: ViewUpdate) => { });
-    const editor = useTemplateRef("editor");
+    const linter = ref<Extension | undefined>();
+    const lintGutter = ref(false);
+    const roslynCompletion = ref<(() => Promise<Extension>) | undefined>();
+    const roslynTooltip = ref({
+        input: undefined as (() => Extension) | undefined,
+        output: undefined as (() => Extension) | undefined
+    });
+    const keymapProp = ref<Extension | undefined>();
     async function initEditerAsync() {
         if (!isInitLinter.value) {
-            const editorHost = editor.value!;
-            const editorView = editorHost.editor!;
             await resetCodeAsync(code.value);
 
             onChange.value = ({ changes }: ViewUpdate) => {
@@ -845,6 +844,7 @@
         return html;
     }
 
+    const direction = shallowRef<"row" | "column">("row");
     onMounted(async () => {
         const importWorker = () => import("./worker");
         if (loadSettings()) {
@@ -921,6 +921,7 @@
         font-size: inherit;
         font-family: inherit;
         white-space: pre-wrap;
+        overflow: visible;
     }
 
     .toolbar,

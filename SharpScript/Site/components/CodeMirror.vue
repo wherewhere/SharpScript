@@ -37,7 +37,7 @@
             if (newValue !== oldValue) {
                 const lang = await getLanguageAsync(newValue!);
                 editor!.dispatch({ effects: languageSet.reconfigure(lang) });
-                updateTooltipAsync();
+                updateTooltip();
                 updateCompletionAsync();
             }
         });
@@ -99,11 +99,11 @@
     }
 
     const tooltipSet = new Compartment();
-    async function getTooltipAsync() {
-        return language === "il" ? await import("codemirror-lang-msil").then(m => m.msilTooltip()) : roslynTooltip ? roslynTooltip() : empty;
+    function getTooltip() {
+        return language !== "il" && roslynTooltip ? roslynTooltip() : empty;
     }
-    async function updateTooltipAsync() {
-        editor!.dispatch({ effects: tooltipSet.reconfigure(await getTooltipAsync()) });
+    function updateTooltip() {
+        editor!.dispatch({ effects: tooltipSet.reconfigure(getTooltip()) });
     }
 
     const autocompletionSet = new Compartment();
@@ -127,14 +127,14 @@
                     "operator", "out", "override", "params", "private", "protected", "public", "readonly", "record", "ref", "required", "return", "sealed",
                     "sizeof", "stackalloc", "static", "struct", "switch", "this", "throw", "try", "typeof", "unchecked",
                     "unsafe", "using", "virtual", "void", "volatile", "while", "add", "alias", "ascending", "descending", "dynamic", "from", "get",
-                    "global", "group", "into", "join", "let", "orderby", "partial", "remove", "select", "set", "value", "var", "yield"];
+                    "global", "group", "into", "join", "let", "orderby", "partial", "remove", "select", "set", "value", "var", "yield"] as const;
                 const types = ["Action", "Boolean", "Byte", "Char", "DateTime", "DateTimeOffset", "Decimal", "Double", "Func",
                     "Guid", "Int16", "Int32", "Int64", "Object", "SByte", "Single", "String", "Task", "TimeSpan", "UInt16", "UInt32",
                     "UInt64", "bool", "byte", "char", "decimal", "double", "short", "int", "long", "object",
-                    "sbyte", "float", "string", "ushort", "uint", "ulong"];
-                const atoms = ["true", "false", "null"];
+                    "sbyte", "float", "string", "ushort", "uint", "ulong"] as const;
+                const atoms = ["true", "false", "null"] as const;
                 return new LanguageSupport(csharpLanguage, csharpLanguage.data.of({
-                    autocomplete: keywords.concat(types, atoms)
+                    autocomplete: (keywords as readonly string[]).concat(types, atoms)
                 }));
             case "vb":
                 return StreamLanguage.define(await import("@codemirror/legacy-modes/mode/vb").then(m => m.vb));
@@ -171,7 +171,7 @@
                 linterSet.of(linter || empty),
                 lintGutterSet.of(lintGutterProp ? lintGutter() : empty),
                 readonlySet.of(EditorState.readOnly.of(!!readonly)),
-                tooltipSet.of(empty),
+                tooltipSet.of(getTooltip()),
                 languageSet.of(empty),
                 autocompletionSet.of(empty),
                 EditorView.updateListener.of(e => {
@@ -185,7 +185,6 @@
         });
         editor.dispatch({
             effects: [
-                tooltipSet.reconfigure(await getTooltipAsync()),
                 languageSet.reconfigure(await getLanguageAsync(language)),
                 autocompletionSet.reconfigure(await getCompletionAsync())
             ]
