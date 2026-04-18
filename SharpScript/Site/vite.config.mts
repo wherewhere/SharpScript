@@ -67,7 +67,7 @@ export default defineConfig(({ mode }) => {
                         test: "codemirror-lang-msil"
                     }, {
                         name: "csharp",
-                        test: "@replit/codemirror-lang-csharp"
+                        test: "@where/codemirror-lang-csharp"
                     }, {
                         name: "vb",
                         test: "@codemirror/legacy-modes/mode/vb"

@@ -120,7 +120,7 @@
                 const { msil } = await import("codemirror-lang-msil");
                 return msil();
             case "csharp":
-                const { csharpLanguage } = await import("@replit/codemirror-lang-csharp");
+                const { csharpLanguage } = await import("@where/codemirror-lang-csharp");
                 const keywords = ["abstract", "as", "async", "await", "base", "break", "case", "catch", "checked", "class", "const", "continue",
                     "default", "delegate", "do", "else", "enum", "event", "explicit", "extern", "finally", "fixed", "for",
                     "foreach", "goto", "if", "implicit", "in", "init", "interface", "internal", "is", "lock", "namespace", "new",
