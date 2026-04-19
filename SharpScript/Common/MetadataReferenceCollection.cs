@@ -106,5 +106,11 @@ namespace SharpScript.Common
         }
     }
 
-    public readonly record struct MetadataReferenceHost(byte[] Image, PortableExecutableReference Reference);
+    public readonly record struct MetadataReferenceHost(byte[] Image, PortableExecutableReference Reference)
+    {
+        public MetadataReferenceHost(MemoryStream peStream, MetadataReferenceProperties properties = default, DocumentationProvider? documentation = null, string? filePath = null) :
+            this(peStream.ToArray(), MetadataReference.CreateFromStream(peStream, properties, documentation, filePath))
+        {
+        }
+    }
 }

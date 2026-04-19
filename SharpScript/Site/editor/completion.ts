@@ -1,4 +1,4 @@
-import { autocompletion, ifNotIn, type Completion } from "@codemirror/autocomplete";
+import { autocompletion, ifNotIn, type Completion, type CompletionContext } from "@codemirror/autocomplete";
 import { mapTextTagsToType, renderParts } from "../helpers/render-parts";
 import type { dotnet } from "../worker";
 
@@ -6,12 +6,14 @@ export function createCompletion(
     getCompletionsAsync: typeof dotnet.getCompletionsAsync,
     completionGetDescriptionAsync: typeof dotnet.completionGetDescriptionAsync,
     completionGetChangeAsync: typeof dotnet.completionGetChangeAsync,
-    customCompletionAsync: (context: any) => Promise<Completion[]>
+    customCompletionAsync: (context: CompletionContext) => Promise<Completion[]>
 ) {
     return autocompletion({
         override: [ifNotIn([';', '{', '}'], async context => {
+            if (context.aborted) { return null; }
             const from = context.pos;
             const completions = await getCompletionsAsync(from);
+            if (context.aborted) { return null; }
             const matchContext = context.matchBefore(/[\w\d]+/) ?? { from };
             return {
                 from: matchContext.from ?? from,
