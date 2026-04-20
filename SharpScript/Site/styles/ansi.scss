@@ -1,0 +1,54 @@
+$light: (
+    "black": #1A1A1A,
+    "red": #99000D,
+    "green": #0C5C0C,
+    "yellow": #BA8900,
+    "blue": #005A9E,
+    "magenta": #62116E,
+    "cyan": #005659,
+    "white": #5C5C5C,
+    "bright-black": #5C5C5C,
+    "bright-red": #6E0009,
+    "bright-green": #094209,
+    "bright-yellow": #805E00,
+    "bright-blue": #004275,
+    "bright-magenta": #470C4F,
+    "bright-cyan": #00393B,
+    "bright-white": #F3F3F3,
+);
+
+$dark: (
+    "black": #202020,
+    "red": #FF99A1,
+    "green": #61BA61,
+    "yellow": #FFE08C,
+    "blue": #76B9ED,
+    "magenta": #E893F4,
+    "cyan": #80D6D9,
+    "white": #FFFFFF,
+    "bright-black": #CCCCCC,
+    "bright-red": #FFBDC2,
+    "bright-green": #90D690,
+    "bright-yellow": #FFE8A8,
+    "bright-blue": #A6D8FF,
+    "bright-magenta": #F7B8FF,
+    "bright-cyan": #B3F4F5,
+    "bright-white": #CCCCCC,
+);
+
+@mixin ansi-colors($colors) {
+    @each $name, $color in $colors {
+        .ansi-#{$name}-fg {
+            color: $color;
+        }
+
+        .ansi-#{$name}-bg {
+            background-color: $color;
+        }
+    }
+}
+
+@include ansi-colors($light);
+@media (prefers-color-scheme: dark) {
+    @include ansi-colors($dark);
+}

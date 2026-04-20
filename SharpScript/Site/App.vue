@@ -77,7 +77,7 @@
                             <SyntaxTreeItem :item="syntaxTree" />
                         </fluent-tree-view>
                         <div v-else-if="isRun && results.outputs.length && !diagnostics.errors.length">
-                            <pre class="unset" v-for="item in results.outputs" v-html="renderConsole(item)"></pre>
+                            <pre class="unset" v-for="item in renderConsole(results.outputs)" v-html="item"></pre>
                         </div>
                         <div v-else-if="diagnostics.errors.length || diagnostics.warnings.length || diagnostics.infos.length">
                             <table cellpadding="4">
@@ -167,7 +167,6 @@
         title,
         description,
         author: author,
-        keywords: keywords.join(", "),
 
         // Open Graph
         ogTitle: title,
@@ -838,10 +837,10 @@
         hashChanged = true;
     }
 
-    function renderConsole(output: string) {
+    function renderConsole(output: readonly string[]) {
         const ansi_up = new AnsiUp();
-        const html = ansi_up.ansi_to_html(output);
-        return html;
+        ansi_up.use_classes = true;
+        return output.map(line => ansi_up.ansi_to_html(line));
     }
 
     const direction = shallowRef<"row" | "column">("row");
@@ -867,6 +866,7 @@
 <style lang="scss">
     @use "github:microsoft/fluentui-blazor?branch=dev&path=/src/Core/wwwroot/css/reboot.css";
     @use "./styles/fonts";
+    @use "./styles/ansi";
 
     $base-transition: background-color 0.083s ease-in-out;
 
