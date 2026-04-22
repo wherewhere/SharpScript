@@ -61,7 +61,8 @@ export default defineConfig(({ mode }) => {
                         test: "@lezer"
                     }, {
                         name: "codemirror",
-                        test: "/codemirror/"
+                        test: moduleId => (/\/@?codemirror\//.test(moduleId))
+                            && !/\/@codemirror\/(legacy-modes\/mode\/|lang-)/.test(moduleId)
                     }, {
                         name: "msil",
                         test: "codemirror-lang-msil"
