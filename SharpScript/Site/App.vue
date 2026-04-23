@@ -125,8 +125,10 @@
 
 <script lang="ts" setup>
     import "./types";
+    import type { Extension } from "@codemirror/state";
     import type { AstNodeItem, InfoTipItem, TextChanges } from "sharp-script";
     import type { setProperty, DotNetWorker, DiagnosticWrapper } from "./worker";
+    import type { ChangeHandler, ExtensionHandler, TooltipHandler } from "./components/CodeMirror.vue";
     import { computed, nextTick, onMounted, ref, shallowRef, useTemplateRef, watch, watchPostEffect } from "vue";
     import { useI18n } from "vue-i18n";
     import { useSeoMeta } from "@unhead/vue";
@@ -134,7 +136,6 @@
     import { useAnalytics } from "./helpers/analytics";
     import { AsyncLock, Comlink } from "./helpers/shared";
     import { AnsiUp } from "ansi_up";
-    import type { Extension } from "@codemirror/state";
     import { keymap, type ViewUpdate } from "@codemirror/view";
     import { createCompletion } from "./editor/completion";
     import { createLinter } from "./editor/diagnostics";
@@ -648,13 +649,13 @@
 
     const isInitLinter = shallowRef(false);
     const syntaxTree = shallowRef<AstNodeItem>();
-    const onChange = shallowRef((_: ViewUpdate) => { });
+    const onChange = shallowRef<ChangeHandler>();
     const linter = ref<Extension | undefined>();
     const lintGutter = ref(false);
-    const roslynCompletion = ref<(() => Promise<Extension>) | undefined>();
+    const roslynCompletion = ref<ExtensionHandler>();
     const roslynTooltip = ref({
-        input: undefined as (() => Extension) | undefined,
-        output: undefined as (() => Extension) | undefined
+        input: undefined as TooltipHandler,
+        output: undefined as TooltipHandler
     });
     const keymapProp = ref<Extension | undefined>();
     async function initEditerAsync() {
@@ -700,7 +701,7 @@
                 getCustomCompletionAsync(language, await dotnet!.fingerprinting)
             );
 
-            roslynTooltip.value.input = () => createTooltip(getInfoTipAsync);
+            roslynTooltip.value.input = options => createTooltip(getInfoTipAsync, options);
             roslynTooltip.value.output = () => createTooltip(getCSharpInfoTipLiteAsync);
 
             keymapProp.value = keymap.of(createFormatKeymap(formatCodeAsync));
@@ -851,7 +852,7 @@
             noWorker = true;
         }
         else {
-            const url = new URL(importWorker.toString().match(/import\("(\S+)"\)/)![1], import.meta.url);
+            const url = new URL(importWorker.toString().match(/import\(["'`](\S+)["'`]\)/)![1], import.meta.url);
             dotnet = Comlink.wrap<DotNetWorker>(new Worker(url.href, { type: "module" }));
         }
         addEventListener("hashchange", loadSettings);

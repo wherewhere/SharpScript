@@ -2,7 +2,7 @@ import { hoverTooltip } from "@codemirror/view";
 import { mapTextTagsToType, renderPartsTo } from "../helpers/render-parts";
 import type { dotnet } from "../worker";
 
-export function createTooltip(getInfoTipAsync: typeof dotnet.getInfoTipAsync) {
+export function createTooltip(getInfoTipAsync: typeof dotnet.getInfoTipAsync, options?: Parameters<typeof hoverTooltip>[1]) {
     return hoverTooltip(async (_, pos) => {
         const tooltip = await getInfoTipAsync(pos);
         return {
@@ -24,5 +24,5 @@ export function createTooltip(getInfoTipAsync: typeof dotnet.getInfoTipAsync) {
                 return { dom };
             }
         };
-    });
+    }, options);
 }

@@ -8,7 +8,7 @@
     import { basicSetup, EditorView } from "codemirror";
     import { Compartment, EditorState, type Extension } from "@codemirror/state";
     import { indentUnit, LanguageSupport, StreamLanguage } from "@codemirror/language";
-    import { keymap, type ViewUpdate } from "@codemirror/view";
+    import { keymap, type hoverTooltip, type ViewUpdate } from "@codemirror/view";
     import { lintGutter } from "@codemirror/lint";
     import { vscodeDark, vscodeLight } from "@uiw/codemirror-theme-vscode";
     import { vscodeKeymap } from "@replit/codemirror-vscode-keymap";
@@ -19,10 +19,16 @@
         lintGutter?: boolean;
         linter?: Extension;
         keymap?: Extension;
-        roslynTooltip?: () => Extension;
-        roslynCompletion?: () => Promise<Extension>;
+        roslynTooltip?: (options: Parameters<typeof hoverTooltip>[1]) => Extension;
+        roslynCompletion?: () => Extension | Promise<Extension>;
     }>();
+    export type TooltipHandler = typeof roslynTooltip;
+    export type ExtensionHandler = typeof roslynCompletion;
+    
     const value = defineModel<string>("value");
+    const tooltipOptions: Parameters<typeof hoverTooltip>[1] = {
+        hideOnChange: true
+    };
 
     let changed = false;
     const languageSet = new Compartment();
@@ -81,7 +87,7 @@
         () => roslynTooltip,
         (newValue, oldValue) => {
             if (newValue !== oldValue && language !== "il") {
-                editor!.dispatch({ effects: tooltipSet.reconfigure(newValue ? newValue() : empty) });
+                editor!.dispatch({ effects: tooltipSet.reconfigure(newValue ? newValue(tooltipOptions) : empty) });
             }
         });
     watch(
@@ -100,7 +106,7 @@
 
     const tooltipSet = new Compartment();
     function getTooltip() {
-        return language !== "il" && roslynTooltip ? roslynTooltip() : empty;
+        return language !== "il" && roslynTooltip ? roslynTooltip(tooltipOptions) : empty;
     }
     function updateTooltip() {
         editor!.dispatch({ effects: tooltipSet.reconfigure(getTooltip()) });
@@ -118,24 +124,16 @@
         switch (lang) {
             case "il":
                 const { msil } = await import("codemirror-lang-msil");
-                return msil();
+                return msil({
+                    tooltip: {
+                        options: {
+                            hideOnChange: true
+                        }
+                    }
+                });
             case "csharp":
-                const { csharpLanguage } = await import("@where/codemirror-lang-csharp");
-                const keywords = ["abstract", "as", "async", "await", "base", "break", "case", "catch", "checked", "class", "const", "continue",
-                    "default", "delegate", "do", "else", "enum", "event", "explicit", "extern", "finally", "fixed", "for",
-                    "foreach", "goto", "if", "implicit", "in", "init", "interface", "internal", "is", "lock", "namespace", "new",
-                    "operator", "out", "override", "params", "private", "protected", "public", "readonly", "record", "ref", "required", "return", "sealed",
-                    "sizeof", "stackalloc", "static", "struct", "switch", "this", "throw", "try", "typeof", "unchecked",
-                    "unsafe", "using", "virtual", "void", "volatile", "while", "add", "alias", "ascending", "descending", "dynamic", "from", "get",
-                    "global", "group", "into", "join", "let", "orderby", "partial", "remove", "select", "set", "value", "var", "yield"] as const;
-                const types = ["Action", "Boolean", "Byte", "Char", "DateTime", "DateTimeOffset", "Decimal", "Double", "Func",
-                    "Guid", "Int16", "Int32", "Int64", "Object", "SByte", "Single", "String", "Task", "TimeSpan", "UInt16", "UInt32",
-                    "UInt64", "bool", "byte", "char", "decimal", "double", "short", "int", "long", "object",
-                    "sbyte", "float", "string", "ushort", "uint", "ulong"] as const;
-                const atoms = ["true", "false", "null"] as const;
-                return new LanguageSupport(csharpLanguage, csharpLanguage.data.of({
-                    autocomplete: (keywords as readonly string[]).concat(types, atoms)
-                }));
+                const { csharp } = await import("@where/codemirror-lang-csharp");
+                return csharp();
             case "vb":
                 return StreamLanguage.define(await import("@codemirror/legacy-modes/mode/vb").then(m => m.vb));
             default:
@@ -146,6 +144,7 @@
     const emit = defineEmits<{
         change: [update: ViewUpdate]
     }>();
+    export type ChangeHandler = (update: ViewUpdate) => void;
 
     const root = useTemplateRef("root");
     const scheme = matchMedia("(prefers-color-scheme: dark)");
