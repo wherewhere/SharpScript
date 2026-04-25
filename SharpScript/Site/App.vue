@@ -41,11 +41,11 @@
                             <fluent-option title="CSharp" value="CSharp">C#</fluent-option>
                             <fluent-option title="IL" value="IL">IL</fluent-option>
                             <fluent-option title="Run" value="Run">{{ t("output.language.run") }}</fluent-option>
-                            <fluent-option title="SyntaxTree" value="SyntaxTree" :disabled="language === 'IL'">
+                            <fluent-option title="SyntaxTree" value="SyntaxTree" :disabled="isIL">
                                 {{ t("output.language.syntaxTree") }}
                             </fluent-option>
                         </fluent-select>
-                        <fluent-button v-if="isInitLinter && language !== 'IL'" :title="t('output.format.title')"
+                        <fluent-button v-if="isInitLinter && !isIL" :title="t('output.format.title')"
                                        @click="formatEditorAsync" :disabled="loading">
                             <CodeText16Regular style="fill: currentColor;" />
                         </fluent-button>
