@@ -1,4 +1,5 @@
-﻿using Microsoft.CodeAnalysis;
+﻿using ILAssembler;
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.VisualBasic;
 using System;
@@ -8,12 +9,12 @@ using VisualBasicLanguageVersion = Microsoft.CodeAnalysis.VisualBasic.LanguageVe
 
 namespace SharpScript.Models
 {
-    [Flags]
     public enum LanguageType
     {
-        CSharp = 0b011,
-        VisualBasic = 0b111,
-        IL = 0b001
+        CSharp,
+        VisualBasic,
+        IL,
+        CIL
     }
 
     public interface IInputOptions
@@ -98,5 +99,14 @@ namespace SharpScript.Models
         public VisualBasicLanguageVersion LanguageVersion { get; set; } = VisualBasicLanguageVersion.Latest;
     }
 
-    public sealed class ILInputOptions : InputOptions;
+    public sealed class MonoInputOptions : InputOptions;
+
+    public sealed class CoreCLROptions : InputOptions
+    {
+        public Options Options { get; } = new Options
+        {
+            //Pdb = true,
+            Optimize = true
+        };
+    }
 }

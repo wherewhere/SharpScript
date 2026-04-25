@@ -8,9 +8,10 @@
                                        :placeholder="t('input.language.placeholder')" position="below" v-model="language">
                             <fluent-option title="CSharp" value="CSharp">C#</fluent-option>
                             <fluent-option title="VisualBasic" value="VisualBasic">VB</fluent-option>
-                            <fluent-option title="IL" value="IL">IL</fluent-option>
+                            <fluent-option title="Mono IL" value="IL">IL</fluent-option>
+                            <fluent-option title="CoreCLR IL" value="CIL">IL (CoreCLR)</fluent-option>
                         </fluent-select>
-                        <ToggleButton v-model="isScript">{{ t("input.language.script") }}</ToggleButton>
+                        <ToggleButton v-if="!isIL" v-model="isScript">{{ t("input.language.script") }}</ToggleButton>
                     </div>
                     <div class="toolgroup">
                         <fluent-button :title="loading ? message : t('input.process.title')" @click="processAsync"
@@ -141,7 +142,7 @@
     import { createLinter } from "./editor/diagnostics";
     import { createFormatKeymap, formatAsync } from "./editor/formatting";
     import { createTooltip } from "./editor/hover";
-    import { csharpExample, vbExample, ilExample } from "./helpers/examples";
+    import { csharpExample, vbExample, ilExample, cilExample } from "./helpers/examples";
     import { getCustomCompletionAsync } from "./helpers/fingerprinting";
     import { setTimeoutAsync } from "./helpers/utils";
     import { keywords } from "./package.json";
@@ -200,7 +201,7 @@
     const inputLanguages = ref<readonly string[]>(["Default", "CSharp1", "CSharp2", "CSharp3", "CSharp4", "CSharp5", "CSharp6", "CSharp7", "CSharp7_1", "CSharp7_2", "CSharp7_3", "CSharp8", "CSharp9", "CSharp10", "CSharp11", "CSharp12", "CSharp13", "CSharp14", "LatestMajor", "Preview", "Latest"]);
     const inputLanguage = shallowRef<string | undefined>("Preview");
     const isScript = shallowRef(false);
-    const output = shallowRef<"CSharp" | "VisualBasic" | "IL" | "Run" | "SyntaxTree">("Run");
+    const output = shallowRef("Run");
     const outputLanguages = ref<readonly string[]>([]);
     const outputLanguage = shallowRef<string | undefined>("CSharp1");
     const loading = shallowRef(false);
@@ -395,6 +396,8 @@
         }
     }
 
+    const isIL = computed(() => language.value === "IL" || language.value === "CIL");
+
     const diagnostics = ref({
         errors: [] as DiagnosticWrapper[],
         warnings: [] as DiagnosticWrapper[],
@@ -406,7 +409,7 @@
             const mes = message.value;
             message.value = t("message.compiling");
             setSettings();
-            await (language.value === "IL" ? initDotNetAsync() : initCompilerAsync());
+            await (isIL.value ? initDotNetAsync() : initCompilerAsync());
             await initEditerAsync();
             await applyChangesAsync();
             await nextTick();
@@ -594,7 +597,7 @@
             loading.value = true;
             const mes = message.value;
             message.value = t("message.initLinter");
-            await (language.value === "IL" ? initDotNetAsync() : initCompilerAsync());
+            await (isIL.value ? initDotNetAsync() : initCompilerAsync());
             await initEditerAsync();
             message.value = mes;
         }
@@ -698,7 +701,7 @@
                 getCompletionsAsync,
                 completionGetDescriptionAsync,
                 completionGetChangeAsync,
-                getCustomCompletionAsync(language, await dotnet!.fingerprinting)
+                getCustomCompletionAsync(isIL, await dotnet!.fingerprinting)
             );
 
             roslynTooltip.value.input = options => createTooltip(getInfoTipAsync, options);
@@ -713,6 +716,7 @@
     function getLauguage() {
         switch (language.value) {
             case "IL":
+            case "CIL":
                 return "il";
             case "CSharp":
                 return "csharp";
@@ -748,6 +752,8 @@
                 return vbExample;
             case "IL":
                 return ilExample;
+            case "CIL":
+                return cilExample;
             default:
                 return '';
         }
@@ -769,10 +775,8 @@
             if (params.has("language")) {
                 language.value = params.get("language")!;
             }
-            if (language.value !== "IL") {
-                if (params.has("version")) {
-                    inputLanguage.value = params.get("version")!;
-                }
+            if (params.has("version")) {
+                inputLanguage.value = params.get("version")!;
             }
             if (params.has("output")) {
                 output.value = params.get("output")! as typeof output.value;
@@ -814,7 +818,7 @@
         if (isScript.value) {
             settings.script = "true";
         }
-        if (settings.language !== "IL") {
+        if (inputLanguages.value.length) {
             if (settings.language === "VisualBasic") {
                 if (inputLanguage.value !== "Latest") {
                     settings.version = inputLanguage.value!;

@@ -39,20 +39,20 @@ using (PEReader peReader = new(peStream))
 
     TypeDefinitionHandle volatileType = FindTypeDefinition(reader, "System.Threading", "Volatile");
     TypeDefinitionHandle interlockedType = FindTypeDefinition(reader, "System.Threading", "Interlocked");
-    TypeDefinitionHandle threadType = FindTypeDefinition(reader, "System.Threading", "Thread");
+    //TypeDefinitionHandle runtimeFeatureType = FindTypeDefinition(reader, "System.Runtime.CompilerServices", "RuntimeFeature");
 
     MethodDefinitionHandle readBarrier = FindMethodDefinition(reader, volatileType, "ReadBarrier", 0);
     MethodDefinitionHandle writeBarrier = FindMethodDefinition(reader, volatileType, "WriteBarrier", 0);
     MethodDefinitionHandle memoryBarrier = FindMethodDefinition(reader, interlockedType, "MemoryBarrier", 0);
 
-    //MethodDefinitionHandle throwIfSingleThreaded = FindMethodDefinition(reader, threadType, "ThrowIfSingleThreaded", 0);
+    //MethodDefinitionHandle throwIfMultithreadingIsNotSupported = FindMethodDefinition(reader, runtimeFeatureType, "ThrowIfMultithreadingIsNotSupported", 0);
 
     // Workaround for https://github.com/jjonescz/DotNetLab/issues/129.
     PatchMethodBody(bytes, peReader, readBarrier, memoryBarrier, "Volatile.ReadBarrier");
     PatchMethodBody(bytes, peReader, writeBarrier, memoryBarrier, "Volatile.WriteBarrier");
 
     // Workaround for https://github.com/dotnet/roslyn/issues/82361.
-    //PatchMethodBodyToRet(bytes, peReader, throwIfSingleThreaded, "System.Threading.Thread.ThrowIfSingleThreaded");
+    //PatchMethodBodyToRet(bytes, peReader, throwIfMultithreadingIsNotSupported, "System.Runtime.CompilerServices.RuntimeFeature.ThrowIfMultithreadingIsNotSupported");
 }
 
 Directory.CreateDirectory(Path.GetDirectoryName(outputPath) ?? ".");

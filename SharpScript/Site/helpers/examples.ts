@@ -26,3 +26,17 @@ export const ilExample = `.assembly ' ' {
     call void [System.Console]System.Console::WriteLine(string)
     ret
 }`;
+
+export const cilExample = `.assembly SharpScript.Playground {
+    .ver 0:0:0:0
+}
+
+.assembly extern System.Console {
+}
+
+.method static void Main() {
+    .entrypoint
+    ldstr "Hello, World!"
+    call void [System.Console]System.Console::WriteLine(string)
+    ret
+}`;

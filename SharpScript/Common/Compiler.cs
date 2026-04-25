@@ -40,8 +40,11 @@ namespace SharpScript.Common
                         case RoslynOptions options:
                             _codeSession = new RoslynCodeSession(EmptySourceText, options, isConsole, factory.CreateLogger<RoslynCodeSession>());
                             break;
-                        case ILInputOptions:
-                            _codeSession = new ILCodeSession(EmptySourceText, isConsole);
+                        case MonoInputOptions:
+                            _codeSession = new MonoCodeSession(EmptySourceText, isConsole);
+                            break;
+                        case CoreCLROptions options:
+                            _codeSession = new CoreCLRCodeSession(EmptySourceText, options.Options);
                             break;
                     }
                 }
@@ -60,7 +63,8 @@ namespace SharpScript.Common
                     {
                         LanguageType.CSharp => new CSharpInputOptions(),
                         LanguageType.VisualBasic => new VisualBasicInputOptions(),
-                        LanguageType.IL => new ILInputOptions(),
+                        LanguageType.IL => new MonoInputOptions(),
+                        LanguageType.CIL => new CoreCLROptions(),
                         _ => throw new Exception("Invalid language type."),
                     };
                     field = value;
@@ -147,8 +151,11 @@ namespace SharpScript.Common
                     case RoslynOptions options:
                         _codeSession = new RoslynCodeSession(_codeSession.SourceCode ?? EmptySourceText, options, isConsole, factory.CreateLogger<RoslynCodeSession>());
                         break;
-                    case ILInputOptions:
-                        _codeSession = new ILCodeSession(_codeSession.SourceCode ?? EmptySourceText, isConsole);
+                    case MonoInputOptions:
+                        _codeSession = new MonoCodeSession(_codeSession.SourceCode ?? EmptySourceText, isConsole);
+                        break;
+                    case CoreCLROptions options:
+                        _codeSession = new CoreCLRCodeSession(_codeSession.SourceCode ?? EmptySourceText, options.Options);
                         break;
                 }
             }

@@ -1,4 +1,4 @@
-import type { Ref } from "vue";
+import type { ComputedRef } from "vue";
 import type { Completion, CompletionContext } from "@codemirror/autocomplete";
 import type { Fingerprinting } from "../worker";
 
@@ -20,9 +20,9 @@ async function getAssemblyAsync(fingerprinting: Fingerprinting | Promise<Fingerp
     }
 }
 
-export function getCustomCompletionAsync(language: Ref<string>, fingerprinting: Fingerprinting) {
+export function getCustomCompletionAsync(isIL: ComputedRef<boolean>, fingerprinting: Fingerprinting) {
     return async (context: CompletionContext) => {
-        if (language.value !== "IL") {
+        if (!isIL.value) {
             const pos = context.pos;
             const line = context.state.doc.lineAt(pos);
             const text = line.text;
