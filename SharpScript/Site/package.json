@@ -63,7 +63,7 @@
     "ansi_up": "^6.0.0",
     "async-lock": "^1.0.0",
     "codemirror": "^6.0.0",
-    "codemirror-lang-msil": "^0.0.1-beta.6",
+    "codemirror-lang-msil": "^0.0.1-beta.7",
     "comlink": "^4.0.0",
     "lz-string": "^1.0.0",
     "vue": "^3.0.0",
