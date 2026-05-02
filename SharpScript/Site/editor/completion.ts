@@ -14,7 +14,7 @@ export function createCompletion(
             const from = context.pos;
             const completions = await getCompletionsAsync(from);
             if (context.aborted) { return null; }
-            const matchContext = context.matchBefore(/[\w\d]+/) ?? { from };
+            const matchContext = context.matchBefore(/[\w\d]+/) || { from };
             return {
                 from: matchContext.from ?? from,
                 options: [...completions!.map(item => {

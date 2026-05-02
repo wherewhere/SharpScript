@@ -45,7 +45,7 @@
                                 {{ t("output.language.syntaxTree") }}
                             </fluent-option>
                         </fluent-select>
-                        <fluent-button v-if="isInitLinter && !isIL" :title="t('output.format.title')"
+                        <fluent-button v-if="isInitLinter || isIL" :title="t('output.format.title')"
                                        @click="formatEditorAsync" :disabled="loading">
                             <CodeText16Regular style="fill: currentColor;" />
                         </fluent-button>
@@ -227,7 +227,7 @@
                     if (code.value === getDefaultCode(oldValue)) {
                         code.value = getDefaultCode(newValue);
                     }
-                    await initDotNetAsync();
+                    await (newValue === "IL" || newValue === "CIL" ? initDotNetAsync() : initCompilerAsync());
                     await dotnet!.setLanguageTypeAsync(newValue);
                     inputLanguages.value = await dotnet!.getInputLanguageVersionsAsync();
                     inputLanguage.value = await dotnet!.getInputLanguageVersionAsync();
@@ -556,7 +556,7 @@
             loading.value = true;
             const mes = message.value;
             message.value = t("message.formatting");
-            await formatAsync(editor.value!.editor!, formatCodeAsync);
+            await formatAsync(editor.value!.editor!, isIL, formatCodeAsync);
             message.value = mes;
         }
         catch (e) {
@@ -707,7 +707,7 @@
             roslynTooltip.value.input = options => createTooltip(getInfoTipAsync, options);
             roslynTooltip.value.output = () => createTooltip(getCSharpInfoTipLiteAsync);
 
-            keymapProp.value = keymap.of(createFormatKeymap(formatCodeAsync));
+            keymapProp.value = keymap.of(createFormatKeymap(isIL, formatCodeAsync));
 
             isInitLinter.value = true;
         }

@@ -1,7 +1,16 @@
-import { type EditorView, type Command } from "@codemirror/view";
+import type { ComputedRef } from "vue";
+import type { EditorView, Command } from "@codemirror/view";
 import type { dotnet } from "../worker";
 
-export async function formatAsync(view: EditorView, formatCodeAsync: typeof dotnet.formatCodeAsync) {
+type msilFormatter = ReturnType<typeof import("codemirror-lang-msil").msilFormatter>;
+let msilFormatter: msilFormatter | undefined;
+export async function formatAsync(view: EditorView, isIL: ComputedRef<boolean>, formatCodeAsync: typeof dotnet.formatCodeAsync) {
+    if (isIL.value) {
+        msilFormatter ||= await import("codemirror-lang-msil").then<msilFormatter>(m => m.msilFormatter());
+        if (msilFormatter(view)) {
+            return true;
+        }
+    }
     const results = await formatCodeAsync();
     if (results instanceof Array) {
         view.dispatch({
@@ -13,15 +22,15 @@ export async function formatAsync(view: EditorView, formatCodeAsync: typeof dotn
     }
 }
 
-function createFormat(formatCodeAsync: typeof dotnet.formatCodeAsync): Command {
+function createFormat(isIL: ComputedRef<boolean>, formatCodeAsync: typeof dotnet.formatCodeAsync): Command {
     return view => {
-        formatAsync(view, formatCodeAsync);
+        formatAsync(view, isIL, formatCodeAsync);
         return true;
     };
 }
 
-export function createFormatKeymap(formatCodeAsync: typeof dotnet.formatCodeAsync) {
+export function createFormatKeymap(isIL: ComputedRef<boolean>, formatCodeAsync: typeof dotnet.formatCodeAsync) {
     return [
-        { key: "Shift-Alt-f", run: createFormat(formatCodeAsync), preventDefault: true }
+        { key: "Shift-Alt-f", run: createFormat(isIL, formatCodeAsync), preventDefault: true }
     ];
 }

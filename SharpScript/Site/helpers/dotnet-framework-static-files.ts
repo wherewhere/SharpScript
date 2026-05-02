@@ -18,7 +18,7 @@ export default {
                     }
                     function sendFile(filePath: string) {
                         const ext = path.extname(filePath).toLowerCase();
-                        const mime = Mime.getType(ext) ?? "application/octet-stream";
+                        const mime = Mime.getType(ext) || "application/octet-stream";
                         res.setHeader("Content-Type", mime);
                         res.setHeader("Cache-Control", "no-cache");
                         const stream = fs.createReadStream(filePath);
