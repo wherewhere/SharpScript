@@ -40,8 +40,8 @@
   "devDependencies": {
     "@types/node": "^25.0.0",
     "@vitejs/plugin-vue": "^6.0.0",
-    "cssnano": "^7.0.0",
-    "cssnano-preset-advanced": "^7.0.0",
+    "cssnano": "^8.0.0",
+    "cssnano-preset-advanced": "^8.0.0",
     "eslint": "^10.0.0",
     "mime": "^4.0.0",
     "sass": "^1.0.0",
