@@ -50,7 +50,7 @@
     "vite-svg-loader": "^5.0.0"
   },
   "dependencies": {
-    "@babel/runtime": "^7.0.0",
+    "@babel/runtime": "^8.0.0",
     "@codemirror/legacy-modes": "^6.0.0",
     "@fluentui/svg-icons": "^1.0.0",
     "@fluentui/web-components": "^2.0.0",

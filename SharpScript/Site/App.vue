@@ -851,6 +851,7 @@
     const direction = shallowRef<"row" | "column">("row");
     onMounted(async () => {
         const importWorker = () => import("./worker");
+        await nextTick();
         if (loadSettings()) {
             dotnet = await importWorker().then(x => x.dotnet);
             noWorker = true;

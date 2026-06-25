@@ -20,11 +20,9 @@ provideFluentDesignSystem()
     );
 
 const scheme = matchMedia("(prefers-color-scheme: dark)");
-if (typeof scheme !== "undefined") {
-    scheme.addEventListener("change", e => baseLayerLuminance.withDefault(e.matches ? StandardLuminance.DarkMode : StandardLuminance.LightMode));
-    if (scheme.matches) {
-        baseLayerLuminance.withDefault(StandardLuminance.DarkMode);
-    }
+scheme.addEventListener("change", e => baseLayerLuminance.withDefault(e.matches ? StandardLuminance.DarkMode : StandardLuminance.LightMode));
+if (scheme.matches) {
+    baseLayerLuminance.withDefault(StandardLuminance.DarkMode);
 }
 
 import { createApp } from "vue";
