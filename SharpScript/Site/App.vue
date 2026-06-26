@@ -850,8 +850,13 @@
 
     const direction = shallowRef<"row" | "column">("row");
     onMounted(async () => {
-        const importWorker = () => import("./worker");
+        function onResize() {
+            direction.value = innerWidth < innerHeight ? "column" : "row";
+        }
+        onResize();
+        addEventListener("resize", onResize);
         await nextTick();
+        const importWorker = () => import("./worker");
         if (loadSettings()) {
             dotnet = await importWorker().then(x => x.dotnet);
             noWorker = true;
@@ -861,11 +866,6 @@
             dotnet = Comlink.wrap<DotNetWorker>(new Worker(url.href, { type: "module" }));
         }
         addEventListener("hashchange", loadSettings);
-        function onResize() {
-            direction.value = innerWidth < innerHeight ? "column" : "row";
-        }
-        addEventListener("resize", onResize);
-        onResize();
     });
 </script>
 
