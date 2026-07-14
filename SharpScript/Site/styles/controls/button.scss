@@ -1,0 +1,111 @@
+@use "../theme" as *;
+@use "../colors" as *;
+
+$accent-button-background: $accent-fill-color-default;
+$accent-button-background-pointer-over: $accent-fill-color-secondary;
+$accent-button-background-pressed: $accent-fill-color-tertiary;
+$accent-button-background-disabled: $accent-fill-color-disabled;
+$accent-button-foreground: $text-on-accent-fill-color-primary;
+$accent-button-foreground-pointer-over: $text-on-accent-fill-color-primary;
+$accent-button-foreground-pressed: $text-on-accent-fill-color-secondary;
+$accent-button-foreground-disabled: $text-on-accent-fill-color-disabled;
+$accent-button-border: $control-stroke-color-on-accent-default;
+$accent-button-border-bottom: $control-stroke-color-on-accent-secondary;
+$accent-button-border-pressed: $control-fill-color-transparent;
+$accent-button-border-disabled: $control-fill-color-transparent;
+
+$button-background: $control-fill-color-default;
+$button-background-pointer-over: $control-fill-color-secondary;
+$button-background-pressed: $control-fill-color-tertiary;
+$button-background-disabled: $control-fill-color-disabled;
+$button-foreground: $text-fill-color-primary;
+$button-foreground-pointer-over: $text-fill-color-primary;
+$button-foreground-pressed: $text-fill-color-secondary;
+$button-foreground-disabled: $text-fill-color-disabled;
+$button-border: $control-stroke-color-default;
+$button-border-top: ( light: $control-stroke-color-default, dark: $control-stroke-color-secondary );
+$button-border-bottom: ( light: $control-stroke-color-secondary, dark: $control-stroke-color-default );
+$button-border-pressed: $control-stroke-color-default;
+$button-border-disabled: $control-stroke-color-default;
+
+$button-border-theme-thickness: 1px;
+$button-padding: 6px 11px;
+
+button,
+.cm-editor .cm-button,
+input[type="button"],
+input[type="reset"],
+input[type="submit"],
+select {
+    padding: $button-padding;
+    fill: currentColor;
+    border-radius: $control-corner-radius;
+    font-family: $content-control-theme-font-family;
+    font-size: var(--font-size, $content-control-font-size);
+    line-height: $content-control-line-height;
+    transition: background-color $control-faster-animation-duration ease-in-out;
+
+    @include auto-theme {
+        color: themed($button-foreground);
+        background: padding-box themed($button-background);
+        border-left: $button-border-theme-thickness solid themed($button-border);
+        border-top: $button-border-theme-thickness solid themed($button-border-top);
+        border-right: $button-border-theme-thickness solid themed($button-border);
+        border-bottom: $button-border-theme-thickness solid themed($button-border-bottom);
+
+        &:not(:disabled):hover {
+            color: themed($button-foreground-pointer-over);
+            background: padding-box themed($button-background-pointer-over);
+        }
+
+        &:not(:disabled):active {
+            color: themed($button-foreground-pressed);
+            background: padding-box themed($button-background-pressed);
+            border: $button-border-theme-thickness solid themed($button-border-pressed);
+        }
+
+        &:disabled {
+            color: themed($button-foreground-disabled);
+            background: padding-box themed($button-background-disabled);
+            border: $button-border-theme-thickness solid themed($button-border-disabled);
+        }
+
+        &.accent {
+            color: themed($accent-button-foreground);
+            background: padding-box themed($accent-button-background);
+            border-left: $button-border-theme-thickness solid themed($accent-button-border);
+            border-top: $button-border-theme-thickness solid themed($accent-button-border);
+            border-right: $button-border-theme-thickness solid themed($accent-button-border);
+            border-bottom: $button-border-theme-thickness solid themed($accent-button-border-bottom);
+
+            &:not(:disabled):hover {
+                color: themed($accent-button-foreground-pointer-over);
+                background: padding-box themed($accent-button-background-pointer-over);
+            }
+
+            &:not(:disabled):active {
+                color: themed($accent-button-foreground-pressed);
+                background: padding-box themed($accent-button-background-pressed);
+                border: $button-border-theme-thickness solid themed($accent-button-border-pressed);
+            }
+
+            &:disabled {
+                color: themed($accent-button-foreground-disabled);
+                background: padding-box themed($accent-button-background-disabled);
+                border: $button-border-theme-thickness solid themed($accent-button-border-disabled);
+            }
+        }
+    }
+}
+
+select {
+    padding-left: 7px;
+    padding-right: 7px;
+}
+
+$compact-button-padding: 2px 4px;
+
+.cm-editor .cm-button {
+    font-size: $caption-text-block-font-size;
+    padding: $compact-button-padding;
+}

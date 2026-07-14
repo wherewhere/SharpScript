@@ -1,0 +1,93 @@
+@use "../theme" as *;
+@use "../colors" as *;
+
+$temporary-text-fill-color-disabled: ( light:#0101015C, dark:#FEFEFE5D );
+
+$text-control-background: $control-fill-color-default;
+$text-control-background-pointer-over: $control-fill-color-secondary;
+$text-control-background-focused: $control-fill-color-input-active;
+$text-control-background-disabled: $control-fill-color-disabled;
+$text-control-border: $control-stroke-color-default;
+$text-control-border-bottom: $control-strong-stroke-color-default;
+$text-control-border-bottom-focused: $accent-fill-color-default;
+$text-control-border-disabled: $control-stroke-color-default;
+$text-control-foreground: $text-fill-color-primary;
+$text-control-foreground-pointer-over: $text-fill-color-primary;
+$text-control-foreground-focused: $text-fill-color-primary;
+$text-control-foreground-disabled: $temporary-text-fill-color-disabled;
+$text-control-placeholder-foreground: $text-fill-color-secondary;
+$text-control-placeholder-foreground-pointer-over: $text-fill-color-secondary;
+$text-control-placeholder-foreground-focused: $text-fill-color-secondary;
+$text-control-placeholder-foreground-disabled: $text-fill-color-disabled;
+
+$text-control-border-theme-thickness: 1px;
+$text-control-border-theme-thickness-focused: 2px;
+
+$text-control-theme-padding: 6px 11px;
+$text-control-theme-padding-focused: 6px 11px 5px 11px;
+
+input,
+input[type="datetime"],
+input[type="email"],
+input[type="number"],
+input[type="password"],
+input[type="search"],
+input[type="tel"],
+input[type="text"],
+input[type="url"],
+.cm-editor .cm-textfield,
+textarea {
+    padding: $text-control-theme-padding;
+    fill: currentColor;
+    border-radius: $control-corner-radius;
+    font-family: $content-control-theme-font-family;
+    font-size: var(--font-size, $content-control-font-size);
+    line-height: $content-control-line-height;
+    transition: background-color $control-faster-animation-duration ease-in-out, border-bottom-color $control-faster-animation-duration ease-in-out;
+
+    &:not(:disabled):active,
+    &:not(:disabled):focus:not(:active) {
+        outline: none;
+        padding: $text-control-theme-padding-focused;
+    }
+
+    @include auto-theme {
+        color: themed($text-control-foreground);
+        background: themed($text-control-background);
+        border-left: $text-control-border-theme-thickness solid themed($text-control-border);
+        border-top: $text-control-border-theme-thickness solid themed($text-control-border);
+        border-right: $text-control-border-theme-thickness solid themed($text-control-border);
+        border-bottom: $text-control-border-theme-thickness solid themed($text-control-border-bottom);
+
+        &:not(:disabled):hover {
+            color: themed($text-control-foreground-pointer-over);
+            background: themed($text-control-background-pointer-over);
+        }
+
+        &:not(:disabled):active,
+        &:not(:disabled):focus:not(:active) {
+            color: themed($text-control-foreground-focused);
+            background: themed($text-control-background-focused);
+            border-bottom: $text-control-border-theme-thickness-focused solid themed($text-control-border-bottom-focused);
+        }
+
+        &:disabled {
+            color: themed($text-control-foreground-disabled);
+            background: themed($text-control-background-disabled);
+            border: $text-control-border-theme-thickness solid themed($text-control-border-disabled);
+        }
+    }
+}
+
+$compact-text-control-theme-padding: 2px 4px;
+$compact-text-control-theme-padding-focused: 2px 4px 1px 4px;
+
+.cm-editor .cm-textfield {
+    font-size: $caption-text-block-font-size;
+    padding: $compact-text-control-theme-padding;
+
+    &:not(:disabled):active,
+    &:not(:disabled):focus:not(:active) {
+        padding: $compact-text-control-theme-padding-focused;
+    }
+}

@@ -4,7 +4,7 @@
             <slot name="panel1"></slot>
         </div>
         <div class="median" ref="median" @pointerdown="pointerdown">
-            <span class="handle"></span>
+            <span class="handle" role="button"></span>
         </div>
         <div v-if="!collapsed" class="slotted slot2">
             <slot name="panel2"></slot>
@@ -202,6 +202,29 @@
 </script>
 
 <style lang="scss" scoped>
+    @use "../styles/theme";
+    @use "../styles/colors";
+
+    $sizer-base-background: colors.$card-background-fill-color-default;
+    $sizer-base-background-pointer-over: colors.$control-fill-color-secondary;
+    $sizer-base-background-pressed: colors.$control-fill-color-tertiary;
+    $sizer-base-background-disabled: colors.$control-fill-color-disabled;
+    $sizer-base-border: colors.$card-stroke-color-default;
+    $button-border-top-pointer-over: (
+        light: colors.$control-stroke-color-default,
+        dark: colors.$control-stroke-color-secondary
+    );
+    $button-border-bottom-pointer-over: (
+        light: colors.$control-stroke-color-secondary,
+        dark: colors.$control-stroke-color-default
+    );
+    $sizer-base-foreground: colors.$control-strong-fill-color-default;
+
+    $sizer-base-thumb-height: 24px;
+    $sizer-base-thumb-width: 4px;
+    $sizer-base-thumb-radius: 2px;
+    $sizer-base-padding: 4px;
+
     div.split-panels {
         display: grid;
 
@@ -228,8 +251,7 @@
                 }
 
                 span.handle {
-                    height: 16px;
-                    margin: 2px 0;
+                    height: $sizer-base-thumb-height;
                 }
             }
 
@@ -255,8 +277,7 @@
                 }
 
                 span.handle {
-                    width: 16px;
-                    margin: 0 2px;
+                    width: $sizer-base-thumb-height;
                 }
             }
 
@@ -291,39 +312,37 @@
 
     .median {
         box-sizing: border-box;
-        background: var(--neutral-fill-input-rest);
-        border: calc(var(--stroke-width) * 1px) solid var(--neutral-stroke-layer-rest);
-        border-radius: calc(var(--control-corner-radius) * 1px);
+        border-radius: colors.$control-corner-radius;
         display: inline-flex;
         align-items: center;
         justify-content: center;
+        transition: background-color colors.$control-faster-animation-duration ease-in-out;
 
         span.handle {
-            border: 1px solid var(--neutral-stroke-strong-rest);
             border-radius: 1px;
+            margin: $sizer-base-padding;
         }
 
-        &:hover {
-            background: var(--neutral-fill-input-hover);
+        @include theme.auto-theme {
+            background: theme.themed($sizer-base-background);
+            border: 1px solid theme.themed($sizer-base-border);
 
             span.handle {
-                border: 1px solid var(--neutral-stroke-strong-hover);
+                border: 1px solid theme.themed($sizer-base-foreground);
             }
-        }
 
-        &:active {
-            background: var(--neutral-fill-input-active);
-
-            span.handle {
-                border: 1px solid var(--neutral-stroke-strong-active);
+            &:not(:disabled):hover {
+                background: theme.themed($sizer-base-background-pointer-over);
+                border-top: 1px solid theme.themed($button-border-top-pointer-over);
+                border-bottom: 1px solid theme.themed($button-border-bottom-pointer-over);
             }
-        }
 
-        &:focus {
-            background: var(--neutral-fill-input-focus);
+            &:not(:disabled):active {
+                background: theme.themed($sizer-base-background-pressed);
+            }
 
-            span.handle {
-                border: 1px solid var(--neutral-stroke-strong-focus);
+            &:disabled {
+                background: theme.themed($sizer-base-background-disabled);
             }
         }
     }

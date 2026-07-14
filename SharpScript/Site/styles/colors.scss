@@ -1,0 +1,198 @@
+@use "sass:color";
+
+/** Colors */
+
+$system-accent-color: #007dcf;
+$system-accent-color-dark1: #0064b2;
+$system-accent-color-dark2: #00448d;
+$system-accent-color-dark3: #002063;
+$system-accent-color-light1: #0099f3;
+$system-accent-color-light2: #51d2ff;
+$system-accent-color-light3: #86efff;
+
+/** Light */
+
+$system-alt-high-color: ( light: #FFFFFFFF, dark: #000000FF );
+$system-alt-low-color: ( light: #FFFFFF33, dark: #00000033 );
+$system-alt-medium-color: ( light: #FFFFFF99, dark: #00000099 );
+$system-alt-medium-high-color: ( light: #FFFFFFCC, dark: #000000CC );
+$system-alt-medium-low-color: ( light: #FFFFFF66, dark: #00000066 );
+$system-base-high-color: ( light: #000000FF, dark: #FFFFFFFF );
+$system-base-low-color: ( light: #00000033, dark: #FFFFFF33 );
+$system-base-medium-color: ( light: #00000099, dark: #FFFFFF99 );
+$system-base-medium-high-color: ( light: #000000CC, dark: #FFFFFFCC );
+$system-base-medium-low-color: ( light: #00000066, dark: #FFFFFF66 );
+$system-chrome-alt-low-color: ( light: #171717FF, dark: #F2F2F2FF );
+$system-chrome-black-high-color: #000000FF;
+$system-chrome-black-low-color: #00000033;
+$system-chrome-black-medium-low-color: #00000066;
+$system-chrome-black-medium-color: #000000CC;
+$system-chrome-disabled-high-color: ( light: #CCCCCCFF, dark: #333333FF );
+$system-chrome-disabled-low-color: ( light: #7A7A7AFF, dark: #858585FF );
+$system-chrome-high-color: ( light: #CCCCCCFF, dark: #767676FF );
+$system-chrome-low-color: ( light: #F2F2F2FF, dark: #171717FF );
+$system-chrome-medium-color: ( light: #E6E6E6FF, dark: #1F1F1FFF );
+$system-chrome-medium-low-color: ( light: #F2F2F2FF, dark: #2B2B2BFF );
+$system-chrome-white-color: #FFFFFFFF;
+$system-chrome-gray-color: #767676FF;
+$system-list-low-color: ( light: #00000019, dark: #FFFFFF19 );
+$system-list-medium-color: ( light: #00000033, dark: #FFFFFF33 );
+$system-error-text-color: ( light: #C50500, dark: #FFF000 );
+
+$text-fill-color-primary: ( light: #000000E4, dark: #FFFFFF );
+$text-fill-color-secondary: ( light: #0000009E, dark: #FFFFFFC5 );
+$text-fill-color-tertiary: ( light: #00000072, dark: #FFFFFF87 );
+$text-fill-color-disabled: ( light: #0000005C, dark: #FFFFFF5D );
+$text-fill-color-inverse: ( light: #FFFFFF, dark: #000000E4 );
+
+$accent-text-fill-color-primary: ( light: $system-accent-color-dark2, dark: $system-accent-color-light3 );
+$accent-text-fill-color-secondary: ( light: $system-accent-color-dark3, dark: $system-accent-color-light3 );
+$accent-text-fill-color-tertiary: ( light: $system-accent-color-dark1, dark: $system-accent-color-light2 );
+$accent-text-fill-color-disabled: ( light: #0000005C, dark: #FFFFFF5D );
+
+$text-on-accent-fill-color-selected-text: #FFFFFF;
+
+$text-on-accent-fill-color-primary: ( light: #FFFFFF, dark: #000000 );
+$text-on-accent-fill-color-secondary: ( light: #FFFFFFB3, dark: #00000080 );
+$text-on-accent-fill-color-disabled: ( light: #FFFFFF, dark: #FFFFFF87 );
+
+$control-fill-color-default: ( light: #FFFFFFB3, dark: #FFFFFF0F );
+$control-fill-color-secondary: ( light: #F9F9F980, dark: #FFFFFF15 );
+$control-fill-color-tertiary: ( light: #F9F9F94D, dark: #FFFFFF08 );
+$control-fill-color-disabled: ( light: #F9F9F94D, dark: #FFFFFF0B );
+$control-fill-color-transparent: #FFFFFF00;
+$control-fill-color-input-active: ( light: #FFFFFF, dark: #1E1E1EB3 );
+
+$control-strong-fill-color-default: ( light: #00000072, dark: #FFFFFF8B );
+$control-strong-fill-color-disabled: ( light: #00000051, dark: #FFFFFF3F );
+
+$control-solid-fill-color-default: ( light: #FFFFFF, dark: #454545 );
+
+$subtle-fill-color-transparent: #FFFFFF00;
+$subtle-fill-color-secondary: ( light: #00000009, dark: #FFFFFF0F );
+$subtle-fill-color-tertiary: ( light: #00000006, dark: #FFFFFF0A );
+$subtle-fill-color-disabled: #FFFFFF00;
+
+$control-alt-fill-color-transparent: #FFFFFF00;
+$control-alt-fill-color-secondary: ( light: #00000006, dark: #00000019 );
+$control-alt-fill-color-tertiary: ( light: #0000000F, dark: #FFFFFF0B );
+$control-alt-fill-color-quarternary: ( light: #00000018, dark: #FFFFFF12 );
+$control-alt-fill-color-disabled: #FFFFFF00;
+
+$control-on-image-fill-color-default: ( light: #FFFFFFC9, dark: #1C1C1CB3 );
+$control-on-image-fill-color-secondary: ( light: #F3F3F3, dark: #1A1A1A );
+$control-on-image-fill-color-tertiary: ( light: #EBEBEB, dark: #131313 );
+$control-on-image-fill-color-disabled: ( light: #FFFFFF00, dark: #1E1E1E );
+
+$accent-fill-color-default: ( light: $system-accent-color-dark1, dark: $system-accent-color-light2 );
+$accent-fill-color-secondary: ( light: color.change($system-accent-color-dark1, $alpha: 0.9), dark: color.change($system-accent-color-light2, $alpha: 0.9) );
+$accent-fill-color-tertiary: ( light: color.change($system-accent-color-dark1, $alpha: 0.8), dark: color.change($system-accent-color-light2, $alpha: 0.8) );
+$accent-fill-color-disabled: ( light: #00000037, dark: #FFFFFF28 );
+
+$control-stroke-color-default: ( light: #0000000F, dark: #FFFFFF12 );
+$control-stroke-color-secondary: ( light: #00000029, dark: #FFFFFF18 );
+$control-stroke-color-on-accent-default: #FFFFFF14;
+$control-stroke-color-on-accent-secondary: ( light: #00000066, dark: #00000023 );
+$control-stroke-color-on-accent-tertiary: #00000037;
+$control-stroke-color-on-accent-disabled: ( light: #0000000F, dark: #00000033 );
+
+$control-stroke-color-for-strong-fill-when-on-image: ( light: #FFFFFF59, dark: #0000006B );
+
+$card-stroke-color-default: ( light: #0000000F, dark: #00000019 );
+$card-stroke-color-default-solid: ( light: #EBEBEB, dark: #1C1C1C );
+
+$control-strong-stroke-color-default: ( light: #00000072, dark: #FFFFFF8B );
+$control-strong-stroke-color-disabled: ( light: #00000037, dark: #FFFFFF28 );
+
+$surface-stroke-color-default: #75757566;
+$surface-stroke-color-flyout: ( light: #0000000F, dark: #00000033 );
+$surface-stroke-color-inverse: ( light: #FFFFFF15, dark: #0000000F );
+
+$divider-stroke-color-default: ( light: #0000000F, dark: #FFFFFF15 );
+
+$focus-stroke-color-outer: ( light: #000000E4, dark: #FFFFFF );
+$focus-stroke-color-inner: ( light: #FFFFFFB3, dark: #000000B3 );
+
+$card-background-fill-color-default: ( light: #FFFFFFB3, dark: #FFFFFF0D );
+$card-background-fill-color-secondary: ( light: #F6F6F680, dark: #FFFFFF08 );
+
+$smoke-fill-color-default: #0000004D;
+
+$layer-fill-color-default: ( light: #FFFFFF80, dark: #3A3A3A4C );
+$layer-fill-color-alt: ( light: #FFFFFF, dark: #FFFFFF0D );
+$layer-on-acrylic-fill-color-default: ( light: #FFFFFF40, dark: #FFFFFF09 );
+$layer-on-accent-acrylic-fill-color-default: ( light: #FFFFFF40, dark: #FFFFFF09 );
+
+$layer-on-mica-base-alt-fill-color-default: ( light: #FFFFFFB3, dark: #3A3A3A73 );
+$layer-on-mica-base-alt-fill-color-secondary: ( light: #0000000A, dark: #FFFFFF0F );
+$layer-on-mica-base-alt-fill-color-tertiary: ( light: #F9F9F9, dark: #2C2C2C );
+$layer-on-mica-base-alt-fill-color-transparent: ( light: #00000000, dark: #FFFFFF00 );
+
+$solid-background-fill-color-base: ( light: #F3F3F3, dark: #202020 );
+$solid-background-fill-color-secondary: ( light: #EEEEEE, dark: #1C1C1C );
+$solid-background-fill-color-tertiary: ( light: #F9F9F9, dark: #282828 );
+$solid-background-fill-color-quarternary: ( light: #FFFFFF, dark: #2C2C2C );
+$solid-background-fill-color-transparent: ( light: #F3F3F300, dark: #20202000 );
+$solid-background-fill-color-base-alt: ( light: #DADADA, dark: #0A0A0A );
+
+$system-fill-color-success: ( light: #0F7B0F, dark: #6CCB5F );
+$system-fill-color-caution: ( light: #9D5D00, dark: #FCE100 );
+$system-fill-color-critical: ( light: #C42B1C, dark: #FF99A4 );
+$system-fill-color-neutral: ( light: #00000072, dark: #FFFFFF8B );
+$system-fill-color-solid-neutral: ( light: #8A8A8A, dark: #9D9D9D );
+$system-fill-color-attention-background: ( light: #F6F6F680, dark: #FFFFFF08 );
+$system-fill-color-success-background: ( light: #DFF6DD, dark: #393D1B );
+$system-fill-color-caution-background: ( light: #FFF4CE, dark: #433519 );
+$system-fill-color-critical-background: ( light: #FDE7E9, dark: #442726 );
+$system-fill-color-neutral-background: ( light: #00000006, dark: #FFFFFF08 );
+$system-fill-color-solid-attention-background: ( light: #F7F7F7, dark: #2E2E2E );
+$system-fill-color-solid-neutral-background: ( light: #F3F3F3, dark: #2E2E2E );
+
+$text-on-accent-fill-color-default: #FFFFFF;
+$text-on-accent-a-a-fill-color-primary: ( light: #FFFFFF, dark: #000000 );
+$text-on-accent-a-a-fill-color-secondary: ( light: #FFFFFFB3, dark: #00000080 );
+$text-on-accent-a-a-fill-color-disabled: ( light: #FFFFFF, dark: #FFFFFF87 );
+$control-a-a-fill-color-default: ( light: #00000072, dark: #FFFFFF8B );
+$control-a-a-fill-color-disabled: ( light: #00000051, dark: #FFFFFF3F );
+$accent-a-a-fill-color-default: ( light: $system-accent-color-dark1, dark: $system-accent-color-light2 );
+$accent-a-a-fill-color-secondary: ( light: $system-accent-color-dark2, dark: $system-accent-color-light3 );
+$accent-a-a-fill-color-tertiary: ( light: $system-accent-color, dark: $system-accent-color-light1 );
+$accent-a-a-fill-color-disabled: ( light: #00000037, dark: #FFFFFF28 );
+$control-stroke-color-for-a-a-fill-on-image: ( light: #FFFFFF59, dark: #0000006B );
+$control-a-a-stroke-color-default: ( light: #00000072, dark: #FFFFFF8B );
+$control-a-a-stroke-color-disabled: ( light: #00000037, dark: #FFFFFF28 );
+
+/** Common */
+
+$control-corner-radius: 4px;
+$overlay-corner-radius: 8px;
+
+/** Font Size */
+
+$content-control-font-size: 14px;
+$content-control-line-height: 1.2862;
+
+$text-style-large-font-size: 18.14px;
+$text-style-extra-large-font-size: 25.5px;
+
+$pivot-header-item-font-size: 24px;
+
+$caption-text-block-font-size: 12px;
+$body-text-block-font-size: 14px;
+$subtitle-text-block-font-size: 20px;
+$title-text-block-font-size: 28px;
+$title-large-text-block-font-size: 40px;
+$display-text-block-font-size: 68px;
+
+/** Animation Duration */
+
+$control-fast-out-slow-in-key-spline: 0, 0, 0, 1;
+
+$control-normal-animation-duration: 0.250s;
+$control-fast-animation-duration: 0.167s;
+$control-fast-animation-after-duration: 0.168s;
+$control-faster-animation-duration: 0.083s;
+
+/** Font Family */
+
+$content-control-theme-font-family: Segoe UI Variable, Segoe UI, sans-serif;

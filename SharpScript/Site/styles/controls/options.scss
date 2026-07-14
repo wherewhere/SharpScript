@@ -1,0 +1,77 @@
+@use "sass:color";
+@use "../theme" as *;
+@use "../colors" as *;
+
+$combobox-item-foreground: $text-fill-color-primary;
+$combobox-item-foreground-pressed: $text-fill-color-secondary;
+$combobox-item-foreground-pointer-over: $text-fill-color-primary;
+$combobox-item-foreground-disabled: $text-fill-color-disabled;
+$combobox-item-foreground-selected: $text-fill-color-primary;
+$combobox-item-foreground-selected-unfocused: $text-fill-color-primary;
+$combobox-item-foreground-selected-pressed: $text-fill-color-secondary;
+$combobox-item-foreground-selected-pointer-over: $text-fill-color-primary;
+$combobox-item-foreground-selected-disabled: $text-fill-color-disabled;
+$combobox-item-background: $subtle-fill-color-transparent;
+$combobox-item-background-pressed: $subtle-fill-color-tertiary;
+$combobox-item-background-pointer-over: $subtle-fill-color-secondary;
+$combobox-item-background-disabled: $subtle-fill-color-disabled;
+$combobox-item-background-selected: $subtle-fill-color-secondary;
+$combobox-item-background-selected-unfocused: $subtle-fill-color-tertiary;
+$combobox-item-background-selected-pressed: $subtle-fill-color-secondary;
+$combobox-item-background-selected-pointer-over: $subtle-fill-color-tertiary;
+$combobox-item-background-selected-disabled: $subtle-fill-color-secondary;
+
+$combobox-dropdown-background: $solid-background-fill-color-tertiary;
+
+$combobox-item-theme-padding: 6px 11px;
+$combobox-item-corner-radius: 3px;
+
+option {
+    padding: $combobox-item-theme-padding;
+    font-family: $content-control-theme-font-family;
+    font-size: var(--font-size, $content-control-font-size);
+    line-height: $content-control-line-height;
+    border-radius: $combobox-item-corner-radius;
+    margin: 5px 2px;
+    transition: background-color $control-faster-animation-duration ease-in-out;
+
+    @include auto-theme {
+        color: themed($combobox-item-foreground);
+        background-color: blend(themed($combobox-item-background), themed($combobox-dropdown-background));
+
+        &:not(:disabled):hover {
+            color: themed($combobox-item-foreground-pointer-over);
+            background-color: blend(themed($combobox-item-background-pointer-over), themed($combobox-dropdown-background));
+        }
+
+        &:not(:disabled):active {
+            color: themed($combobox-item-foreground-pressed);
+            background-color: blend(themed($combobox-item-background-pressed), themed($combobox-dropdown-background));
+        }
+
+        &:disabled {
+            color: themed($combobox-item-foreground-disabled);
+            background-color: blend(themed($combobox-item-background-disabled), themed($combobox-dropdown-background));
+        }
+
+        &:not(:disabled):checked {
+            color: themed($combobox-item-foreground-selected);
+            background-color: blend(themed($combobox-item-background-selected), themed($combobox-dropdown-background));
+        }
+
+            &:not(:disabled):checked:hover {
+                color: themed($combobox-item-foreground-selected-pointer-over);
+                background-color: blend(themed($combobox-item-background-selected-pointer-over), themed($combobox-dropdown-background));
+            }
+
+            &:not(:disabled):checked:active {
+                color: themed($combobox-item-foreground-selected-pressed);
+                background-color: blend(themed($combobox-item-background-selected-pressed), themed($combobox-dropdown-background));
+            }
+
+        &:disabled:checked {
+            color: themed($combobox-item-foreground-selected-disabled);
+            background-color: blend(themed($combobox-item-background-selected-disabled), themed($combobox-dropdown-background));
+        }
+    }
+}

@@ -24,7 +24,7 @@
     }>();
     export type TooltipHandler = typeof roslynTooltip;
     export type ExtensionHandler = typeof roslynCompletion;
-    
+
     const value = defineModel<string>("value");
     const tooltipOptions: Parameters<typeof hoverTooltip>[1] = {
         hideOnChange: true
@@ -225,6 +225,9 @@
 </style>
 
 <style lang="scss" scoped>
+    @use "../styles/theme";
+    @use "../styles/colors";
+
     :deep(.cm-editor) {
         background: none;
         outline: none;
@@ -308,52 +311,14 @@
         }
 
         .cm-panels {
-            background: var(--neutral-fill-stealth-rest);
-        }
-
-        .cm-button {
-            border: calc(var(--stroke-width) * 1px) solid transparent;
-            background: padding-box linear-gradient(var(--neutral-fill-rest), var(--neutral-fill-rest)), border-box var(--neutral-stroke-control-rest);
-            font-family: var(--body-font);
-            color: var(--neutral-foreground-rest);
-            border-radius: calc(var(--control-corner-radius) * 1px);
-            fill: currentcolor;
-
-            &:not(:disabled):active {
-                background: padding-box linear-gradient(var(--neutral-fill-active), var(--neutral-fill-active)), border-box var(--neutral-stroke-control-active);
-            }
-
-            &:not(:disabled):hover {
-                background: padding-box linear-gradient(var(--neutral-fill-hover), var(--neutral-fill-hover)), border-box var(--neutral-stroke-control-hover);
-            }
-
-            &:disabled {
-                background: padding-box linear-gradient(var(--neutral-fill-rest), var(--neutral-fill-rest)), border-box var(--neutral-stroke-rest);
-                opacity: var(--disabled-opacity);
-                cursor: not-allowed;
-            }
-        }
-
-        .cm-textfield {
-            background: padding-box linear-gradient(var(--neutral-fill-input-rest), var(--neutral-fill-input-rest)), border-box var(--neutral-stroke-input-rest);
-            border: calc(var(--stroke-width) * 1px) solid transparent;
-            border-radius: calc(var(--control-corner-radius) * 1px);
-            font-family: var(--body-font);
-            color: var(--neutral-foreground-rest);
-            fill: currentcolor;
-            position: relative;
-            outline: none;
-
-            @media (forced-colors: none) {
-
-                &:not(:disabled):active,
-                &:not(:disabled):focus-within {
-                    border-bottom: calc(var(--stroke-width) * 1px) solid var(--accent-fill-rest);
-                }
+            @include theme.auto-theme {
+                background: theme.themed(colors.$card-background-fill-color-default);
+                border-top: 1px solid theme.themed(colors.$card-stroke-color-default);
             }
         }
 
         .cm-panel.cm-search label {
+            font-size: colors.$caption-text-block-font-size;
             display: inline-flex;
             vertical-align: middle;
             align-items: center;

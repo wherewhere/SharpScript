@@ -4,29 +4,28 @@
             <template #panel1>
                 <div class="toolbar">
                     <div class="toolgroup">
-                        <fluent-select class="auto-select" :title="t('input.language.title')"
-                                       :placeholder="t('input.language.placeholder')" position="below" v-model="language">
-                            <fluent-option title="CSharp" value="CSharp">C#</fluent-option>
-                            <fluent-option title="VisualBasic" value="VisualBasic">VB</fluent-option>
-                            <fluent-option title="Mono IL" value="IL">IL</fluent-option>
-                            <fluent-option title="CoreCLR IL" value="CIL">IL (CoreCLR)</fluent-option>
-                        </fluent-select>
+                        <ComboBox name="language" :title="t('input.language.title')"
+                                  :placeholder="t('input.language.placeholder')" position="below" v-model="language">
+                            <option title="CSharp" value="CSharp">C#</option>
+                            <option title="VisualBasic" value="VisualBasic">VB</option>
+                            <option title="Mono IL" value="IL">IL</option>
+                            <option title="CoreCLR IL" value="CIL">CIL</option>
+                        </ComboBox>
                         <ToggleButton v-if="!isIL" v-model="isScript">{{ t("input.language.script") }}</ToggleButton>
                     </div>
                     <div class="toolgroup">
-                        <fluent-button :title="loading ? message : t('input.process.title')" @click="processAsync"
-                                       :disabled="loading || isSyntaxTree" class="icon-button">
-                            <fluent-progress-ring v-if="loading"
-                                                  style="width: 12px; height: 12px;"></fluent-progress-ring>
+                        <button :title="loading ? message : t('input.process.title')" @click="processAsync"
+                                :disabled="loading || isSyntaxTree" class="icon-button">
+                            <ProgressRing v-if="loading" style="width: 12px; height: 12px;" />
                             <TriangleRight12Filled v-else style="fill: currentColor;" />
-                        </fluent-button>
-                        <fluent-select class="input-select" v-if="inputLanguages.length" v-model="inputLanguage"
-                                       :title="t('input.version.title')" position="below"
-                                       :placeholder="t('input.version.placeholder')">
-                            <fluent-option v-for="item in inputLanguages" :title="item" :value="item">
+                        </button>
+                        <ComboBox name="version" v-if="inputLanguages.length" v-model="inputLanguage"
+                                  :title="t('input.version.title')" position="below"
+                                  :placeholder="t('input.version.placeholder')">
+                            <option v-for="item in inputLanguages" :title="item" :value="item">
                                 {{ getVersion(item) }}
-                            </fluent-option>
-                        </fluent-select>
+                            </option>
+                        </ComboBox>
                     </div>
                 </div>
                 <CodeMirror class="editor" v-model:value="code" :language="getLauguage()" :readonly="loading"
@@ -36,36 +35,35 @@
             <template #panel2>
                 <div class="toolbar">
                     <div class="toolgroup">
-                        <fluent-select class="auto-select" :title="t('output.language.title')"
-                                       :placeholder="t('output.language.placeholder')" position="below" v-model="output">
-                            <fluent-option title="CSharp" value="CSharp">C#</fluent-option>
-                            <fluent-option title="IL" value="IL">IL</fluent-option>
-                            <fluent-option title="Run" value="Run">{{ t("output.language.run") }}</fluent-option>
-                            <fluent-option title="SyntaxTree" value="SyntaxTree" :disabled="isIL">
+                        <ComboBox name="output" :title="t('output.language.title')"
+                                  :placeholder="t('output.language.placeholder')" position="below" v-model="output">
+                            <option title="CSharp" value="CSharp">C#</option>
+                            <option title="IL" value="IL">IL</option>
+                            <option title="Run" value="Run">{{ t("output.language.run") }}</option>
+                            <option title="SyntaxTree" value="SyntaxTree" :disabled="isIL">
                                 {{ t("output.language.syntaxTree") }}
-                            </fluent-option>
-                        </fluent-select>
-                        <fluent-button v-if="isInitLinter || isIL" :title="t('output.format.title')"
-                                       @click="formatEditorAsync" :disabled="loading">
+                            </option>
+                        </ComboBox>
+                        <button class="icon-button" v-if="isInitLinter || isIL" :title="t('output.format.title')"
+                                @click="formatEditorAsync" :disabled="loading">
                             <CodeText16Regular style="fill: currentColor;" />
-                        </fluent-button>
+                        </button>
                     </div>
                     <div class="toolgroup">
-                        <fluent-button v-if="isInitLinter && !diagnostics.errors.length"
-                                       :title="t('output.download.title')" @click="downloadAssemblyAsync" :disabled="loading">
+                        <button class="icon-button" v-if="isInitLinter && !diagnostics.errors.length"
+                                :title="t('output.download.title')" @click="downloadAssemblyAsync" :disabled="loading">
                             <ArrowDownload16Regular style="fill: currentColor;" />
-                        </fluent-button>
-                        <fluent-button v-if="!isInitLinter" :title="t('output.linter.title')" @click="initLinterAsync"
-                                       :disabled="loading">
+                        </button>
+                        <button class="icon-button" v-if="!isInitLinter" :title="t('output.linter.title')"
+                                @click="initLinterAsync" :disabled="loading">
                             <Sparkle16Regular style="fill: currentColor;" />
-                        </fluent-button>
-                        <fluent-select class="output-select" v-if="outputLanguages.length" v-model="outputLanguage"
-                                       position="below" :title="t('output.version.title')"
-                                       :placeholder="t('output.version.placeholder')">
-                            <fluent-option v-for="item in outputLanguages" :title="item" :value="item">
+                        </button>
+                        <ComboBox name="version" v-if="outputLanguages.length" v-model="outputLanguage" position="below"
+                                  :title="t('output.version.title')" :placeholder="t('output.version.placeholder')">
+                            <option v-for="item in outputLanguages" :title="item" :value="item">
                                 {{ getVersion(item) }}
-                            </fluent-option>
-                        </fluent-select>
+                            </option>
+                        </ComboBox>
                     </div>
                 </div>
                 <div class="editor">
@@ -73,10 +71,11 @@
                                 v-model:value="results.decompiled" :language="getOutputLanguage()"
                                 :roslyn-tooltip="roslynTooltip.output" :readonly="true" style="flex: 1;" />
                     <div class="output" v-else>
-                        <fluent-tree-view class="no-selected-indicator" v-if="isSyntaxTree && syntaxTree"
-                                          style="flex: 1; margin: 12px 0;">
-                            <SyntaxTreeItem :item="syntaxTree" />
-                        </fluent-tree-view>
+                        <div class="syntax-tree" v-if="isSyntaxTree && syntaxTree">
+                            <ol>
+                                <SyntaxTreeItem :item="syntaxTree" />
+                            </ol>
+                        </div>
                         <div v-else-if="isRun && results.outputs.length && !diagnostics.errors.length">
                             <pre class="unset" v-for="item in renderConsole(results.outputs)" v-html="item"></pre>
                         </div>
@@ -146,6 +145,8 @@
     import { getCustomCompletionAsync } from "./helpers/fingerprinting";
     import { setTimeoutAsync } from "./helpers/utils";
     import { keywords } from "./package.json";
+    import ComboBox from "./components/ComboBox.vue";
+    import ProgressRing from "./components/ProgressRing.vue";
     import SplitPanels from "./components/SplitPanels.vue";
     import CodeMirror from "./components/CodeMirror.vue";
     import SyntaxTreeItem from "./components/SyntaxTreeItem.vue";
@@ -352,17 +353,6 @@
             }
         }
     )
-
-    const inputMinWidth = computed(() => {
-        switch (language.value) {
-            case "CSharp":
-                return "var(--cs-select-min-width)";
-            case "VisualBasic":
-                return "var(--vb-select-min-width)";
-            default:
-                return "auto";
-        }
-    });
 
     async function resetCodeAsync(code: string) {
         try {
@@ -870,56 +860,57 @@
 </script>
 
 <style lang="scss">
-    @use "github:microsoft/fluentui-blazor?branch=dev&path=/src/Core/wwwroot/css/reboot.css";
     @use "./styles/fonts";
     @use "./styles/ansi";
+    @use "./styles/theme";
+    @use "./styles/colors";
+    @use "./styles/controls";
 
-    $base-transition: background-color 0.083s ease-in-out;
-
-    :root {
-        --small-gap-size: calc(var(--design-unit) * 1px);
-        --large-gap-size: calc(var(--design-unit) * 2px);
-        color-scheme: light;
-
-        @media (max-width: 767px) {
-            --large-gap-size: calc(var(--design-unit) * 1.5px);
-        }
-
-        @media (prefers-color-scheme: dark) {
-            color-scheme: dark;
-        }
-    }
+    $base-transition: background-color colors.$control-faster-animation-duration ease-in-out;
 
     * {
-        transition: $base-transition;
+        box-sizing: border-box;
     }
 
-    body,
-    .body {
+    :root {
+        --large-gap-size: 8px;
+        --font-size: #{colors.$content-control-font-size};
+        --status-bar-height: 32px;
+
+        @include theme.auto-theme {
+            accent-color: theme.themed(colors.$accent-fill-color-default);
+            color-scheme: theme.themed((light: light, dark: dark));
+        }
+
+        @media (max-width: 767px) {
+            --large-gap-size: 6px;
+            --font-size: #{colors.$caption-text-block-font-size};
+            --status-bar-height: 28px;
+        }
+    }
+
+    body {
+        margin: 0;
         width: 100%;
         height: 100%;
         overflow: hidden;
-        background: var(--neutral-fill-stealth-rest);
+        font-family: colors.$content-control-theme-font-family;
+        font-size: var(--font-size);
+        line-height: colors.$content-control-line-height;
+        transition: $base-transition;
 
-        @media (max-width: 767px) {
-            --type-ramp-base-font-size: 12px;
-            --type-ramp-base-line-height: 16px;
-            --type-ramp-base-font-variations: "wght" 400, "opsz" 10.5;
-            --base-height-multiplier: 7;
+        @include theme.auto-theme {
+            background: theme.themed(colors.$solid-background-fill-color-base);
+            color: theme.themed(colors.$text-fill-color-primary);
         }
     }
 </style>
 
 <style lang="scss" scoped>
-    .content {
-        --cs-select-min-width: 105px;
-        --vb-select-min-width: 99px;
+    @use "./styles/theme";
+    @use "./styles/colors";
 
-        @media (max-width: 767px) {
-            --cs-select-min-width: 81px;
-            --vb-select-min-width: 77px;
-        }
-    }
+    $base-transition: background-color colors.$control-faster-animation-duration ease-in-out;
 
     :deep(pre.unset) {
         margin-top: 0;
@@ -930,100 +921,79 @@
         overflow: visible;
     }
 
-    .toolbar,
-    .toolgroup {
-        display: flex;
-        column-gap: var(--small-gap-size);
-    }
-
     .toolbar {
+        display: flex;
+        column-gap: 18.5px;
+        overflow-x: auto;
+        overflow-y: hidden;
+        white-space: nowrap;
         justify-content: space-between;
+
+        .toolgroup {
+            display: flex;
+            column-gap: 4px;
+
+            button.icon-button {
+                padding: 0;
+                width: var(--status-bar-height);
+                height: var(--status-bar-height);
+            }
+
+            button,
+            .combobox {
+                height: var(--status-bar-height);
+                flex-shrink: 0;
+            }
+        }
     }
 
     .loading-progress {
         bottom: 0;
         width: var(--blazor-load-percentage, 0%);
-        background: var(--accent-fill-rest);
-        height: calc((var(--stroke-width) * 3) * 1px);
+        height: 3px;
         transition: all 0.2s ease-in-out;
         overflow: hidden;
         position: absolute;
-    }
 
-    .auto-select {
-        min-width: auto;
-    }
-
-    .input-select {
-        min-width: v-bind(inputMinWidth);
-    }
-
-    .output-select {
-        min-width: 92px;
-
-        @media (max-width: 767px) {
-            min-width: 70px;
+        @include theme.auto-theme {
+            background: theme.themed(colors.$accent-fill-color-default);
         }
-    }
-
-    .no-selected-indicator :deep(fluent-tree-item[selected])::after {
-        display: none;
-    }
-
-    :deep(fluent-select)::part(listbox) {
-        max-height: calc(var(--base-height-multiplier) * 30px);
-    }
-
-    fluent-button.icon-button::part(control) {
-        padding: 0;
-        line-height: 0;
     }
 
     .content {
         height: 100%;
         padding: var(--large-gap-size) var(--large-gap-size) 0 var(--large-gap-size);
-    }
 
-    $status-bar-height: calc((var(--base-height-multiplier) + var(--density)) * var(--design-unit) * 1px);
+        $status-bar-height: var(--status-bar-height);
 
-    div.status-bar {
-        display: flex;
-        height: $status-bar-height;
-        padding-left: calc(var(--layer-corner-radius) * 0.5px - 1px);
-        padding-right: calc(var(--layer-corner-radius) * 0.5px);
-        font-family: var(--font-monospace);
-        justify-content: space-between;
-        align-items: center;
+        div.split-view {
+            height: calc(100% - $status-bar-height);
+            gap: var(--large-gap-size);
 
-        >div {
-            transform: translateY(-1px);
-        }
-    }
+            :deep(.slotted) {
+                display: flex;
+                flex-direction: column;
+                row-gap: var(--large-gap-size);
 
-    div.split-view {
-        height: calc(100% - $status-bar-height);
-        gap: var(--large-gap-size);
-
-        :deep(.slotted) {
-            display: flex;
-            flex-direction: column;
-            row-gap: var(--large-gap-size);
-
-            &::-webkit-scrollbar {
-                display: none;
+                &::-webkit-scrollbar {
+                    display: none;
+                }
             }
 
             .editor {
                 flex: 1;
                 display: flex;
                 overflow: auto;
-                box-sizing: border-box;
                 flex-direction: column;
-                background: var(--neutral-fill-input-rest);
-                border: calc(var(--stroke-width) * 1px) solid var(--neutral-stroke-layer-rest);
-                border-radius: calc(var(--layer-corner-radius) * 1px);
+                border-radius: colors.$overlay-corner-radius;
+                transition: $base-transition;
 
-                .cm-editor {
+                @include theme.auto-theme {
+                    background: theme.themed(colors.$card-background-fill-color-default);
+                    border: 1px solid theme.themed(colors.$card-stroke-color-default);
+                }
+
+                :deep(.cm-editor) {
                     flex: 1;
                     overflow: inherit;
                 }
@@ -1040,15 +1010,41 @@
                 &>.output {
                     flex: 1;
                     display: flex;
+                    line-height: 1.4;
                     flex-direction: column;
                     font-family: var(--font-monospace);
-                    padding: 0 calc(var(--small-gap-size) * 3);
+                    padding: 0 12px;
                     width: 100%;
 
                     &>div {
-                        padding: var(--small-gap-size) 0;
+                        padding: 4px 0;
+                    }
+
+                    .syntax-tree {
+                        display: flex;
+                        flex-direction: row;
+
+                        ol {
+                            padding: 0;
+                            margin: 4px 0;
+                            white-space: nowrap;
+                        }
                     }
                 }
+            }
+        }
+
+        div.status-bar {
+            display: flex;
+            height: $status-bar-height;
+            padding-left: 3px;
+            padding-right: 4px;
+            font-family: var(--font-monospace);
+            justify-content: space-between;
+            align-items: center;
+
+            >div {
+                transform: translateY(-1px);
             }
         }
     }

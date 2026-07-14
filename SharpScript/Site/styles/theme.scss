@@ -1,0 +1,45 @@
+@use "sass:color";
+@use "sass:map";
+@use "sass:meta";
+
+$_mode: light !default;
+
+@function _getValue($token, $mode: $_mode) {
+    @if meta.type-of($token)=="map" {
+        $value: map.get($token, $mode);
+        @return _getValue($value, $mode);
+    }
+
+    @return $token;
+}
+
+@function themed($var) {
+    @return _getValue($var, $_mode);
+}
+
+@mixin auto-theme {
+    $_mode: light !global;
+    @content;
+
+    @media (prefers-color-scheme: dark) {
+        $_mode: dark !global;
+        @content;
+    }
+}
+
+@function blend($foreground, $background) {
+    $alpha: color.alpha($foreground);
+    $fg-r: color.channel($foreground, "red", $space: rgb);
+    $fg-g: color.channel($foreground, "green", $space: rgb);
+    $fg-b: color.channel($foreground, "blue", $space: rgb);
+
+    $bg-r: color.channel($background, "red", $space: rgb);
+    $bg-g: color.channel($background, "green", $space: rgb);
+    $bg-b: color.channel($background, "blue", $space: rgb);
+
+    $r: $fg-r * $alpha + $bg-r * (1 - $alpha);
+    $g: $fg-g * $alpha + $bg-g * (1 - $alpha);
+    $b: $fg-b * $alpha + $bg-b * (1 - $alpha);
+
+    @return rgb($r, $g, $b);
+}

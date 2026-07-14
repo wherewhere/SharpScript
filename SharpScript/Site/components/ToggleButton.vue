@@ -1,15 +1,12 @@
 <template>
-    <fluent-button :appearance="appearance" @click="onclick">
+    <button :class="{ accent: model }" @click="onclick">
         <slot></slot>
-    </fluent-button>
+    </button>
 </template>
 
 <script lang="ts" setup>
-    import { computed } from 'vue';
-
-    const modelValue = defineModel<Boolean>({ default: false });
-    const appearance = computed(() => modelValue.value ? "accent" : "neutral");
+    const model = defineModel<Boolean>({ default: () => false });
     function onclick() {
-        modelValue.value = !modelValue.value;
+        model.value = !model.value;
     }
 </script>
