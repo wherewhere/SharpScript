@@ -34,6 +34,7 @@ $button-padding: 6px 11px;
 button,
 .cm-editor .cm-button,
 .cm-editor .cm-diagnosticAction,
+.cm-editor .cm-foldPlaceholder,
 input[type="button"],
 input[type="reset"],
 input[type="submit"],
@@ -106,12 +107,20 @@ select {
 
 $compact-button-padding: 2px 4px;
 
-.cm-editor .cm-button {
-    font-size: $caption-text-block-font-size;
+.cm-editor .cm-button,
+.cm-editor .cm-diagnosticAction {
     padding: $compact-button-padding;
 }
 
-.cm-editor .cm-diagnosticAction {
-    padding: $compact-button-padding;
+.cm-editor .cm-diagnosticAction,
+.cm-editor .cm-foldPlaceholder {
     font-family: var(--font-monospace);
+}
+
+.cm-editor .cm-button {
+    font-size: $caption-text-block-font-size;
+}
+
+.cm-editor .cm-foldPlaceholder {
+    padding: 0px 4px;
 }

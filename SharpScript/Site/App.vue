@@ -91,7 +91,7 @@
                                 <tr v-for="item in [...diagnostics.errors, ...diagnostics.warnings, ...diagnostics.infos]">
                                     <td :class="item.severity.toLowerCase() + '-icon'" :title="item.severity"></td>
                                     <td>{{ item.id }}</td>
-                                    <td style="white-space: pre-wrap;">{{ item.message }}</td>
+                                    <td class="message">{{ item.message }}</td>
                                     <td>{{ getLocation(item) }}</td>
                                 </tr>
                             </tbody>
@@ -916,6 +916,7 @@
         font-size: inherit;
         font-family: inherit;
         white-space: pre-wrap;
+        word-wrap: break-word;
         overflow: visible;
         width: max-content;
     }
@@ -1036,6 +1037,15 @@
                     table {
                         font-size: var(--font-size);
                         min-width: max-content;
+
+                        th {
+                            text-align: start;
+                        }
+
+                        td.message {
+                            white-space: pre-wrap;
+                            word-wrap: break-word;
+                        }
                     }
                 }
             }

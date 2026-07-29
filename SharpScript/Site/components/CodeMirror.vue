@@ -214,36 +214,30 @@
     }
 
     .hidden-icon::after,
-    .info-icon::after,
-    .cm-editor .cm-lint-marker-info {
+    .info-icon::after {
         content: url("../assets/vs-icon/light/StatusInformation.svg");
     }
 
-    .warning-icon::after,
-    .cm-editor .cm-lint-marker-warning {
+    .warning-icon::after {
         content: url("../assets/vs-icon/light/StatusWarning.svg");
     }
 
-    .error-icon::after,
-    .cm-editor .cm-lint-marker-error {
+    .error-icon::after {
         content: url("../assets/vs-icon/light/StatusError.svg");
     }
 
     @media (prefers-color-scheme: dark) {
 
         .hidden-icon::after,
-        .info-icon::after,
-        .cm-editor .cm-lint-marker-info {
+        .info-icon::after {
             content: url("../assets/vs-icon/dark/StatusInformation.svg");
         }
 
-        .warning-icon::after,
-        .cm-editor .cm-lint-marker-warning {
+        .warning-icon::after {
             content: url("../assets/vs-icon/dark/StatusWarning.svg");
         }
 
-        .error-icon::after,
-        .cm-editor .cm-lint-marker-error {
+        .error-icon::after {
             content: url("../assets/vs-icon/dark/StatusError.svg");
         }
     }
@@ -298,6 +292,53 @@
         background: none;
         outline: none;
 
+        .cm-gutter-lint {
+            width: 3px;
+            overflow: visible;
+
+            .cm-gutterElement {
+                padding: 0;
+
+                .cm-lint-marker {
+                    content: none;
+                    height: 100%;
+                    width: 100%;
+                    transform-origin: left;
+                    transition: transform colors.$control-faster-animation-duration ease-in-out;
+                    
+                    &:hover {
+                        transform: scaleX(2);
+                    }
+
+                    &.cm-lint-marker-hint {
+                        background: transparent;
+                    }
+
+                    &.cm-lint-marker-info {
+                        background: #a5a5a5;
+                    }
+
+                    &.cm-lint-marker-warning {
+                        background: #008000;
+                    }
+
+                    &.cm-lint-marker-error {
+                        background: #ff0000;
+                    }
+
+                    @media (prefers-color-scheme: dark) {
+                        &.cm-lint-marker-warning {
+                            background: #95db7d;
+                        }
+
+                        &.cm-lint-marker-error {
+                            background: #fc3e36;
+                        }
+                    }
+                }
+            }
+        }
+
         .cm-scroller,
         .cm-diagnostic,
         .cm-completionInfo,
@@ -309,8 +350,8 @@
             display: flex;
             flex-direction: column;
             border-radius: colors.$overlay-corner-radius;
-            max-height: $flyout-theme-max-height;
-            max-width: $flyout-theme-max-width;
+            max-height: min($flyout-theme-max-height, 100%);
+            max-width: min($flyout-theme-max-width, 100%);
             padding: $flyout-content-padding;
             box-shadow: 0 0 16px rgba(0, 0, 0, .14);
             transition: opacity colors.$control-faster-animation-duration linear;
@@ -340,6 +381,7 @@
 
             .cm-tooltip-section {
                 white-space: pre-wrap;
+                word-wrap: break-word;
                 font-family: var(--font-monospace);
 
                 &:not(:first-child) {
@@ -350,27 +392,28 @@
                         border-top: 1px solid theme.themed(colors.$divider-stroke-color-default);
                     }
                 }
+            }
 
-                .cm-diagnostic-hint {
-                    border-left: 3px solid #a5a5a5;
-                }
+            .cm-diagnostic-hint,
+            .cm-diagnostic-info {
+                border-left: 3px solid #a5a5a5;
+            }
 
+            .cm-diagnostic-warning {
+                border-left: 3px solid #008000;
+            }
+
+            .cm-diagnostic-error {
+                border-left: 3px solid #ff0000;
+            }
+
+            @media (prefers-color-scheme: dark) {
                 .cm-diagnostic-warning {
-                    border-left: 3px solid #008000;
+                    border-left: 3px solid #95db7d;
                 }
 
                 .cm-diagnostic-error {
-                    border-left: 3px solid #ff0000;
-                }
-
-                @media (prefers-color-scheme: dark) {
-                    .cm-diagnostic-warning {
-                        border-left: 3px solid #95db7d;
-                    }
-
-                    .cm-diagnostic-error {
-                        border-left: 3px solid #fc3e36;
-                    }
+                    border-left: 3px solid #fc3e36;
                 }
             }
         }
@@ -476,6 +519,10 @@
         }
 
         .cm-lintRange-hint {
+            background: none;
+        }
+
+        .cm-lintRange-info {
             background: none;
             position: relative;
 
