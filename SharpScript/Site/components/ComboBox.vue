@@ -8,6 +8,7 @@
 </template>
 
 <script generic="T" lang="ts" setup>
+    import "../types";
     import { ClassValue, StyleValue } from "vue";
     import ChevronDown12Regular from "@fluentui/svg-icons/icons/chevron_down_12_regular.svg?component";
 
@@ -34,14 +35,6 @@
     $combobox-dropdown-foreground: colors.$text-fill-color-primary;
     $combobox-dropdown-background: colors.$solid-background-fill-color-tertiary;
     $combobox-dropdown-border: colors.$surface-stroke-color-flyout;
-
-    $combobox-item-pill-fill: colors.$accent-fill-color-default;
-    $combobox-item-pill-height: 16px;
-    $combobox-item-pill-width: 3px;
-    $combobox-item-pill-min-scale: 0.625;
-    $combobox-item-pill-corner-radius: 1.5px;
-
-    $combobox-item-scale-animation-duration: colors.$control-fast-animation-duration;
 
     $combobox-padding: 6px 34px 6px 11px;
     $combobox-dropdown-border-thickness: 1px;
@@ -81,7 +74,7 @@
                 }
 
                 &::picker(select) {
-                    //opacity: 0;
+                    opacity: 0;
                     appearance: base-select;
                     max-height: $max-dropdown-height;
                     border-radius: colors.$overlay-corner-radius;
@@ -94,38 +87,13 @@
                         background: theme.themed($combobox-dropdown-background);
                         border: $combobox-dropdown-border-thickness solid theme.themed($combobox-dropdown-border);
                     }
-
-                    //&:popover-open {
-                    //    opacity: 1;
-
-                    //    @starting-style {
-                    //        opacity: 0;
-                    //    }
-                    //}
                 }
 
-                :deep() option {
-                    position: relative;
-                    min-block-size: auto;
+                &:open::picker(select) {
+                    opacity: 1;
 
-                    &::checkmark {
-                        content: '';
-                        position: absolute;
-                        left: 0;
-                        height: $combobox-item-pill-height;
-                        width: $combobox-item-pill-width;
-                        border-radius: $combobox-item-pill-corner-radius;
-                        transition: height $combobox-item-scale-animation-duration cubic-bezier(colors.$control-fast-out-slow-in-key-spline);
-
-                        @include theme.auto-theme {
-                            background: theme.themed($combobox-item-pill-fill);
-                        }
-                    }
-
-                    &:not(:disabled):active {
-                        &::checkmark {
-                            height: $combobox-item-pill-height * $combobox-item-pill-min-scale;
-                        }
+                    @starting-style {
+                        opacity: 0;
                     }
                 }
             }

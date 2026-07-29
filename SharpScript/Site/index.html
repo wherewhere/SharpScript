@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>SharpScript</title>
     <meta name="description" content=".NET language playground on WASM" />
-    <meta name="theme-color" content="#fbfbfb" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#272727" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#f3f3f3" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#202020" media="(prefers-color-scheme: dark)" />
     <base href="/" />
     <link rel="icon" type="image/png" sizes="50x50"
           href="https://cdn.jsdelivr.net/gh/wherewhere/SharpScript@main/SharpScript/Assets/StoreLogo.scale-100.png" />
@@ -19,14 +19,9 @@
     <link rel="icon" type="image/png" sizes="200x200"
           href="https://cdn.jsdelivr.net/gh/wherewhere/SharpScript@main/SharpScript/Assets/StoreLogo.scale-400.png" />
     <style>
-        :root {
-            --neutral-fill-stealth-rest: #fbfbfb;
-        }
-
-        .body,
         body,
         #vue-app div.cover {
-            background: #fbfbfb;
+            background: #f3f3f3;
         }
 
         #vue-app div.cover {
@@ -48,7 +43,7 @@
         }
 
             .pace .pace-progress {
-                background: #036ac4;
+                background: #0064b2;
                 position: fixed;
                 z-index: 4;
                 bottom: 0;
@@ -63,18 +58,13 @@
         }
 
         @media (prefers-color-scheme:dark) {
-            :root {
-                --neutral-fill-stealth-rest: #272727;
-            }
-
-            #vue-app div.cover,
-            .body,
-            body {
-                background: #272727;
+            body,
+            #vue-app div.cover {
+                background: #202020;
             }
 
             .pace .pace-progress {
-                background: #60c9fc;
+                background: #51d2ff;
             }
         }
     </style>

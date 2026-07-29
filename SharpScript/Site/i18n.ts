@@ -3,12 +3,11 @@ import { createI18n } from "vue-i18n";
 export default createI18n({
     legacy: false,
     locale: (() => {
-        const supportLanguages = ["en-US", "zh-CN"];
-        const supportLanguageCodes =
-            [
-                ["en", "en-au", "en-ca", "en-gb", "en-ie", "en-in", "en-nz", "en-sg", "en-us", "en-za", "en-bz", "en-hk", "en-id", "en-jm", "en-kz", "en-mt", "en-my", "en-ph", "en-pk", "en-tt", "en-vn", "en-zw", "en-053", "en-021", "en-029", "en-011", "en-018", "en-014"],
-                ["zh-hans", "zh-cn", "zh-hans-cn", "zh-sg", "zh-hans-sg"]
-            ];
+        const supportLanguages = ["en-US", "zh-CN"] as const;
+        const supportLanguageCodes = [
+            ["en", "en-au", "en-ca", "en-gb", "en-ie", "en-in", "en-nz", "en-sg", "en-us", "en-za", "en-bz", "en-hk", "en-id", "en-jm", "en-kz", "en-mt", "en-my", "en-ph", "en-pk", "en-tt", "en-vn", "en-zw", "en-053", "en-021", "en-029", "en-011", "en-018", "en-014"],
+            ["zh-hans", "zh-cn", "zh-hans-cn", "zh-sg", "zh-hans-sg"]
+        ] as const;
         const fallbackLanguage = "en-US";
         const languages = navigator.languages || [navigator.language || fallbackLanguage];
         for (const lang of languages) {

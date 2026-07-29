@@ -3,6 +3,8 @@ import type { Diagnostic, TextChanges, ICodeActionObject, ICompletionItemObject 
 import { importAsync, AsyncLock, Comlink } from "./helpers/shared";
 
 if (typeof window === "undefined") {
+    self.Node = class { static readonly COMMENT_NODE = 8 } as any;
+    self.Element = class extends self.Node { } as any;
     self.window = self;
     self.document = {
         baseURI: location.href,
@@ -13,22 +15,36 @@ if (typeof window === "undefined") {
             }
         },
         addEventListener() { },
+        createComment() {
+            return {};
+        },
         createElement() {
             return {};
         },
         createElementNS() {
             return {};
         },
+        createRange() {
+            return {};
+        },
+        createTextNode() {
+            return {};
+        },
+        getElementById() {
+            return null;
+        },
         hasChildNodes() {
             return false;
         },
         querySelector() {
             return null;
-        }
+        },
+        querySelectorAll() {
+            return [];
+        },
+        removeEventListener() { }
     } as any;
     self.history = {} as any;
-    self.Element = function () { } as any;
-    self.Node = function () { } as any;
 }
 
 let diagnostics: ICodeActionObject[] = [], completions: ICompletionItemObject[] = [];

@@ -33,6 +33,7 @@ $button-padding: 6px 11px;
 
 button,
 .cm-editor .cm-button,
+.cm-editor .cm-diagnosticAction,
 input[type="button"],
 input[type="reset"],
 input[type="submit"],
@@ -108,4 +109,9 @@ $compact-button-padding: 2px 4px;
 .cm-editor .cm-button {
     font-size: $caption-text-block-font-size;
     padding: $compact-button-padding;
+}
+
+.cm-editor .cm-diagnosticAction {
+    padding: $compact-button-padding;
+    font-family: var(--font-monospace);
 }

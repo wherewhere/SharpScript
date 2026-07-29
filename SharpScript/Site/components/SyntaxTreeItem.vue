@@ -77,7 +77,7 @@
         .expand-collapse-chevron {
             width: 20px;
             height: 20px;
-            margin-right: 6px;
+            margin-right: 5px;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -154,30 +154,31 @@
         display: block;
         width: 20px;
         height: 20px;
+        margin-left: 1px;
         margin-right: 5px;
 
         .ast-item-node & {
-            background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0.5%200.5%2020%2020'%3E%3Cpath%20fill='%234684ee'%20stroke='%23f6f6f6'%20d='M4%204h12v4H4zm0%204h12v4H4zm0%204h12v4H4z'/%3E%3C/svg%3E");
+            background-image: url("../assets/node.svg");
         }
 
         .ast-item-token & {
-            background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0.5%200.5%2020%2020'%3E%3Cpath%20fill='%23eeb046'%20stroke='%23f6f6f6'%20d='M4%208h12v4H4z'/%3E%3C/svg%3E");
+            background-image: url("../assets/token.svg");
         }
 
         .ast-item-trivia & {
-            background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0.5%200.5%2020%2020'%3E%3Cpath%20d='M5.5%207.1V11h9V7.1'%20stroke='%23f6f6f6'%20stroke-width='4'%20fill='none'/%3E%3Cpath%20d='M5.5%208v3h9V8'%20stroke='%23666'%20stroke-width='2'%20fill='none'/%3E%3C/svg%3E");
+            background-image: url("../assets/trivia.svg");
         }
 
         .ast-item-value & {
-            background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0.5%200.5%2020%2020'%3E%3Cpath%20fill='%23eeb046'%20stroke='%23f6f6f6'%20d='M8%208h4v4H8z'/%3E%3C/svg%3E");
+            background-image: url("../assets/value.svg");
         }
 
         .ast-item-operation & {
-            background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0.5%200.5%2020%2020'%3E%3Ccircle%20cx='10'%20cy='10'%20r='4.23'%20stroke='%23f6f6f6'%20stroke-width='4.5'%20fill='none'/%3E%3Ccircle%20cx='10'%20cy='10'%20r='4.23'%20stroke='%23888'%20stroke-width='2.5'%20fill='none'/%3E%3C/svg%3E");
+            background-image: url("../assets/operation.svg");
         }
 
         .ast-item-property-only & {
-            background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0.5%200.5%2020%2020'%3E%3Ccircle%20cx='10'%20cy='10'%20r='2'%20fill='%23888'%20stroke='%23f6f6f6'%20stroke-width='1.1'/%3E%3C/svg%3E");
+            background-image: url("../assets/property.svg");
         }
     }
 

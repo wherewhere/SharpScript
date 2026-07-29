@@ -64,7 +64,7 @@ namespace SharpScript.Common
                 if (node is NamespaceDeclaration @namespace && IsNonUserCode(@namespace))
                 {
                     node.Remove();
-                    root.AddChildWithExistingRole(node);
+                    root.AddChild(node, node.Slot!);
                     firstMovedNode ??= node;
                 }
             }

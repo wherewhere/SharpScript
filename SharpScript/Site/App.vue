@@ -6,10 +6,10 @@
                     <div class="toolgroup">
                         <ComboBox name="language" :title="t('input.language.title')"
                                   :placeholder="t('input.language.placeholder')" position="below" v-model="language">
-                            <option title="CSharp" value="CSharp">C#</option>
-                            <option title="VisualBasic" value="VisualBasic">VB</option>
-                            <option title="Mono IL" value="IL">IL</option>
-                            <option title="CoreCLR IL" value="CIL">CIL</option>
+                            <ComboBoxItem title="CSharp" value="CSharp">C#</ComboBoxItem>
+                            <ComboBoxItem title="VisualBasic" value="VisualBasic">VB</ComboBoxItem>
+                            <ComboBoxItem title="Mono IL" value="IL">IL</ComboBoxItem>
+                            <ComboBoxItem title="CoreCLR IL" value="CIL">CIL</ComboBoxItem>
                         </ComboBox>
                         <ToggleButton v-if="!isIL" v-model="isScript">{{ t("input.language.script") }}</ToggleButton>
                     </div>
@@ -22,9 +22,9 @@
                         <ComboBox name="version" v-if="inputLanguages.length" v-model="inputLanguage"
                                   :title="t('input.version.title')" position="below"
                                   :placeholder="t('input.version.placeholder')">
-                            <option v-for="item in inputLanguages" :title="item" :value="item">
+                            <ComboBoxItem v-for="item in inputLanguages" :title="item" :value="item">
                                 {{ getVersion(item) }}
-                            </option>
+                            </ComboBoxItem>
                         </ComboBox>
                     </div>
                 </div>
@@ -37,12 +37,12 @@
                     <div class="toolgroup">
                         <ComboBox name="output" :title="t('output.language.title')"
                                   :placeholder="t('output.language.placeholder')" position="below" v-model="output">
-                            <option title="CSharp" value="CSharp">C#</option>
-                            <option title="IL" value="IL">IL</option>
-                            <option title="Run" value="Run">{{ t("output.language.run") }}</option>
-                            <option title="SyntaxTree" value="SyntaxTree" :disabled="isIL">
+                            <ComboBoxItem title="CSharp" value="CSharp">C#</ComboBoxItem>
+                            <ComboBoxItem title="IL" value="IL">IL</ComboBoxItem>
+                            <ComboBoxItem title="Run" value="Run">{{ t("output.language.run") }}</ComboBoxItem>
+                            <ComboBoxItem title="SyntaxTree" value="SyntaxTree" :disabled="isIL">
                                 {{ t("output.language.syntaxTree") }}
-                            </option>
+                            </ComboBoxItem>
                         </ComboBox>
                         <button class="icon-button" v-if="isInitLinter || isIL" :title="t('output.format.title')"
                                 @click="formatEditorAsync" :disabled="loading">
@@ -60,9 +60,9 @@
                         </button>
                         <ComboBox name="version" v-if="outputLanguages.length" v-model="outputLanguage" position="below"
                                   :title="t('output.version.title')" :placeholder="t('output.version.placeholder')">
-                            <option v-for="item in outputLanguages" :title="item" :value="item">
+                            <ComboBoxItem v-for="item in outputLanguages" :title="item" :value="item">
                                 {{ getVersion(item) }}
-                            </option>
+                            </ComboBoxItem>
                         </ComboBox>
                     </div>
                 </div>
@@ -71,39 +71,36 @@
                                 v-model:value="results.decompiled" :language="getOutputLanguage()"
                                 :roslyn-tooltip="roslynTooltip.output" :readonly="true" style="flex: 1;" />
                     <div class="output" v-else>
-                        <div class="syntax-tree" v-if="isSyntaxTree && syntaxTree">
-                            <ol>
-                                <SyntaxTreeItem :item="syntaxTree" />
-                            </ol>
-                        </div>
-                        <div v-else-if="isRun && results.outputs.length && !diagnostics.errors.length">
+                        <ol class="syntax-tree" v-if="isSyntaxTree && syntaxTree">
+                            <SyntaxTreeItem :item="syntaxTree" />
+                        </ol>
+                        <output v-else-if="isRun && results.outputs.length && !diagnostics.errors.length">
                             <pre class="unset" v-for="item in renderConsole(results.outputs)" v-html="item"></pre>
-                        </div>
-                        <div v-else-if="diagnostics.errors.length || diagnostics.warnings.length || diagnostics.infos.length">
-                            <table cellpadding="4">
-                                <thead>
-                                    <tr>
-                                        <th style="width: 20px;"></th>
-                                        <th>ID</th>
-                                        <th>{{ t("output.diagnostic.message") }}</th>
-                                        <th>{{ t("output.diagnostic.location") }}</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr v-for="item in [...diagnostics.errors, ...diagnostics.warnings, ...diagnostics.infos]">
-                                        <td :class="item.severity.toLowerCase() + '-icon'"></td>
-                                        <td>{{ item.id }}</td>
-                                        <td>{{ item.message }}</td>
-                                        <td>{{ getLocation(item) }}</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
+                        </output>
+                        <table cellpadding="4"
+                               v-else-if="diagnostics.errors.length || diagnostics.warnings.length || diagnostics.infos.length">
+                            <thead>
+                                <tr>
+                                    <th style="width: 20px;"></th>
+                                    <th>ID</th>
+                                    <th>{{ t("output.diagnostic.message") }}</th>
+                                    <th>{{ t("output.diagnostic.location") }}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="item in [...diagnostics.errors, ...diagnostics.warnings, ...diagnostics.infos]">
+                                    <td :class="item.severity.toLowerCase() + '-icon'" :title="item.severity"></td>
+                                    <td>{{ item.id }}</td>
+                                    <td style="white-space: pre-wrap;">{{ item.message }}</td>
+                                    <td>{{ getLocation(item) }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </template>
         </SplitPanels>
-        <div class="status-bar">
+        <footer class="status-bar">
             <div style="height: 20px;">
                 <Alert16Regular style="fill: currentColor; margin: 3px 4px -3px 0;" title="{{ $t('status.alert') }}" />
                 <span>{{ message }}</span>
@@ -118,7 +115,7 @@
                     <span style="margin: 0 0 0 4px;">{{ diagnostics.warnings.length }}</span>
                 </span>
             </div>
-        </div>
+        </footer>
     </div>
     <div class="loading-progress" v-if="!isInitDotnet"></div>
 </template>
@@ -146,6 +143,7 @@
     import { setTimeoutAsync } from "./helpers/utils";
     import { keywords } from "./package.json";
     import ComboBox from "./components/ComboBox.vue";
+    import ComboBoxItem from "./components/ComboBoxItem.vue";
     import ProgressRing from "./components/ProgressRing.vue";
     import SplitPanels from "./components/SplitPanels.vue";
     import CodeMirror from "./components/CodeMirror.vue";
@@ -919,19 +917,26 @@
         font-family: inherit;
         white-space: pre-wrap;
         overflow: visible;
+        width: max-content;
     }
 
     .toolbar {
         display: flex;
-        column-gap: 18.5px;
+        column-gap: 4px;
         overflow-x: auto;
         overflow-y: hidden;
         white-space: nowrap;
         justify-content: space-between;
+        scrollbar-width: none;
+
+        &::-webkit-scrollbar {
+            display: none;
+        }
 
         .toolgroup {
             display: flex;
             column-gap: 4px;
+            flex-shrink: 0;
 
             button.icon-button {
                 padding: 0;
@@ -974,6 +979,7 @@
                 display: flex;
                 flex-direction: column;
                 row-gap: var(--large-gap-size);
+                scrollbar-width: none;
 
                 &::-webkit-scrollbar {
                     display: none;
@@ -1016,25 +1022,26 @@
                     padding: 0 12px;
                     width: 100%;
 
-                    &>div {
+                    &>output {
                         padding: 4px 0;
                     }
 
                     .syntax-tree {
-                        display: flex;
-                        flex-direction: row;
+                        padding: 0;
+                        margin: 4px 0;
+                        white-space: nowrap;
+                        min-width: fit-content;
+                    }
 
-                        ol {
-                            padding: 0;
-                            margin: 4px 0;
-                            white-space: nowrap;
-                        }
+                    table {
+                        font-size: var(--font-size);
+                        min-width: max-content;
                     }
                 }
             }
         }
 
-        div.status-bar {
+        .status-bar {
             display: flex;
             height: $status-bar-height;
             padding-left: 3px;
