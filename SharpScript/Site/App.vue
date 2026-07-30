@@ -105,7 +105,7 @@
                 <Alert16Regular style="fill: currentColor; margin: 3px 4px -3px 0;" title="{{ $t('status.alert') }}" />
                 <span>{{ message }}</span>
             </div>
-            <div style="height: 20px;">
+            <div style="height: 20px;" @dblclick="() => results = { outputs: [] }">
                 <span :title="t('status.errors', [diagnostics.errors.length])">
                     <DismissCircle16Regular style="fill: currentColor; margin: 3px 0 -3px 0;" />
                     <span style="margin: 0 0 0 4px;">{{ diagnostics.errors.length }}</span>

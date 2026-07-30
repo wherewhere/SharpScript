@@ -41,7 +41,6 @@ namespace SharpScript.Common
         private readonly RoslynOptions _options;
         private readonly string _language;
         private readonly bool _isConsole;
-        private readonly AsyncLocker _addonLocker = new();
         private readonly string _comment;
         private bool _outOfDate;
         private bool _sourceUpdated;
@@ -385,6 +384,7 @@ namespace SharpScript.Common
                 _ = assemblyStream.Seek(0, SeekOrigin.Begin);
                 _ = symbolStream.Seek(0, SeekOrigin.Begin);
                 _ = documentationStream.Seek(0, SeekOrigin.Begin);
+                results.AddRange(emitResult.Diagnostics.Select(x => new Diagnostic(x)));
                 return new CompilationResults(AssemblyName, assemblyStream, symbolStream, documentationStream, References + _addon);
             }
             else
@@ -407,6 +407,7 @@ namespace SharpScript.Common
                             _ = assemblyStream.Seek(0, SeekOrigin.Begin);
                             _ = symbolStream.Seek(0, SeekOrigin.Begin);
                             _ = documentationStream.Seek(0, SeekOrigin.Begin);
+                            results.AddRange(emitResult.Diagnostics.Select(x => new Diagnostic(x)));
                             return new CompilationResults(AssemblyName, assemblyStream, symbolStream, documentationStream, References + _addon);
                         }
                     }

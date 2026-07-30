@@ -10,8 +10,8 @@
     import { indentUnit, StreamLanguage } from "@codemirror/language";
     import { keymap, type hoverTooltip, EditorView, type ViewUpdate } from "@codemirror/view";
     import { lintGutter } from "@codemirror/lint";
-    import { vscodeDark, vscodeLight } from "@uiw/codemirror-theme-vscode";
     import { vscodeKeymap } from "@replit/codemirror-vscode-keymap";
+    import { vscodeDark, vscodeLight } from "../helpers/theme";
 
     const { language, readonly, lintGutter: lintGutterProp, keymap: keymapProp, linter, roslynTooltip, roslynCompletion } = defineProps<{
         language?: lang;
@@ -244,6 +244,7 @@
 </style>
 
 <style lang="scss" scoped>
+    @use "sass:string";
     @use "../styles/theme";
     @use "../styles/colors";
 
@@ -288,58 +289,78 @@
     $flyout-theme-min-width: 96px;
     $flyout-content-padding: 8px 12px;
 
+    $base-transition: background-color colors.$control-faster-animation-duration ease-in-out;
+
+    @function svg($content, $attrs: "viewBox='0 0 40 40'") {
+        @return url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' #{$attrs}%3E#{$content}%3C/svg%3E");
+    }
+
+    @function underline($color) {
+        $path: "%3Cpath d='m0 2.5 l2 -1.5 l1 0 l2 1.5 l1 0' stroke='#{$color}' fill='none' stroke-width='.7'/%3E";
+        @return svg($path, "width='6' height='3'");
+    }
+
     :deep(.cm-editor) {
         background: none;
         outline: none;
 
-        .cm-gutter-lint {
-            width: 3px;
-            overflow: visible;
+        .cm-gutters {
+            transition: $base-transition;
 
-            .cm-gutterElement {
-                padding: 0;
+            .cm-gutter-lint {
+                width: 3px;
+                overflow: visible;
 
-                .cm-lint-marker {
-                    content: none;
-                    height: 100%;
-                    width: 100%;
-                    transform-origin: left;
-                    transition: transform colors.$control-faster-animation-duration ease-in-out;
-                    
-                    &:hover {
-                        transform: scaleX(2);
-                    }
+                .cm-gutterElement {
+                    padding: 0;
 
-                    &.cm-lint-marker-hint {
-                        background: transparent;
-                    }
+                    .cm-lint-marker {
+                        content: none;
+                        height: 100%;
+                        width: 100%;
+                        transform-origin: left;
+                        transition: $base-transition, transform colors.$control-faster-animation-duration ease-in-out;
 
-                    &.cm-lint-marker-info {
-                        background: #a5a5a5;
-                    }
+                        &:hover {
+                            transform: scaleX(2);
+                        }
 
-                    &.cm-lint-marker-warning {
-                        background: #008000;
-                    }
+                        &.cm-lint-marker-hint {
+                            background: transparent;
+                            transition: $base-transition;
 
-                    &.cm-lint-marker-error {
-                        background: #ff0000;
-                    }
+                            &:hover {
+                                transform: none;
+                                background: #a5a5a5;
+                            }
+                        }
 
-                    @media (prefers-color-scheme: dark) {
+                        &.cm-lint-marker-info {
+                            background: #a5a5a5;
+                        }
+
                         &.cm-lint-marker-warning {
-                            background: #95db7d;
+                            background: #008000;
                         }
 
                         &.cm-lint-marker-error {
-                            background: #fc3e36;
+                            background: #ff0000;
+                        }
+
+                        @media (prefers-color-scheme: dark) {
+                            &.cm-lint-marker-warning {
+                                background: #95db7d;
+                            }
+
+                            &.cm-lint-marker-error {
+                                background: #fc3e36;
+                            }
                         }
                     }
                 }
             }
         }
 
-        .cm-scroller,
         .cm-diagnostic,
         .cm-completionInfo,
         .cm-tooltip-autocomplete>ul {
@@ -354,7 +375,7 @@
             max-width: min($flyout-theme-max-width, 100%);
             padding: $flyout-content-padding;
             box-shadow: 0 0 16px rgba(0, 0, 0, .14);
-            transition: opacity colors.$control-faster-animation-duration linear;
+            transition: $base-transition, opacity colors.$control-faster-animation-duration linear;
 
             @include theme.auto-theme {
                 background: theme.themed($flyout-presenter-background);
@@ -423,7 +444,7 @@
             border-radius: colors.$overlay-corner-radius;
             padding: $combobox-dropdown-content-margin;
             box-shadow: 0 0 16px rgba(0, 0, 0, .14);
-            transition: opacity colors.$control-faster-animation-duration linear;
+            transition: $base-transition, opacity colors.$control-faster-animation-duration linear;
 
             @include theme.auto-theme {
                 color: theme.themed($combobox-dropdown-foreground);
@@ -442,7 +463,7 @@
                     padding: $compact-combobox-item-theme-padding;
                     line-height: colors.$content-control-line-height;
                     border-radius: $combobox-item-corner-radius;
-                    transition: background-color colors.$control-faster-animation-duration ease-in-out;
+                    transition: $base-transition;
 
                     @include theme.auto-theme {
                         color: theme.themed($combobox-item-foreground);
@@ -514,16 +535,16 @@
             color: #2b91af;
         }
 
+        .cm-lintRange {
+            background-image: none;
+        }
+
         .cm-lintRange-unnecessary {
-            opacity: 0.66;
+            opacity: 0.467;
         }
 
-        .cm-lintRange-hint {
-            background: none;
-        }
-
+        .cm-lintRange-hint,
         .cm-lintRange-info {
-            background: none;
             position: relative;
 
             &::after {
@@ -532,21 +553,36 @@
                 border-radius: 50%;
                 content: '';
                 position: absolute;
-                bottom: 0;
+                bottom: 0.5px;
                 left: 1px;
-                background: #a5a5a5;
-                box-shadow: 3.5px 0 0 #a5a5a5;
             }
         }
 
+        .cm-lintRange-hint::after {
+            transition: background-color colors.$control-faster-animation-duration ease-in-out,
+                box-shadow colors.$control-faster-animation-duration ease-in-out;
+        }
+
+        .cm-lintRange-hint:hover::after,
+        .cm-lintRange-info::after {
+            background: #a5a5a5;
+            box-shadow: 3.5px 0 0 #a5a5a5;
+        }
+
         .cm-lintRange-warning {
-            background: none;
-            text-decoration: underline wavy #008000;
+            background-image: underline(#008000);
         }
 
         .cm-lintRange-error {
-            background: none;
-            text-decoration: underline wavy #ff0000;
+            background-image: underline(#ff0000);
+        }
+
+        .cm-searchMatch {
+            background-color: rgba(234, 92, 0, 0.33);
+        }
+
+        .cm-searchMatch-selected {
+            background-color: rgba(234, 92, 0, 0.22);
         }
 
         @media (prefers-color-scheme: dark) {
@@ -579,19 +615,25 @@
             }
 
             .cm-lintRange-unnecessary {
-                opacity: 0.73;
+                opacity: 0.667;
             }
 
             .cm-lintRange-warning {
-                text-decoration: underline wavy #95db7d;
+                background-image: underline(#95db7d);
             }
 
             .cm-lintRange-error {
-                text-decoration: underline wavy #fc3e36;
+                background-image: underline(#fc3e36);
+            }
+
+            .cm-searchMatch-selected {
+                background-color: #9e6a03;
             }
         }
 
         .cm-panels {
+            transition: $base-transition;
+
             @include theme.auto-theme {
                 background: theme.themed(colors.$card-background-fill-color-default);
                 border-top: 1px solid theme.themed(colors.$card-stroke-color-default);
