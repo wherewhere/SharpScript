@@ -751,6 +751,7 @@
         return `[${item.location.start.line + 1}, ${item.location.start.character}] - [${item.location.end.line + 1}, ${item.location.end.character}]`;
     }
 
+    let init = false;
     let hashChanged = false;
     function loadSettings() {
         if (hashChanged) {
@@ -782,6 +783,9 @@
             }
             if (params.has("noreferrer")) {
                 noreferrer = params.get("noreferrer") !== "false";;
+            }
+            if (params.has("init")) {
+                init = params.get("init") !== "false";
             }
             if (params.has("noworker")) {
                 return params.get("noworker") !== "false";
@@ -853,6 +857,7 @@
             const url = new URL(importWorker.toString().match(/import\(["'`](\S+)["'`]\)/)![1], import.meta.url);
             dotnet = Comlink.wrap<DotNetWorker>(new Worker(url.href, { type: "module" }));
         }
+        if (init) { initLinterAsync(); }
         addEventListener("hashchange", loadSettings);
     });
 </script>

@@ -1,3 +1,4 @@
+/// <reference types="node" />
 import { Importer } from "sass";
 import { createHash } from "crypto";
 import { existsSync } from "fs";
