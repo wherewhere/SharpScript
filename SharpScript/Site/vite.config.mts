@@ -2,10 +2,10 @@ import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
 import svgLoader from "vite-svg-loader";
 import simpleHtmlPlugin from "vite-plugin-simple-html";
-import dotnetFrameworkStaticFiles from "./helpers/dotnet-framework-static-files";
-import githubImporter from "./helpers/github-importer";
+import dotnetFrameworkStaticFiles from "./helpers/dotnet-framework-static-files.mts";
+import githubImporter from "./helpers/github-importer.mts";
 import cssnano from "cssnano";
-import getOutputOptions from "./helpers/output";
+import getOutputOptions from "./helpers/output.mts";
 
 export default defineConfig(({ mode }) => {
     return {

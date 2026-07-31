@@ -305,7 +305,9 @@
         outline: none;
 
         .cm-gutters {
-            transition: $base-transition;
+            border-right-width: 1px;
+            border-right-style: solid;
+            transition: $base-transition, border-color colors.$control-faster-animation-duration ease-in-out;
 
             .cm-gutter-lint {
                 width: 3px;
@@ -543,29 +545,43 @@
             opacity: 0.467;
         }
 
+        .cm-lintRange-hint::after,
+        .cm-lintRange-info::after,
+        .cm-lintPoint::after {
+            border: none;
+            width: 2px;
+            height: 2px;
+            border-radius: 50%;
+            bottom: 0.5px;
+        }
+
+        .cm-lintPoint::after {
+            left: -1px;
+            transition: background-color colors.$control-faster-animation-duration ease-in-out;
+        }
+
         .cm-lintRange-hint,
         .cm-lintRange-info {
             position: relative;
 
             &::after {
-                width: 2px;
-                height: 2px;
-                border-radius: 50%;
                 content: '';
                 position: absolute;
-                bottom: 0.5px;
                 left: 1px;
+                transition: background-color colors.$control-faster-animation-duration ease-in-out,
+                    box-shadow colors.$control-faster-animation-duration ease-in-out;
             }
         }
 
-        .cm-lintRange-hint::after {
-            transition: background-color colors.$control-faster-animation-duration ease-in-out,
-                box-shadow colors.$control-faster-animation-duration ease-in-out;
+        .cm-lintRange-hint:hover::after,
+        .cm-lintRange-info::after,
+        .cm-lintPoint-hint:hover::after,
+        .cm-lintPoint-info::after {
+            background: #a5a5a5;
         }
 
         .cm-lintRange-hint:hover::after,
         .cm-lintRange-info::after {
-            background: #a5a5a5;
             box-shadow: 3.5px 0 0 #a5a5a5;
         }
 
@@ -573,8 +589,16 @@
             background-image: underline(#008000);
         }
 
+        .cm-lintPoint-warning::after {
+            background: #008000;
+        }
+
         .cm-lintRange-error {
             background-image: underline(#ff0000);
+        }
+
+        .cm-lintPoint-error::after {
+            background: #ff0000;
         }
 
         .cm-searchMatch {
@@ -627,7 +651,7 @@
             }
 
             .cm-searchMatch-selected {
-                background-color: #9e6a03;
+                background-color: #9E6A03;
             }
         }
 

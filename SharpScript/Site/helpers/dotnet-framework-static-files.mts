@@ -8,7 +8,7 @@ export default {
     configureServer(server) {
         server.middlewares.use((req, res, next) => {
             if (req.url && req.url.startsWith("/_framework")) {
-                const frameworkRoot = path.resolve(__dirname, "../../bin/Release/net10.0-browser/publish/wwwroot");
+                const frameworkRoot = path.resolve(import.meta.dirname, "../../bin/Release/net10.0-browser/publish/wwwroot");
                 const rawPath = decodeURIComponent(req.url.split('?')[0]);
                 let filePath = path.resolve(frameworkRoot, `.${rawPath}`);
                 fs.stat(filePath, (err, stat) => {

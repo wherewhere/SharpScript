@@ -16,8 +16,8 @@
     <PackageReference Include="ILAssembler" Version="11.0.0-build.8.1" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.10" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="10.0.10" PrivateAssets="all" />
-    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Features" Version="5.11.0-1.26379.13" />
-    <PackageReference Include="Microsoft.CodeAnalysis.VisualBasic.Features" Version="5.11.0-1.26379.13" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Features" Version="5.11.0-1.26380.4" />
+    <PackageReference Include="Microsoft.CodeAnalysis.VisualBasic.Features" Version="5.11.0-1.26380.4" />
     <PackageReference Include="Mobius.ILasm" Version="0.1.0" />
     <PackageReference Include="System.Security.Permissions" Version="10.0.10" />
   </ItemGroup>

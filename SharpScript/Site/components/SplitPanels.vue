@@ -321,6 +321,7 @@
         span.handle {
             border-radius: 1px;
             margin: $sizer-base-padding;
+            transition: border-color colors.$control-faster-animation-duration ease-in-out;
         }
 
         @include theme.auto-theme {
