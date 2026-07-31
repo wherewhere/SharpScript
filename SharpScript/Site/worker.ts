@@ -1,6 +1,7 @@
 /// <reference types="./env.d.ts" />
 import type { Diagnostic, TextChanges, ICodeActionObject, ICompletionItemObject } from "sharp-script";
-import { importAsync, AsyncLock, Comlink } from "./helpers/shared";
+import { expose } from "comlink";
+import AsyncLock from "async-lock";
 
 if (typeof window === "undefined") {
     self.Node = class { static readonly COMMENT_NODE = 8 } as any;
@@ -100,7 +101,7 @@ const dotnet = {
         return getFingerprinting();
     },
     async startAsync() {
-        await importAsync("../_framework/blazor.webassembly.js");
+        await import(/* @vite-ignore */ "../_framework/blazor.webassembly.js");
         await Blazor.start();
     },
     async initAsync() {
@@ -225,7 +226,7 @@ const dotnet = {
 
 declare const WorkerGlobalScope: ObjectConstructor;
 if (typeof WorkerGlobalScope !== "undefined" && self instanceof WorkerGlobalScope) {
-    Comlink.expose(dotnet);
+    expose(dotnet);
 }
 
 export { dotnet };

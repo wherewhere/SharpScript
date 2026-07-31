@@ -131,7 +131,7 @@
     import { useSeoMeta } from "@unhead/vue";
     import { compressToEncodedURIComponent, decompressFromEncodedURIComponent } from "lz-string";
     import { useAnalytics } from "./helpers/analytics";
-    import { AsyncLock, Comlink } from "./helpers/shared";
+    import { wrap, proxy } from "comlink";
     import { AnsiUp } from "ansi_up";
     import { keymap, type ViewUpdate } from "@codemirror/view";
     import { createCompletion } from "./editor/completion";
@@ -142,6 +142,7 @@
     import { getCustomCompletionAsync } from "./helpers/fingerprinting";
     import { setTimeoutAsync } from "./helpers/utils";
     import { keywords } from "./package.json";
+    import AsyncLock from "async-lock";
     import ComboBox from "./components/ComboBox.vue";
     import ComboBoxItem from "./components/ComboBoxItem.vue";
     import ProgressRing from "./components/ProgressRing.vue";
@@ -612,7 +613,7 @@
                         dotnet!.init();
                     }
                     else {
-                        await dotnet!.init(document.baseURI, Comlink.proxy<setProperty>((x, y) => document.documentElement.style.setProperty(x, y)));
+                        await dotnet!.init(document.baseURI, proxy<setProperty>((x, y) => document.documentElement.style.setProperty(x, y)));
                     }
                     message.value = mes;
                     await dotnet!.startAsync();
@@ -855,7 +856,7 @@
         }
         else {
             const url = new URL(importWorker.toString().match(/import\(["'`](\S+)["'`]\)/)![1], import.meta.url);
-            dotnet = Comlink.wrap<DotNetWorker>(new Worker(url.href, { type: "module" }));
+            dotnet = wrap<DotNetWorker>(new Worker(url.href, { type: "module" }));
         }
         if (init) { initLinterAsync(); }
         addEventListener("hashchange", loadSettings);

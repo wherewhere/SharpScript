@@ -54,7 +54,7 @@ export default defineConfig(({ mode }) => {
                 output: getOutputOptions(mode, {
                     groups: [{
                         name: "shared",
-                        test: "/helpers/shared.ts"
+                        test: /\/comlink\/|\/async-lock\/|vite\/preload-helper.js/
                     }, {
                         name: "lezer",
                         test: "@lezer"
