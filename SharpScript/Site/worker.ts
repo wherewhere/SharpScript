@@ -101,7 +101,8 @@ const dotnet = {
         return getFingerprinting();
     },
     async startAsync() {
-        await import(/* @vite-ignore */ "../_framework/blazor.webassembly.js");
+        const url = "../_framework/blazor.webassembly.js";
+        await import(/* @vite-ignore */ url);
         await Blazor.start();
     },
     async initAsync() {

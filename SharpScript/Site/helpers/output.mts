@@ -13,24 +13,14 @@ function getType(path: string[]) {
     }
 }
 
-export default function getOutputOptions(mode: string, codeSplitting?: boolean | CodeSplittingOptions): OutputOptions {
-    const output: OutputOptions = { codeSplitting };
-    if (mode === "publish") {
-        output.assetFileNames = chunkInfo => {
+export default function getOutputOptions(codeSplitting?: boolean | CodeSplittingOptions): OutputOptions {
+    return {
+        assetFileNames: chunkInfo => {
             const type = getType(chunkInfo.names);
             return type && type !== "text" ? `assets/${type}/[name]-[hash].[ext]` : "assets/[name]-[hash].[ext]";
-        };
-        output.chunkFileNames = chunkInfo =>
-            chunkInfo.name === "worker" ? "assets/[name]-[hash].js" : "assets/js/[name]-[hash].js";
-    }
-    else {
-        output.assetFileNames = chunkInfo => {
-            const type = getType(chunkInfo.names);
-            return type && type !== "text" ? `assets/${type}/[name].[ext]` : "assets/[name].[ext]";
-        };
-        output.chunkFileNames = chunkInfo =>
-            chunkInfo.name === "worker" ? "assets/[name].js" : "assets/js/[name].js";
-        output.entryFileNames = "assets/[name].js";
-    }
-    return output;
+        },
+        chunkFileNames: chunkInfo =>
+            chunkInfo.name === "worker" ? "assets/[name]-[hash].js" : "assets/js/[name]-[hash].js",
+        codeSplitting
+    };
 }

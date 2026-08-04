@@ -36,32 +36,23 @@
     <Exec Command="npm install" WorkingDirectory="Site" />
   </Target>
 
-  <Target Name="NPMBuild" BeforeTargets="PreBuildEvent">
-    <PropertyGroup>
-      <RunNPMCompilation Condition="$(RunNPMCompilation) == ''">false</RunNPMCompilation>
-      <NPMArguments Condition="$(_IsPublishing) == 'true'">$(NPMArguments) --mode publish</NPMArguments>
-    </PropertyGroup>
-    <ItemGroup Condition="$(_IsPublishing) == 'true'">
+  <Target Name="NPMBuild" BeforeTargets="PreBuildEvent" Condition="$(RunNPMCompilation) == 'true'">
+    <ItemGroup>
       <Content Remove="wwwroot/assets/**/*" />
     </ItemGroup>
-    <Exec Command="npm run build -- $(NPMArguments)" WorkingDirectory="Site" Condition="$(RunNPMCompilation)" />
-    <ItemGroup Condition="$(_IsPublishing) == 'true'">
+    <Exec Command="npm run build" WorkingDirectory="Site" />
+    <ItemGroup>
       <Content Include="wwwroot/assets/**/*" />
     </ItemGroup>
   </Target>
 
   <Target Name="GetFrameworkXmlDocumentation" AfterTargets="ResolveReferences">
     <ItemGroup>
-      <OutputDocuments Include="@(Reference->'%(RootDir)%(Directory)%(Filename).xml')" Condition="Exists('%(RootDir)%(Directory)%(Filename).xml')" />
+      <Content Include="@(Reference->'%(RootDir)%(Directory)%(Filename).xml')"
+               Condition="Exists('%(RootDir)%(Directory)%(Filename).xml')"
+               Link="wwwroot/_framework/%(Filename).xml">
+      </Content>
     </ItemGroup>
-  </Target>
-
-  <Target Name="CopyDocumentationsToOutputDirectory" AfterTargets="CopyFilesToOutputDirectory" DependsOnTargets="GetFrameworkXmlDocumentation">
-    <Copy SourceFiles="@(OutputDocuments)" DestinationFolder="$(OutputPath)wwwroot\_framework" />
-  </Target>
-
-  <Target Name="CopyDocumentationsToPublishDirectory" AfterTargets="CopyFilesToPublishDirectory" DependsOnTargets="GetFrameworkXmlDocumentation">
-    <Copy SourceFiles="@(OutputDocuments)" DestinationFolder="$(PublishDir)wwwroot\_framework" />
   </Target>
 
   <Import Project="Properties\PatchCoreLib.targets" />
