@@ -198,7 +198,7 @@
 
     const code = shallowRef(csharpExample);
     const language = shallowRef("CSharp");
-    const inputLanguages = ref<readonly string[]>(["Default", "CSharp1", "CSharp2", "CSharp3", "CSharp4", "CSharp5", "CSharp6", "CSharp7", "CSharp7_1", "CSharp7_2", "CSharp7_3", "CSharp8", "CSharp9", "CSharp10", "CSharp11", "CSharp12", "CSharp13", "CSharp14", "LatestMajor", "Preview", "Latest"]);
+    const inputLanguages = ref<readonly string[]>(["Default", "CSharp1", "CSharp2", "CSharp3", "CSharp4", "CSharp5", "CSharp6", "CSharp7", "CSharp7_1", "CSharp7_2", "CSharp7_3", "CSharp8", "CSharp9", "CSharp10", "CSharp11", "CSharp12", "CSharp13", "CSharp14", "CSharp15", "LatestMajor", "Preview", "Latest"]);
     const inputLanguage = shallowRef<string | undefined>("Preview");
     const isScript = shallowRef(false);
     const output = shallowRef("Run");

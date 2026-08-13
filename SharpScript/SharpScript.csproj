@@ -12,14 +12,14 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="ICSharpCode.Decompiler" Version="11.0.0.9223-preview1" />
+    <PackageReference Include="ICSharpCode.Decompiler" Version="11.0.0.9375" />
     <PackageReference Include="ILAssembler" Version="11.0.0-build.8.1" />
-    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.10" />
-    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="10.0.10" PrivateAssets="all" />
-    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Features" Version="5.11.0-1.26381.2" />
-    <PackageReference Include="Microsoft.CodeAnalysis.VisualBasic.Features" Version="5.11.0-1.26381.2" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.11" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="10.0.11" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Features" Version="5.11.0-1.26412.9" />
+    <PackageReference Include="Microsoft.CodeAnalysis.VisualBasic.Features" Version="5.11.0-1.26412.9" />
     <PackageReference Include="Mobius.ILasm" Version="0.1.0" />
-    <PackageReference Include="System.Security.Permissions" Version="10.0.10" />
+    <PackageReference Include="System.Security.Permissions" Version="10.0.11" />
   </ItemGroup>
 
   <ItemGroup>
@@ -48,9 +48,7 @@
 
   <Target Name="GetFrameworkXmlDocumentation" AfterTargets="ResolveReferences">
     <ItemGroup>
-      <Content Include="@(Reference->'%(RootDir)%(Directory)%(Filename).xml')"
-               Condition="Exists('%(RootDir)%(Directory)%(Filename).xml')"
-               Link="wwwroot/_framework/%(Filename).xml">
+      <Content Include="@(Reference->'%(RootDir)%(Directory)%(Filename).xml')" Condition="Exists('%(RootDir)%(Directory)%(Filename).xml')" Link="wwwroot/_framework/%(Filename).xml">
       </Content>
     </ItemGroup>
   </Target>
