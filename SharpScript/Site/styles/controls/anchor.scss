@@ -1,0 +1,27 @@
+@use "../theme" as *;
+@use "../colors" as *;
+
+$hyperlink-foreground: $accent-text-fill-color-primary;
+$hyperlink-foreground-pointer-over: $accent-text-fill-color-secondary;
+$hyperlink-foreground-pressed: $accent-text-fill-color-tertiary;
+$hyperlink-underline-decoration: none;
+
+a {
+    @include auto-theme {
+        color: themed($hyperlink-foreground);
+        text-decoration: themed($hyperlink-underline-decoration);
+
+        &:hover {
+            color: themed($hyperlink-foreground-pointer-over);
+        }
+
+        &:active {
+            color: themed($hyperlink-foreground-pressed);
+        }
+
+        &:not([href]),
+        &:not([href]):hover {
+            color: themed($accent-text-fill-color-disabled);
+        }
+    }
+}

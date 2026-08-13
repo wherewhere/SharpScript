@@ -1,0 +1,22 @@
+@use "../theme" as *;
+@use "../colors" as *;
+
+blockquote {
+    border-right: none;
+    font-style: italic;
+    padding: 2px 15px;
+    margin-inline-start: 1rem;
+    margin-inline-end: 1rem;
+
+    @include auto-theme {
+        border-left: 5px solid themed($accent-fill-color-default);
+    }
+
+    [dir='rtl'] & {
+        border-left: none;
+
+        @include auto-theme {
+            border-left: 5px solid themed($accent-fill-color-default);
+        }
+    }
+}
