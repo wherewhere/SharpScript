@@ -23,7 +23,7 @@ namespace SharpScript.Models
         public static implicit operator List<TextChange>(TextChanges changes) => changes.value;
         public static implicit operator TextChanges(List<TextChange> changes) => new(changes);
 
-        public class JsonConverter : JsonConverter<TextChanges>
+        public sealed class JsonConverter : JsonConverter<TextChanges>
         {
             public override TextChanges Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
             {

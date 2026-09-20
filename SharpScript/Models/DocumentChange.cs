@@ -14,7 +14,7 @@ namespace SharpScript.Models
         [JsonPropertyName("text")]
         public string Text { get; init; }
 
-        private class LinePositionSpanJsonConverter : JsonConverter<LinePositionSpan>
+        private sealed class LinePositionSpanJsonConverter : JsonConverter<LinePositionSpan>
         {
             public override LinePositionSpan Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
             {

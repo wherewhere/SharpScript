@@ -167,7 +167,7 @@ namespace SharpScript.Common
             // Note: the logic cannot be reused, but should match C# and Jit ASM
             !type.NamespaceDefinition.IsNil && type.IsCompilerGenerated(metadata);
 
-        private class ExtendedCSharpOutputVisitor(TextWriter textWriter, CSharpFormattingOptions formattingPolicy) : CSharpOutputVisitor(textWriter, formattingPolicy)
+        private sealed class ExtendedCSharpOutputVisitor(TextWriter textWriter, CSharpFormattingOptions formattingPolicy) : CSharpOutputVisitor(textWriter, formattingPolicy)
         {
             public override void VisitTypeDeclaration(TypeDeclaration typeDeclaration)
             {

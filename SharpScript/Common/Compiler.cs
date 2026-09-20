@@ -18,7 +18,7 @@ using Diagnostic = SharpScript.Models.Diagnostic;
 
 namespace SharpScript.Common
 {
-    public class Compiler(ILoggerFactory factory)
+    public sealed class Compiler(ILoggerFactory factory)
     {
         private static readonly SourceText EmptySourceText = SourceText.From(string.Empty);
 
@@ -44,7 +44,7 @@ namespace SharpScript.Common
                             _codeSession = new MonoCodeSession(EmptySourceText, isConsole);
                             break;
                         case CoreCLROptions options:
-                            _codeSession = new CoreCLRCodeSession(EmptySourceText, options.Options);
+                            _codeSession = new CoreCLRCodeSession(EmptySourceText, options.Options, isConsole);
                             break;
                     }
                 }
@@ -155,7 +155,7 @@ namespace SharpScript.Common
                         _codeSession = new MonoCodeSession(_codeSession.SourceCode ?? EmptySourceText, isConsole);
                         break;
                     case CoreCLROptions options:
-                        _codeSession = new CoreCLRCodeSession(_codeSession.SourceCode ?? EmptySourceText, options.Options);
+                        _codeSession = new CoreCLRCodeSession(_codeSession.SourceCode ?? EmptySourceText, options.Options, isConsole);
                         break;
                 }
             }

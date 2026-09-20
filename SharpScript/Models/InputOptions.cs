@@ -106,7 +106,8 @@ namespace SharpScript.Models
         public Options Options { get; } = new Options
         {
             //Pdb = true,
-            Optimize = true
+            Optimize = true,
+            OutputFileName = "SharpScript.Playground.dll"
         };
     }
 }

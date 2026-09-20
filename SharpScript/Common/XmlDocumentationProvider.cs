@@ -11,7 +11,7 @@ using System.Xml;
 
 namespace SharpScript.Common
 {
-    public class ContentBasedXmlDocumentationProvider : IDeserializationCallback, IDocumentationProvider
+    public sealed class ContentBasedXmlDocumentationProvider : IDeserializationCallback, IDocumentationProvider
     {
         #region Cache
 
@@ -300,7 +300,7 @@ namespace SharpScript.Common
 
         #endregion
 
-        public virtual void OnDeserialization(object? sender) => cache = new XmlDocumentationCache();
+        public void OnDeserialization(object? sender) => cache = new XmlDocumentationCache();
 
         /// <summary>
         /// Creates an <see cref="IDocumentationProvider"/> from bytes representing XML documentation data.

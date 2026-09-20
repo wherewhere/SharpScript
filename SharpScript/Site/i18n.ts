@@ -77,6 +77,12 @@ export default createI18n({
                 initWebWorker: "Initializing Web Worker...",
                 downloadReferences: "Downloading references...",
                 formatting: "Formatting Code..."
+            },
+            version: {
+                default: "Default",
+                latestMajor: "Latest Major",
+                preview: "Preview",
+                latest: "Latest"
             }
         },
         "zh-CN": {
@@ -136,6 +142,12 @@ export default createI18n({
                 initWebWorker: "正在初始化 Web Worker...",
                 downloadReferences: "正在下载引用...",
                 formatting: "正在格式化代码..."
+            },
+            version: {
+                default: "默认版本",
+                latestMajor: "最新主要",
+                preview: "预览版本",
+                latest: "最新版本"
             }
         }
     }

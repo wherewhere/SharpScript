@@ -18,7 +18,7 @@ namespace SharpScript.Models
     {
         public abstract string Type { get; }
 
-        public class JsonConverter : JsonConverter<AstItemBase>
+        public sealed class JsonConverter : JsonConverter<AstItemBase>
         {
             public override AstItemBase? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
             {

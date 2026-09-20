@@ -1,12 +1,10 @@
 ﻿using ILAssembler;
 using SharpScript.Models;
-using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
 using System.Reflection.Metadata;
-using System.Reflection.PortableExecutable;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -16,7 +14,7 @@ using RoslynSourceText = Microsoft.CodeAnalysis.Text.SourceText;
 
 namespace SharpScript.Common
 {
-    public sealed partial class CoreCLRCodeSession(RoslynSourceText code, Options options) : ICodeSession
+    public sealed partial class CoreCLRCodeSession(RoslynSourceText code, Options options, bool isConsole) : ICodeSession
     {
         RoslynSourceText ICodeSession.SourceCode => code;
 
@@ -34,7 +32,8 @@ namespace SharpScript.Common
         {
             cancellationToken.ThrowIfCancellationRequested();
             DocumentCompiler compiler = new();
-            (ImmutableArray<ILDiagnostic> diagnostics, PEBuilder? builder) = compiler.Compile(
+            options.IsDll = !isConsole;
+            (ImmutableArray<ILDiagnostic> diagnostics, CompilationResult? builder) = compiler.Compile(
                 code.AsSourceTest("Program.il"),
                 path => new SourceText(string.Empty, path),
                 _ => [],
@@ -56,7 +55,8 @@ namespace SharpScript.Common
         {
             cancellationToken.ThrowIfCancellationRequested();
             DocumentCompiler compiler = new();
-            (ImmutableArray<ILDiagnostic> diagnostics, PEBuilder? builder) = compiler.Compile(
+            options.IsDll = !isConsole;
+            (ImmutableArray<ILDiagnostic> diagnostics, CompilationResult? builder) = compiler.Compile(
                 code.AsSourceTest("Program.il"),
                 path => new SourceText(string.Empty, path),
                 _ => [],

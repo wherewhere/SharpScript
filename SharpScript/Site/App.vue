@@ -730,7 +730,18 @@
     }
 
     function getVersion(version?: string) {
-        return version ? version.replace("VisualBasic", "VB ").replace("CSharp", "C# ").replace('_', '.') : '';
+        switch (version) {
+            case "Default":
+                return t("version.default");
+            case "LatestMajor":
+                return t("version.latestMajor");
+            case "Preview":
+                return t("version.preview");
+            case "Latest":
+                return t("version.latest");
+            default:
+                return version ? version.replace("VisualBasic", "VB ").replace("CSharp", "C# ").replace('_', '.') : '';
+        }
     }
 
     function getDefaultCode(language: string) {

@@ -13,13 +13,13 @@
 
   <ItemGroup>
     <PackageReference Include="ICSharpCode.Decompiler" Version="11.0.0.9375" />
-    <PackageReference Include="ILAssembler" Version="11.0.0-build.8.1" />
-    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.11" />
-    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="10.0.11" PrivateAssets="all" />
-    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Features" Version="5.11.0-1.26412.9" />
-    <PackageReference Include="Microsoft.CodeAnalysis.VisualBasic.Features" Version="5.11.0-1.26412.9" />
+    <PackageReference Include="ILAssembler" Version="11.0.0-build.9.1" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.12" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="10.0.12" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Features" Version="5.12.0-1.26469.109" />
+    <PackageReference Include="Microsoft.CodeAnalysis.VisualBasic.Features" Version="5.12.0-1.26469.109" />
     <PackageReference Include="Mobius.ILasm" Version="0.1.0" />
-    <PackageReference Include="System.Security.Permissions" Version="10.0.11" />
+    <PackageReference Include="System.Security.Permissions" Version="10.0.12" />
   </ItemGroup>
 
   <ItemGroup>

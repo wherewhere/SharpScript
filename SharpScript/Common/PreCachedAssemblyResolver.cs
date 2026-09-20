@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace SharpScript.Common
 {
-    public class PreCachedAssemblyResolver : IAssemblyResolver
+    public sealed class PreCachedAssemblyResolver : IAssemblyResolver
     {
         private static readonly Task<MetadataFile?> NullFileTask = Task.FromResult<MetadataFile?>(null);
 
