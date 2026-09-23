@@ -30,25 +30,15 @@ namespace SharpScript.Common
             }
         }
 
-        public MetadataFile? Resolve(IAssemblyReference reference)
-        {
-            return ResolveFromCacheForDecomplication(reference).file;
-        }
+        public MetadataFile? Resolve(IAssemblyReference reference) => ResolveFromCacheForDecomplication(reference).file;
 
-        public Task<MetadataFile?> ResolveAsync(IAssemblyReference reference)
-        {
-            return ResolveFromCacheForDecomplication(reference).task;
-        }
+        public Task<MetadataFile?> ResolveAsync(IAssemblyReference reference) => ResolveFromCacheForDecomplication(reference).task;
 
-        public MetadataFile ResolveModule(MetadataFile mainModule, string moduleName)
-        {
-            throw new NotSupportedException();
-        }
+        public MetadataFile ResolveModule(MetadataFile mainModule, string moduleName) => throw new NotSupportedException();
 
-        public Task<MetadataFile?> ResolveModuleAsync(MetadataFile mainModule, string moduleName)
-        {
-            throw new NotSupportedException();
-        }
+        public Task<MetadataFile?> ResolveModuleAsync(MetadataFile mainModule, string moduleName) => throw new NotSupportedException();
+
+        public IDisposable? BeginSnapshot() => null;
 
         private (PEFile? file, Task<MetadataFile?> task) ResolveFromCacheForDecomplication(IAssemblyReference reference)
         {
