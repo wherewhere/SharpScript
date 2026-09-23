@@ -43,10 +43,6 @@ jobs:
       - name: Publish
         run: dotnet publish ${{ env.Solution_Name }} -c:Release -o:public
 
-      # Changes the base-tag in index.html to match GitHub Pages repository subdirectory
-      - name: Change index.html base-tag
-        run: sed -i 's/<base href=\/>/<base href=\/SharpScript\/>/g' public/wwwroot/index.html
-
       # Add .nojekyll file to tell GitHub pages to not treat this as a Jekyll project. (Allow files and folders starting with an underscore)
       - name: Add .nojekyll file
         run: touch public/wwwroot/.nojekyll
