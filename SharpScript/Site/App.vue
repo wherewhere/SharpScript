@@ -50,6 +50,10 @@
                         </button>
                     </div>
                     <div class="toolgroup">
+                        <button class="icon-button" v-if="hasHash" :title="t('output.share.title')"
+                                @click="shareCurrentUrlAsync">
+                            <Share16Regular style="fill: currentColor;" />
+                        </button>
                         <button class="icon-button" v-if="isInitLinter && !diagnostics.errors.length"
                                 :title="t('output.download.title')" @click="downloadAssemblyAsync" :disabled="loading">
                             <ArrowDownload16Regular style="fill: currentColor;" />
@@ -141,6 +145,7 @@
     import { csharpExample, vbExample, ilExample, cilExample } from "./helpers/examples";
     import { getCustomCompletionAsync } from "./helpers/fingerprinting";
     import { setTimeoutAsync } from "./helpers/utils";
+    import { shareCurrentUrlAsync } from "./helpers/share";
     import { keywords } from "./package.json";
     import AsyncLock from "async-lock";
     import ComboBox from "./components/ComboBox.vue";
@@ -152,6 +157,7 @@
     import ToggleButton from "./components/ToggleButton.vue";
     import TriangleRight12Filled from "@fluentui/svg-icons/icons/triangle_right_12_filled.svg?component";
     import CodeText16Regular from "@fluentui/svg-icons/icons/code_text_16_regular.svg?component";
+    import Share16Regular from "@fluentui/svg-icons/icons/share_16_regular.svg?component";
     import ArrowDownload16Regular from "@fluentui/svg-icons/icons/arrow_download_16_regular.svg?component";
     import Sparkle16Regular from "@fluentui/svg-icons/icons/sparkle_16_regular.svg?component";
     import Alert16Regular from "@fluentui/svg-icons/icons/alert_16_regular.svg?component";
@@ -188,6 +194,7 @@
 
     let noreferrer = false;
     const hash = location.hash.substring(1);
+    const hasHash = shallowRef(!!hash);
     if (hash) {
         const params = new URLSearchParams(hash);
         if (params.has("noreferrer")) {
@@ -771,7 +778,7 @@
             return;
         }
         const hash = location.hash.substring(1);
-        if (hash) {
+        if (hasHash.value = !!hash) {
             const params = new URLSearchParams(hash);
             if (params.has("language")) {
                 language.value = params.get("language")!;
@@ -843,7 +850,7 @@
             settings.code = compressToEncodedURIComponent(code.value);
         }
         location.hash = new URLSearchParams(settings).toString();
-        hashChanged = true;
+        hasHash.value = hashChanged = true;
     }
 
     function renderConsole(output: readonly string[]) {

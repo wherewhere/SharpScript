@@ -46,6 +46,9 @@ export default createI18n({
                 format: {
                     title: "Format (Shift+Alt+F)"
                 },
+                share: {
+                    title: "Share"
+                },
                 download: {
                     title: "Download Assembly"
                 },
@@ -110,6 +113,9 @@ export default createI18n({
                 },
                 format: {
                     title: "格式化 (Shift+Alt+F)"
+                },
+                share: {
+                    title: "分享"
                 },
                 download: {
                     title: "下载程序集"
