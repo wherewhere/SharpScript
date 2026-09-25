@@ -926,6 +926,16 @@
             color: theme.themed(colors.$text-fill-color-primary);
         }
     }
+
+    #shareAPIPolyfill-container {
+        color-scheme: light;
+
+        button {
+            color: inherit;
+            border-radius: 0;
+            line-height: normal;
+        }
+    }
 </style>
 
 <style lang="scss" scoped>

@@ -65,6 +65,7 @@
     "codemirror-lang-msil": "^0.0.1-beta.8",
     "comlink": "^4.0.0",
     "lz-string": "^1.0.0",
+    "share-api-polyfill": "^1.0.0",
     "vue": "^3.0.0",
     "vue-i18n": "^11.0.0"
   }

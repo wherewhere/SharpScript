@@ -256,6 +256,9 @@ declare module "bilibili-card:*" {
     export default component;
 }
 
+declare module "share-api-polyfill" {
+}
+
 declare module "*/blazor.webassembly.js" {
     import { CompileResult, Diagnostic, TextChanges, ICompletionItem, InfoTipItem, AstNodeItem } from "sharp-script";
     global {
