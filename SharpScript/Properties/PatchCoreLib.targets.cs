@@ -37,22 +37,12 @@ using (PEReader peReader = new(peStream))
 
     MetadataReader reader = peReader.GetMetadataReader();
 
-    TypeDefinitionHandle volatileType = FindTypeDefinition(reader, "System.Threading", "Volatile");
-    TypeDefinitionHandle interlockedType = FindTypeDefinition(reader, "System.Threading", "Interlocked");
-    //TypeDefinitionHandle runtimeFeatureType = FindTypeDefinition(reader, "System.Runtime.CompilerServices", "RuntimeFeature");
+    TypeDefinitionHandle runtimeFeatureType = FindTypeDefinition(reader, "System.Runtime.CompilerServices", "RuntimeFeature");
 
-    MethodDefinitionHandle readBarrier = FindMethodDefinition(reader, volatileType, "ReadBarrier", 0);
-    MethodDefinitionHandle writeBarrier = FindMethodDefinition(reader, volatileType, "WriteBarrier", 0);
-    MethodDefinitionHandle memoryBarrier = FindMethodDefinition(reader, interlockedType, "MemoryBarrier", 0);
-
-    //MethodDefinitionHandle throwIfMultithreadingIsNotSupported = FindMethodDefinition(reader, runtimeFeatureType, "ThrowIfMultithreadingIsNotSupported", 0);
-
-    // Workaround for https://github.com/jjonescz/DotNetLab/issues/129.
-    PatchMethodBody(bytes, peReader, readBarrier, memoryBarrier, "Volatile.ReadBarrier");
-    PatchMethodBody(bytes, peReader, writeBarrier, memoryBarrier, "Volatile.WriteBarrier");
+    MethodDefinitionHandle throwIfMultithreadingIsNotSupported = FindMethodDefinition(reader, runtimeFeatureType, "ThrowIfMultithreadingIsNotSupported", 0);
 
     // Workaround for https://github.com/dotnet/roslyn/issues/82361.
-    //PatchMethodBodyToRet(bytes, peReader, throwIfMultithreadingIsNotSupported, "System.Runtime.CompilerServices.RuntimeFeature.ThrowIfMultithreadingIsNotSupported");
+    PatchMethodBodyToRet(bytes, peReader, throwIfMultithreadingIsNotSupported, "System.Runtime.CompilerServices.RuntimeFeature.ThrowIfMultithreadingIsNotSupported");
 }
 
 Directory.CreateDirectory(Path.GetDirectoryName(outputPath) ?? ".");
@@ -112,11 +102,10 @@ static MethodDefinitionHandle FindMethodDefinition(
     throw new InvalidOperationException($"Method not found: {name} with {parameterCount} parameters");
 }
 
-static void PatchMethodBody(
+static void PatchMethodBodyToRet(
     byte[] peBytes,
     PEReader peReader,
     MethodDefinitionHandle targetMethod,
-    MethodDefinitionHandle memoryBarrier,
     string displayName)
 {
     MetadataReader reader = peReader.GetMetadataReader();
@@ -150,76 +139,20 @@ static void PatchMethodBody(
         throw new InvalidOperationException($"Unknown method header format: {displayName}");
     }
 
-    if (codeSize < 6)
+    if (codeSize < 1)
     {
         throw new InvalidOperationException($"Method body too small to patch: {displayName}");
     }
 
     int ilStart = bodyOffset + headerSize;
-    int callToken = MetadataTokens.GetToken(memoryBarrier);
 
-    peBytes[ilStart + 0] = 0x28; // call
-    byte[] tokenBytes = BitConverter.GetBytes(callToken);
-    Buffer.BlockCopy(tokenBytes, 0, peBytes, ilStart + 1, 4);
-    peBytes[ilStart + 5] = 0x2A; // ret
+    peBytes[ilStart + 0] = 0x2A; // ret
 
-    for (int i = 6; i < codeSize; i++)
+    for (int i = 1; i < codeSize; i++)
     {
         peBytes[ilStart + i] = 0x00; // nop padding
     }
 }
-
-//static void PatchMethodBodyToRet(
-//    byte[] peBytes,
-//    PEReader peReader,
-//    MethodDefinitionHandle targetMethod,
-//    string displayName)
-//{
-//    MetadataReader reader = peReader.GetMetadataReader();
-//    MethodDefinition methodDef = reader.GetMethodDefinition(targetMethod);
-
-//    if (methodDef.RelativeVirtualAddress == 0)
-//    {
-//        throw new InvalidOperationException($"Method has no body: {displayName}");
-//    }
-
-//    int bodyOffset = GetOffset(peReader, methodDef.RelativeVirtualAddress);
-
-//    // Determine method header format to locate IL bytes without changing header size.
-//    byte headerByte = peBytes[bodyOffset];
-//    int headerSize;
-//    int codeSize;
-
-//    if ((headerByte & 0x3) == 0x2)
-//    {
-//        headerSize = 1;
-//        codeSize = headerByte >> 2;
-//    }
-//    else if ((headerByte & 0x3) == 0x3)
-//    {
-//        ushort flags = BitConverter.ToUInt16(peBytes, bodyOffset);
-//        headerSize = ((flags >> 12) & 0xF) * 4;
-//        codeSize = BitConverter.ToInt32(peBytes, bodyOffset + 4);
-//    }
-//    else
-//    {
-//        throw new InvalidOperationException($"Unknown method header format: {displayName}");
-//    }
-
-//    if (codeSize < 1)
-//    {
-//        throw new InvalidOperationException($"Method body too small to patch: {displayName}");
-//    }
-
-//    int ilStart = bodyOffset + headerSize;
-
-//    peBytes[ilStart + 0] = 0x2A; // ret
-
-//    for (int i = 1; i < codeSize; i++)
-//    {
-//        peBytes[ilStart + i] = 0x00; // nop padding
-//    }
-//}
 
 static int GetOffset(PEReader peReader, int relativeVirtualAddress)
 {

@@ -5,7 +5,7 @@
     <Description>.NET language playground on WASM</Description>
     <LangVersion>latest</LangVersion>
     <RepositoryType>git</RepositoryType>
-    <PublishRepositoryUrl>True</PublishRepositoryUrl>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <RepositoryUrl>https://github.com/wherewhere/SharpScript</RepositoryUrl>
   </PropertyGroup>
 </Project>
