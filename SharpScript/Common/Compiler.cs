@@ -34,7 +34,7 @@ namespace SharpScript.Common
             {
                 if (_codeSession == null)
                 {
-                    bool isConsole = outputType == OutputType.Run;
+                    bool isConsole = OutputType == OutputType.Run;
                     switch (InputOptions)
                     {
                         case RoslynOptions options:
@@ -68,7 +68,7 @@ namespace SharpScript.Common
                         _ => throw new Exception("Invalid language type."),
                     };
                     field = value;
-                    UpdateCodeSession(outputType == OutputType.Run);
+                    UpdateCodeSession(OutputType == OutputType.Run);
                 }
             }
         } = LanguageType.CSharp;
@@ -83,7 +83,7 @@ namespace SharpScript.Common
                 if (!string.IsNullOrWhiteSpace(value) && ((IInputOptions)InputOptions).LanguageVersion?.GetType() is Type @enum)
                 {
                     ((IInputOptions)InputOptions).LanguageVersion = (Enum)Enum.Parse(@enum, value, true);
-                    UpdateCodeSession(outputType == OutputType.Run);
+                    UpdateCodeSession(OutputType == OutputType.Run);
                 }
             }
         }
@@ -96,18 +96,17 @@ namespace SharpScript.Common
                 if (RoslynOptions.SourceCodeKind != value)
                 {
                     RoslynOptions.SourceCodeKind = value;
-                    UpdateCodeSession(outputType == OutputType.Run);
+                    UpdateCodeSession(OutputType == OutputType.Run);
                 }
             }
         }
 
-        private OutputType outputType = OutputType.Run;
         public OutputType OutputType
         {
-            get => outputType;
+            get;
             set
             {
-                if (outputType != value)
+                if (field != value)
                 {
                     OutputOptions = value switch
                     {
@@ -117,14 +116,14 @@ namespace SharpScript.Common
                         _ => throw new Exception("Invalid output type."),
                     };
                     bool isConsole = value == OutputType.Run;
-                    if (isConsole ^ (outputType == OutputType.Run))
+                    if (isConsole ^ (field == OutputType.Run))
                     {
                         UpdateCodeSession(isConsole);
                     }
-                    outputType = value;
+                    field = value;
                 }
             }
-        }
+        } = OutputType.Run;
 
         public OutputOptions OutputOptions { get; set; } = new RunOutputOptions();
 

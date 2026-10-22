@@ -237,11 +237,7 @@ namespace SharpScript.Common
         {
             await EnsureUpToDateAsync(cancellationToken).ConfigureAwait(false);
             SyntaxNode? node = await CurrentDocument.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
-            if (node != null)
-            {
-                return Formatter.GetFormattedTextChanges(node, Workspace, cancellationToken: cancellationToken);
-            }
-            return null;
+            return node != null ? Formatter.GetFormattedTextChanges(node, Workspace, cancellationToken: cancellationToken) : null;
         }
 
         public async ValueTask<IReadOnlyList<TextChange>> RollbackWorkspaceChangesAsync(CancellationToken cancellationToken = default)

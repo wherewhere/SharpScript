@@ -159,7 +159,10 @@ namespace SharpScript.Common
                     if (charsUsed == 1)
                     {
                         if ((prevChar != '\r' && output[0] == '\n') || output[0] == '\r')
+                        {
                             currentLine++;
+                        }
+
                         prevChar = output[0];
                     }
                 }
@@ -256,7 +259,9 @@ namespace SharpScript.Common
                         {
                             val = LoadDocumentation(key, index[m].PositionInFile);
                             if (val != null)
+                            {
                                 break;
+                            }
                         }
                         // cache the result (even if it is null)
                         cache.Add(key, val);

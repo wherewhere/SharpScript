@@ -24,9 +24,9 @@ namespace SharpScript.Models
         Enum? LanguageVersion { get => null; set { } }
     }
 
-    public abstract class InputOptions : IInputOptions;
+    public closed class InputOptions : IInputOptions;
 
-    public abstract class RoslynOptions : InputOptions, IInputOptions
+    public closed class RoslynOptions : InputOptions, IInputOptions
     {
         public static SourceCodeKind SourceCodeKind { get; set; } = SourceCodeKind.Regular;
 

@@ -20,7 +20,7 @@ namespace SharpScript.Models
         Enum? LanguageVersion { get => default; set { } }
     }
 
-    public abstract class OutputOptions : IOutputOptions;
+    public closed class OutputOptions : IOutputOptions;
 
     public sealed class CSharpOutputOptions : OutputOptions, IOutputOptions
     {

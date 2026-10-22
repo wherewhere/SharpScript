@@ -14,7 +14,7 @@ using System.Threading;
 namespace SharpScript.Models
 {
     [JsonConverter(typeof(JsonConverter))]
-    public abstract class AstItemBase
+    public closed class AstItemBase
     {
         public abstract string Type { get; }
 
@@ -191,26 +191,20 @@ namespace SharpScript.Models
             MemberExpression propertyValue = Expression.Property(Expression.Convert(operation, property.DeclaringType!), property);
             Type propertyType = property.PropertyType;
 
-            if (propertyType.IsGenericType && propertyType.GetGenericTypeDefinition() == typeof(Optional<>))
-            {
-                return Expression.Condition(
+            return propertyType.IsGenericType && propertyType.GetGenericTypeDefinition() == typeof(Optional<>)
+                ? Expression.Condition(
                     Expression.Property(propertyValue, nameof(Optional<>.HasValue)),
                     SlowExpressWriteNameAndValue(
                         property.Name,
                         Expression.Property(propertyValue, nameof(Optional<>.Value)),
                         writer),
-                    Expression.Empty());
-            }
-
-            if (propertyType == typeof(bool))
-            {
-                return Expression.Condition(
+                    Expression.Empty())
+                : propertyType == typeof(bool)
+                ? Expression.Condition(
                     propertyValue,
                     SlowExpressWriteNameAndValue(property.Name, Expression.Constant(true), writer),
-                    Expression.Empty());
-            }
-
-            return SlowHandleNulls(
+                    Expression.Empty())
+                : SlowHandleNulls(
                 propertyValue,
                 SlowExpressWriteNameAndValue(property.Name, propertyValue, writer),
                 Expression.Empty());
@@ -229,26 +223,21 @@ namespace SharpScript.Models
         private static Expression SlowGetValueToWrite(Expression value)
         {
             System.Reflection.TypeInfo type = value.Type.GetTypeInfo();
-            if (type.IsAssignableTo(typeof(IEnumerable)) || type.IsAssignableTo(typeof(SyntaxNode)))
-            { return Skipped; }
-
-            if (value.Type != typeof(string))
-            {
-                return SlowHandleNulls(
+            return type.IsAssignableTo(typeof(IEnumerable)) || type.IsAssignableTo(typeof(SyntaxNode))
+                ? Skipped
+                : value.Type != typeof(string)
+                ? SlowHandleNulls(
                     value,
                     Expression.Call(value, ObjectToString),
-                    Expression.Constant(null, typeof(string)));
-            }
-
-            return value;
+                    Expression.Constant(null, typeof(string)))
+                : value;
         }
 
         private static Expression SlowHandleNulls(Expression value, Expression ifNotNull, Expression ifNull)
         {
-            if (value.Type.IsValueType)
-            { return ifNotNull; }
-
-            return Expression.Condition(
+            return value.Type.IsValueType
+                ? ifNotNull
+                : Expression.Condition(
                 Expression.ReferenceNotEqual(value, Expression.Constant(null, value.Type)),
                 ifNotNull,
                 ifNull);

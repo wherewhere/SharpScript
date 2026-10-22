@@ -86,23 +86,15 @@ namespace SharpScript.Common
 
         public static MetadataReferenceCollection operator +(MetadataReferenceCollection left, MetadataReferenceCollection right)
         {
-            switch (left, right)
+            return (left, right) switch
             {
-                case ({ Count: > 0 }, { Count: > 0 }):
-                    MetadataReferenceCollection collection = new(left);
-                    collection.AddRange(right);
-                    return collection;
-                case ({ Count: > 0 }, _):
-                    return left;
-                case (_, { Count: > 0 }):
-                    return right;
-                case (not null, _):
-                    return left;
-                case (_, not null):
-                    return right;
-                default:
-                    return [];
-            }
+                ({ Count: > 0 }, { Count: > 0 }) => [with(left), .. right],
+                ({ Count: > 0 }, _) => left,
+                (_, { Count: > 0 }) => right,
+                (not null, _) => left,
+                (_, not null) => right,
+                _ => [],
+            };
         }
     }
 

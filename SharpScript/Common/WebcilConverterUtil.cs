@@ -308,11 +308,9 @@ namespace SharpScript.Common
             int size = Unsafe.SizeOf<T>();
             byte[] buffer = new byte[size];
             int read = await s.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
-            if (read != size)
-            {
-                throw new InvalidOperationException("Couldn't read the full structure from the stream.");
-            }
-            return Unsafe.As<byte, T>(ref buffer[0]);
+            return read != size
+                ? throw new InvalidOperationException("Couldn't read the full structure from the stream.")
+                : Unsafe.As<byte, T>(ref buffer[0]);
         }
 
         internal static int RoundToNearest(this int number, int nearest = 512)

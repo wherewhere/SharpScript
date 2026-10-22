@@ -1,13 +1,13 @@
 ﻿using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
 using System;
-using RoslynDiagnostic = Microsoft.CodeAnalysis.Diagnostic;
+using System.Runtime.CompilerServices;
 using ILDiagnostic = ILAssembler.Diagnostic;
 using ILDiagnosticSeverity = ILAssembler.DiagnosticSeverity;
 using ILLocation = ILAssembler.Location;
 using ILSourceText = ILAssembler.SourceText;
+using RoslynDiagnostic = Microsoft.CodeAnalysis.Diagnostic;
 using SourceSpan = ILAssembler.SourceSpan;
-using System.Runtime.CompilerServices;
 
 namespace SharpScript.Models
 {

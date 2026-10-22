@@ -19,10 +19,10 @@ namespace SharpScript.Common
         public ushort reserved0;        // 0
                                         // 12 bytes
         public uint pe_cli_header_rva;
-        public uint pe_cli_header_size;
+        public uint pe_cli_header_size; //
                                         // 20 bytes
         public uint pe_debug_rva;
-        public uint pe_debug_size;
+        public uint pe_debug_size;      //
                                         // 28 bytes
     }
 }

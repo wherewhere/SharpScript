@@ -793,6 +793,7 @@
                 content: url("../assets/vs-icon/light/ExtensionMethod.svg");
             }
 
+            &.cm-completionIcon-field,
             &.cm-completionIcon-field-public {
                 content: url("../assets/vs-icon/light/FieldPublic.svg");
             }
