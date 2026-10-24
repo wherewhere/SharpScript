@@ -296,7 +296,7 @@
     }
 
     @function underline($color) {
-        $path: "%3Cpath d='m0 2.5 l2 -1.5 l1 0 l2 1.5 l1 0' stroke='#{$color}' fill='none' stroke-width='.7'/%3E";
+        $path: "%3Cpath d='m0 2.5 l2 -1.5 l1 0 l2 1.5 l1 0' stroke='%23#{string.slice(#{$color}, 2)}' fill='none' stroke-width='.7'/%3E";
         @return svg($path, "width='6' height='3'");
     }
 
