@@ -70,17 +70,17 @@ function getDiagnostics(list: Diagnostic[]) {
     return [];
 }
 
+let fingerprinting: Record<string, string> | undefined;
 function getFingerprinting() {
-    let fingerprinting: Record<string, string> = Blazor.runtime.config.resources.fingerprinting;
     if (!fingerprinting) {
         fingerprinting = {};
-        for (const x of Blazor.runtime.config.resources.coreAssembly) {
-            fingerprinting[x.name] = x.virtualPath;
+        const config = Blazor.runtime.getConfig();
+        for (const x of config.resources.coreAssembly) {
+            fingerprinting[x.shortName] = x.resolvedUrl;
         }
-        for (const x of Blazor.runtime.config.resources.assembly) {
-            fingerprinting[x.name] = x.virtualPath;
+        for (const x of config.resources.assembly) {
+            fingerprinting[x.shortName] = x.resolvedUrl;
         }
-        Blazor.runtime.config.resources.fingerprinting = fingerprinting;
     }
     return fingerprinting;
 }

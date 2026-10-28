@@ -417,11 +417,11 @@ namespace SharpScript.Common
         {
             try
             {
-                string fileName = $"{assembly}.wasm";
-                if (fingerprinting.FirstOrDefault(x => x.Value.Equals(fileName, StringComparison.OrdinalIgnoreCase)) is { Key.Length: > 0 } result)
+                string fileName = $"{assembly}.dll";
+                if (fingerprinting.TryGetValue(fileName, out string? result) && result.Length > 0)
                 {
                     Task<XmlDocumentationProvider?> documentTask = CreateDocumentationAsync(client, assembly, logger, cancellationToken);
-                    byte[] stream = await client.GetByteArrayAsync(result.Key, cancellationToken).ConfigureAwait(false);
+                    byte[] stream = await client.GetByteArrayAsync(result, cancellationToken).ConfigureAwait(false);
                     await using MemoryStream array = await WebcilConverterUtil.ConvertFromWebcilAsync(stream, cancellationToken: cancellationToken).ConfigureAwait(false);
                     return new MetadataReferenceHost(array, documentation: await documentTask.ConfigureAwait(false), filePath: assembly);
                     static async Task<XmlDocumentationProvider?> CreateDocumentationAsync(HttpClient client, string assembly, ILogger<RoslynCodeSession> logger, CancellationToken cancellationToken = default)

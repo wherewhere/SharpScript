@@ -264,7 +264,7 @@ declare module "*/blazor.webassembly.js" {
     global {
         const Blazor: {
             runtime: {
-                config: Record<string, any>;
+                getConfig(): Record<string, any>;
             };
             start(options?: Record<string, any>): Promise<void>;
         };

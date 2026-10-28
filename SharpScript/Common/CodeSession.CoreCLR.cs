@@ -32,20 +32,21 @@ namespace SharpScript.Common
         {
             cancellationToken.ThrowIfCancellationRequested();
             DocumentCompiler compiler = new();
-            options.IsDll = !isConsole;
-            (ImmutableArray<ILDiagnostic> diagnostics, CompilationResult? builder) = compiler.Compile(
+            options.Dll = !isConsole;
+            (ImmutableArray<ILDiagnostic> diagnostics, CompilationResult? result) = compiler.Compile(
                 code.AsSourceTest("Program.il"),
                 path => new SourceText(string.Empty, path),
                 _ => [],
                 options);
-            if (builder != null)
+            if (result != null)
             {
                 MemoryStream assemblyStream = new();
                 BlobBuilder blobBuilder = new();
-                builder.Serialize(blobBuilder);
+                result.Serialize(blobBuilder);
                 blobBuilder.WriteContentTo(assemblyStream);
                 _ = assemblyStream.Seek(0, SeekOrigin.Begin);
-                return ValueTask.FromResult<CompilationResults?>(new CompilationResults("SharpScript.Playground", assemblyStream, null));
+                MemoryStream? symbolStream = result.PortablePdb is ImmutableArray<byte> pdb ? new MemoryStream([.. pdb]) : null;
+                return ValueTask.FromResult<CompilationResults?>(new CompilationResults("SharpScript.Playground", assemblyStream, symbolStream));
             }
             results.AddRange(diagnostics.Select(x => new Diagnostic(x)));
             return ValueTask.FromResult<CompilationResults?>(null);
@@ -55,7 +56,7 @@ namespace SharpScript.Common
         {
             cancellationToken.ThrowIfCancellationRequested();
             DocumentCompiler compiler = new();
-            options.IsDll = !isConsole;
+            options.Dll = !isConsole;
             (ImmutableArray<ILDiagnostic> diagnostics, CompilationResult? builder) = compiler.Compile(
                 code.AsSourceTest("Program.il"),
                 path => new SourceText(string.Empty, path),
