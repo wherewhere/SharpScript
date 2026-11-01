@@ -464,6 +464,34 @@ declare namespace ToySDK {
     }
 
     // ---------------------------------------------------------------------------
+    // 玩家输入内容检测
+    // ---------------------------------------------------------------------------
+
+    /**
+     * 检测判定，只有三态：
+     * - `ok`：通过，内容可用；
+     * - `rejected`：命中拦截，内容不可用（不返回命中的词、位置与规则）；
+     * - `unavailable`：检测没跑成。**不等于通过**，请提示玩家稍后再试。
+     */
+    type InputSafetyStatus = 'ok' | 'rejected' | 'unavailable'
+
+    interface CheckInputSafetyReq {
+        /** 待检测文本，非空且 ≤16384 字节（UTF-8，一个汉字算 3 字节）。 */
+        text: string
+        /**
+         * 可选业务标记，用于区分昵称 / 留言等不同入口，**不参与判定**。
+         * 字符集仅 `[A-Za-z0-9_.:-]`、≤64 字节，因此不能用中文。
+         */
+        scene?: string
+    }
+
+    interface CheckInputSafetyResp {
+        status: InputSafetyStatus
+        /** 等价于 `status === 'ok'`；`rejected` 与 `unavailable` 均为 `false`。 */
+        passed: boolean
+    }
+
+    // ---------------------------------------------------------------------------
     // 媒体能力（摄像头 / 麦克风）
     // ---------------------------------------------------------------------------
 
@@ -638,6 +666,22 @@ declare namespace ToySDK {
 
         /** 查询我在指定榜单的排名。需用户已登录；是否上榜必须用 `ranked` 判断。 */
         getMyRank(req?: MyRankReq): Promise<MyRankResp>
+
+        /**
+         * 检测玩家输入的文本是否可以展示，用于昵称、留言、涂鸦标题这类会被其他
+         * 玩家看到的内容。需用户已登录，不触发用户数据确认弹窗。
+         *
+         * **无需在平台侧申请权限点，所有 Toy 直接可用**，`isSupport('checkInputSafety')`
+         * 为 `true` 即可调用。
+         *
+         * 返回只有 `ok` / `rejected` / `unavailable` 三态，**`unavailable` 不等于通过**。
+         * 刻意不返回命中的词、位置、规则与供应商信息，因此无法在 Toy 内标出
+         * 「哪几个字有问题」。
+         *
+         * 有调用配额：请在玩家**提交**内容时检测，不要每次按键都调用；命中限流会
+         * 抛错（`error.code === 307044`），而不是返回 `unavailable`。
+         */
+        checkInputSafety(req: CheckInputSafetyReq): Promise<CheckInputSafetyResp>
 
         /**
          * 申请摄像头，返回浏览器原生的实时 `MediaStream`（视频轨），可直接赋给

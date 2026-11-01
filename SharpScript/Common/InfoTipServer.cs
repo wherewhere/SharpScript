@@ -3,6 +3,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.QuickInfo;
 using Microsoft.CodeAnalysis.Text;
 using SharpScript.Models;
+using SharpScript.RoslynAccess;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -43,7 +44,7 @@ namespace SharpScript.Common
         static InfoTipServer()
         {
             SourceText = SourceText.From(string.Empty);
-            Workspace = new AdhocWorkspace();
+            Workspace = RoslynHost.Workspace;
             ProjectId projectId = ProjectId.CreateNewId();
             DocumentId docId = DocumentId.CreateNewId(projectId, "SharpScript.CodeSession");
             Solution solution = Workspace.CurrentSolution

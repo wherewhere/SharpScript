@@ -43,6 +43,7 @@
     "cssnano": "^9.0.0",
     "eslint": "^10.0.0",
     "mime": "^4.0.0",
+    "postcss-svgo": "^9.0.0",
     "sass": "^1.0.0",
     "vite": "^8.0.0",
     "vite-plugin-simple-html": "^1.0.0",

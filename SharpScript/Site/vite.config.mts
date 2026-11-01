@@ -4,6 +4,7 @@ import svgLoader from "vite-svg-loader";
 import simpleHtmlPlugin from "vite-plugin-simple-html";
 import dotnetFrameworkStaticFiles from "./helpers/dotnet-framework-static-files.mts";
 import githubImporter from "./helpers/github-importer.mts";
+import svgo from "postcss-svgo";
 import cssnano from "cssnano";
 import getOutputOptions from "./helpers/output.mts";
 
@@ -36,6 +37,7 @@ export default defineConfig({
         },
         postcss: {
             plugins: [
+                svgo(),
                 cssnano({
                     preset: "advanced"
                 })

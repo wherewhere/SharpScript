@@ -8,7 +8,7 @@
     <NoWarn>$(NoWarn);CA1873;VSTHRD103</NoWarn>
     <Nullable>enable</Nullable>
     <PublishTrimmed>false</PublishTrimmed>
-    <RunNPMCompilation>true</RunNPMCompilation>
+    <!--<RunNPMCompilation>true</RunNPMCompilation>-->
     <TargetFramework>net11.0-browser</TargetFramework>
     <UseMonoRuntime>false</UseMonoRuntime>
   </PropertyGroup>
@@ -18,8 +18,8 @@
     <PackageReference Include="ILAssembler" Version="11.0.0-build.10.1" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="11.0.0-rc.3.26522.148" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="11.0.0-rc.3.26522.148" PrivateAssets="all" />
-    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Features" Version="5.14.0-1.26527.7" />
-    <PackageReference Include="Microsoft.CodeAnalysis.VisualBasic.Features" Version="5.14.0-1.26527.7" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Features" Version="5.14.0-1.26531.102" />
+    <PackageReference Include="Microsoft.CodeAnalysis.VisualBasic.Features" Version="5.14.0-1.26531.102" />
     <PackageReference Include="Mobius.ILasm" Version="0.1.0" />
     <PackageReference Include="System.Security.Permissions" Version="11.0.0-rc.3.26522.148" />
   </ItemGroup>
@@ -32,6 +32,10 @@
   <ItemGroup>
     <Compile Remove="Properties\PatchCoreLib.targets.cs" />
     <None Include="Properties\PatchCoreLib.targets.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SharpScript.RoslynAccess\SharpScript.RoslynAccess.csproj" />
   </ItemGroup>
 
   <Target Name="NPMRestore" AfterTargets="Restore">

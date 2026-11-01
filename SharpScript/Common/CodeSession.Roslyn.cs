@@ -11,6 +11,7 @@ using Microsoft.CodeAnalysis.Text;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using SharpScript.Models;
+using SharpScript.RoslynAccess;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -131,7 +132,7 @@ namespace SharpScript.Common
             _isConsole = isConsole;
             _logger = logger ?? NullLogger<RoslynCodeSession>.Instance;
             SourceCode = code;
-            Workspace = new AdhocWorkspace();
+            Workspace = RoslynHost.Workspace;
             ProjectId projectId = ProjectId.CreateNewId();
             DocumentId docId = DocumentId.CreateNewId(projectId, "SharpScript.CodeSession");
             options.GetOptions(isConsole, out CompilationOptions compilation, out ParseOptions parse);
@@ -549,7 +550,7 @@ namespace SharpScript.Common
             (List<string> references, Dictionary<string, string> features, string? assemblyName, List<TextChange> changes) = FileLevelDirectiveParser.Parse(SourceCode, _language, _comment);
             if (assemblyName != null && assemblyName != AssemblyName)
             {
-                Workspace = new AdhocWorkspace();
+                Workspace = RoslynHost.Workspace;
                 ProjectId projectId = ProjectId.CreateNewId();
                 DocumentId docId = DocumentId.CreateNewId(projectId, "SharpScript.CodeSession");
                 Project oldProject = _currentDocument.Project;
