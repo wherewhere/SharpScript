@@ -1,6 +1,9 @@
 ﻿using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CodeActions;
 using Microsoft.CodeAnalysis.Text;
+using SharpScript.Common;
 using System;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using ILDiagnostic = ILAssembler.Diagnostic;
 using ILDiagnosticSeverity = ILAssembler.DiagnosticSeverity;

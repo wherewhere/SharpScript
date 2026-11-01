@@ -1,13 +1,13 @@
 ﻿using Microsoft.CodeAnalysis.Host;
 using Microsoft.CodeAnalysis.Host.Mef;
 using Microsoft.CodeAnalysis.Storage;
+using System;
 using System.Composition;
 
 namespace SharpScript.RoslynAccess
 {
-    [Shared]
-    [method: ImportingConstructor]
-    [ExportWorkspaceService(typeof(IPersistentStorageConfiguration), ServiceLayer.Host)]
+    [ExportWorkspaceService(typeof(IPersistentStorageConfiguration), ServiceLayer.Test), Shared]
+    [method: ImportingConstructor, Obsolete(MefConstruction.ImportingConstructorMessage, error: true)]
     internal sealed class NoOpPersistentStorageConfiguration() : IPersistentStorageConfiguration
     {
         public bool ThrowOnFailure => false;

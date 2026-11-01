@@ -41,6 +41,24 @@ namespace SharpScript.Models
                 return null;
             }
         }
+
+        public static IEnumerable<RoslynCodeAction> FlatActions(CodeAction action, RoslynCodeSession session)
+        {
+            if (action.NestedActions is { IsEmpty: false } actions)
+            {
+                foreach (CodeAction nested in actions)
+                {
+                    foreach (RoslynCodeAction item in FlatActions(nested, session))
+                    {
+                        yield return item;
+                    }
+                }
+            }
+            else
+            {
+                yield return new RoslynCodeAction(action, session);
+            }
+        }
     }
 
     public sealed class ILCodeAction(string title, Func<Task<IReadOnlyList<TextChange>?>> invoker) : ICodeAction

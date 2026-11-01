@@ -12,10 +12,11 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="Microsoft.CodeAnalysis.Workspaces.Common" Version="5.9.0" />
+    <PackageReference Include="Microsoft.CodeAnalysis.Features" Version="5.9.0" />
   </ItemGroup>
 
   <ItemGroup>
+    <IgnoresAccessChecksTo Include="Microsoft.CodeAnalysis.Features" />
     <IgnoresAccessChecksTo Include="Microsoft.CodeAnalysis.Workspaces" />
   </ItemGroup>
 

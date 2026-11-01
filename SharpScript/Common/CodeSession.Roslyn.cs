@@ -266,7 +266,7 @@ namespace SharpScript.Common
             Diagnostic[] array = await Task.WhenAll(filtered.Select(async diagnostic =>
             {
                 List<CodeAction> actions = await GetCodeActionsAsync(diagnostic, cancellationToken).ConfigureAwait(false);
-                return new Diagnostic(diagnostic, [.. actions.Select(x => new RoslynCodeAction(x, this))]);
+                return new Diagnostic(diagnostic, [.. actions.SelectMany(x => RoslynCodeAction.FlatActions(x, this))]);
             })).ConfigureAwait(false);
             results.AddRange(array);
             return results;

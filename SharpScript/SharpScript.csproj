@@ -8,7 +8,7 @@
     <NoWarn>$(NoWarn);CA1873;VSTHRD103</NoWarn>
     <Nullable>enable</Nullable>
     <PublishTrimmed>false</PublishTrimmed>
-    <!--<RunNPMCompilation>true</RunNPMCompilation>-->
+    <RunNPMCompilation>true</RunNPMCompilation>
     <TargetFramework>net11.0-browser</TargetFramework>
     <UseMonoRuntime>false</UseMonoRuntime>
   </PropertyGroup>
