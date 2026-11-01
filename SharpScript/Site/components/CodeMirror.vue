@@ -399,12 +399,16 @@
 
                 .cm-diagnosticAction {
                     margin-left: 0;
+                    text-align: left;
+                    word-wrap: break-word;
+                    word-break: break-word;
                 }
             }
 
             .cm-tooltip-section {
                 white-space: pre-wrap;
                 word-wrap: break-word;
+                word-break: break-word;
                 font-family: var(--font-monospace);
 
                 &:not(:first-child) {

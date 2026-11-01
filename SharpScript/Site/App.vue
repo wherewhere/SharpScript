@@ -951,6 +951,7 @@
         font-family: inherit;
         white-space: pre-wrap;
         word-wrap: break-word;
+        word-break: break-word;
         overflow: visible;
         width: max-content;
     }
@@ -1079,6 +1080,7 @@
                         td.message {
                             white-space: pre-wrap;
                             word-wrap: break-word;
+                            word-break: break-word;
                         }
                     }
                 }
