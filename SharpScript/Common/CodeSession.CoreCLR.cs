@@ -38,6 +38,7 @@ namespace SharpScript.Common
                 path => new SourceText(string.Empty, path),
                 _ => [],
                 options);
+            results.AddRange(diagnostics.Select(x => new Diagnostic(x)));
             if (result != null)
             {
                 MemoryStream assemblyStream = new();
@@ -48,7 +49,6 @@ namespace SharpScript.Common
                 MemoryStream? symbolStream = result.PortablePdb is ImmutableArray<byte> pdb ? new MemoryStream([.. pdb]) : null;
                 return ValueTask.FromResult<CompilationResults?>(new CompilationResults("SharpScript.Playground", assemblyStream, symbolStream));
             }
-            results.AddRange(diagnostics.Select(x => new Diagnostic(x)));
             return ValueTask.FromResult<CompilationResults?>(null);
         }
 

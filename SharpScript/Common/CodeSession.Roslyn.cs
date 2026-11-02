@@ -39,14 +39,15 @@ namespace SharpScript.Common
         private readonly ImmutableArray<DiagnosticAnalyzer> _analyzers;
         private readonly GeneratorDriver? _generator;
         private readonly RoslynOptions _options;
+        private readonly AsyncLock _lock = new();
         private readonly string _language;
         private readonly bool _isConsole;
         private readonly string _comment;
         private bool _outOfDate;
-        private bool _sourceUpdated;
+        private long _sourceVersion;
+        private long _preprocessedSourceVersion = -1;
         private MetadataReferenceCollection _addon = [];
         private Dictionary<string, string> _features = [];
-        private readonly HashSet<CodeFixProvider> _notWorkFixer = [];
 
         internal readonly ILogger<RoslynCodeSession> _logger;
 
@@ -64,7 +65,7 @@ namespace SharpScript.Common
                 if (field != value)
                 {
                     field = value;
-                    _sourceUpdated = true;
+                    _sourceVersion++;
                 }
             }
         }
@@ -217,9 +218,14 @@ namespace SharpScript.Common
 
         private async ValueTask EnsureUpToDateAsync(CancellationToken cancellationToken = default)
         {
-            if (!_sourceUpdated) { return; }
-            await PreprocessCodeAsync(cancellationToken).ConfigureAwait(false);
-            _sourceUpdated = true;
+            if (_sourceVersion == _preprocessedSourceVersion) { return; }
+            using (await _lock.LockAsync(cancellationToken).ConfigureAwait(false))
+            {
+                long sourceVersion = _sourceVersion;
+                if (sourceVersion == _preprocessedSourceVersion) { return; }
+                await PreprocessCodeAsync(SourceCode, cancellationToken).ConfigureAwait(false);
+                if (_sourceVersion == sourceVersion) { _preprocessedSourceVersion = sourceVersion; }
+            }
         }
 
         public void ResetCode(string code) => SourceCode = SourceText.From(code, Encoding.Default);
@@ -275,31 +281,25 @@ namespace SharpScript.Common
             CodeFixContext context = new(_currentDocument, diagnostic, (x, _) => codeActions.Add(x), cancellationToken);
             if (_providers.TryGetValue(diagnostic.Id, out List<CodeFixProvider>? providers))
             {
-                for (int i = providers.Count; --i >= 0;)
+                List<CodeFixProvider> notWork = [];
+                await Parallel.ForAsync(0, providers.Count, async (i, ct) =>
                 {
                     CodeFixProvider provider = providers[i];
                     try
                     {
-                        if (_notWorkFixer.Contains(provider))
-                        {
-                            _ = providers.Remove(provider);
-                        }
-                        else
-                        {
-                            await provider.RegisterCodeFixesAsync(context).ConfigureAwait(false);
-                        }
+                        await provider.RegisterCodeFixesAsync(context).ConfigureAwait(false);
                     }
                     catch (TypeInitializationException ex)
                     {
                         _logger.LogError(ex, "Not supports provider '{provider}' for diagnostic '{diagnosticId}'.", provider.GetType().Name, diagnostic.Id);
-                        _notWorkFixer.Add(provider);
-                        _ = providers.Remove(provider);
+                        notWork.Add(provider);
                     }
                     catch (Exception ex)
                     {
                         _logger.LogError(ex, "Error while registering code fixes for provider '{provider}' with diagnostic '{diagnosticId}'.", provider.GetType().Name, diagnostic.Id);
                     }
-                }
+                }).ConfigureAwait(false);
+                if (notWork.Count > 0) { _ = Parallel.ForEach(notWork, x => providers.Remove(x)); }
             }
             return codeActions;
         }
@@ -542,17 +542,17 @@ namespace SharpScript.Common
             return null;
         }
 
-        private async ValueTask PreprocessCodeAsync(CancellationToken cancellationToken = default)
+        private async ValueTask PreprocessCodeAsync(SourceText sourceCode, CancellationToken cancellationToken = default)
         {
-            FileLevelDirectives result = FileLevelDirectiveParser.Parse(SourceCode, _language, _comment);
-            if (result.Assembly != null && result.Assembly != AssemblyName)
+            FileLevelDirectives result = FileLevelDirectiveParser.Parse(sourceCode, _language, _comment);
+            if (result.Assembly != AssemblyName)
             {
                 Workspace = new CustomWorkspace();
                 ProjectId projectId = ProjectId.CreateNewId();
                 DocumentId docId = DocumentId.CreateNewId(projectId, "SharpScript.CodeSession");
                 Project oldProject = _currentDocument.Project;
                 Solution solution = Workspace.CurrentSolution
-                    .AddProject(projectId, oldProject.Name, result.Assembly, oldProject.Language)
+                    .AddProject(projectId, oldProject.Name, result.Assembly ?? "SharpScript.Playground", oldProject.Language)
                     .AddMetadataReferences(projectId, oldProject.MetadataReferences)
                     .WithProjectCompilationOptions(projectId, oldProject.CompilationOptions!)
                     .WithProjectParseOptions(projectId, oldProject.ParseOptions!)
@@ -581,6 +581,12 @@ namespace SharpScript.Common
                     _currentDocument = Workspace.SetCurrentSolution(solution).GetDocument(_currentDocument.Id)!;
                 }
             }
+            else if (_addon.Count > 0)
+            {
+                _addon = [];
+                Solution solution = Workspace.CurrentSolution.WithProjectMetadataReferences(_currentDocument.Project.Id, References);
+                _currentDocument = Workspace.SetCurrentSolution(solution).GetDocument(_currentDocument.Id)!;
+            }
             if (!result.Features.SequenceEqual(_features))
             {
                 _features = result.Features;
@@ -590,32 +596,7 @@ namespace SharpScript.Common
                     _currentDocument = Workspace.SetCurrentSolution(solution).GetDocument(_currentDocument.Id)!;
                 }
             }
-            SourceText = result.Changes.Count > 0 ? SourceCode.WithChanges(result.Changes) : SourceCode;
-        }
-
-        public partial class AsyncLocker : IDisposable
-        {
-            public SemaphoreSlim SlimLocker { get; } = new(1, 1);
-
-            public async Task<AsyncLocker> WaitAsync()
-            {
-                await SlimLocker.WaitAsync();
-                return this;
-            }
-
-            protected virtual void Dispose(bool disposing)
-            {
-                if (disposing)
-                {
-                    SlimLocker.Release();
-                }
-            }
-
-            public void Dispose()
-            {
-                Dispose(disposing: true);
-                GC.SuppressFinalize(this);
-            }
+            SourceText = result.Changes.Count > 0 ? sourceCode.WithChanges(result.Changes) : sourceCode;
         }
     }
 

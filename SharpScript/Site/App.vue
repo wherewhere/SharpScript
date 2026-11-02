@@ -245,7 +245,6 @@
                     console.error(e);
                 }
                 finally {
-                    message.value = '';
                     loading.value = false;
                 }
             }
@@ -268,7 +267,6 @@
                     console.error(e);
                 }
                 finally {
-                    message.value = '';
                     loading.value = false;
                 }
             }
@@ -291,7 +289,6 @@
                     console.error(e);
                 }
                 finally {
-                    message.value = '';
                     loading.value = false;
                 }
             }
@@ -322,7 +319,6 @@
                     console.error(e);
                 }
                 finally {
-                    message.value = '';
                     loading.value = false;
                 }
             }
@@ -345,7 +341,6 @@
                     console.error(e);
                 }
                 finally {
-                    message.value = '';
                     loading.value = false;
                 }
             }
@@ -370,16 +365,24 @@
     }
 
     let changeList: TextChanges[] = [];
+    const locker = new AsyncLock();
     async function applyChangesAsync() {
-        try {
-            if (changeList.length) {
-                const task = dotnet!.applyChangesAsync(changeList);
-                changeList = [];
-                return await task;
-            }
-        }
-        catch (e) {
-            console.warn(e);
+        if (changeList.length) {
+            await locker.acquire("applyChanges", async () => {
+                if (changeList.length) {
+                    const temp = changeList;
+                    changeList = [];
+                    try {
+                        await dotnet!.applyChangesAsync(temp);
+                    }
+                    catch (e) {
+                        changeList = changeList.length
+                            ? [...temp, ...changeList]
+                            : temp;
+                        console.warn(e);
+                    }
+                }
+            });
         }
     }
 
@@ -452,7 +455,6 @@
             console.error(e);
         }
         finally {
-            message.value = '';
             loading.value = false;
         }
     }
@@ -583,7 +585,6 @@
             console.error(e);
         }
         finally {
-            message.value = '';
             loading.value = false;
         }
     }
@@ -606,7 +607,6 @@
     }
 
     const isInitDotnet = shallowRef(false);
-    const locker = new AsyncLock();
     let noWorker = false;
     async function initDotNetAsync() {
         if (!isInitDotnet.value) {
@@ -634,15 +634,19 @@
     let isInitCompiler = false;
     async function initCompilerAsync() {
         if (!isInitCompiler) {
-            await initDotNetAsync();
-            const mes = message.value;
-            message.value = t("message.downloadReferences");
-            if (noWorker) {
-                await setTimeoutAsync(1);
-            }
-            await dotnet!.initAsync();
-            message.value = mes;
-            isInitCompiler = true;
+            await locker.acquire("initCompiler", async () => {
+                if (!isInitCompiler) {
+                    await initDotNetAsync();
+                    const mes = message.value;
+                    message.value = t("message.downloadReferences");
+                    if (noWorker) {
+                        await setTimeoutAsync(1);
+                    }
+                    await dotnet!.initAsync();
+                    message.value = mes;
+                    isInitCompiler = true;
+                }
+            });
         }
     }
 
