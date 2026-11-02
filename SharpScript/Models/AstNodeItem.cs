@@ -4,6 +4,7 @@ using System;
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
@@ -157,6 +158,7 @@ namespace SharpScript.Models
         private Action<IOperation, Dictionary<string, string>>? _cache;
 
         public override string Type => "operation";
+        [SuppressMessage("Performance", "CA1822:将成员标记为 static", Justification = "<挂起>")]
         public string Property => "Operation";
         public string Kind => operation.Kind.ToString();
         public Dictionary<string, string> Properties

@@ -12,6 +12,7 @@ using System.Reflection.Emit;
 using System.Reflection.Metadata;
 using System.Runtime.Loader;
 using System.Text;
+using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using Diagnostic = SharpScript.Models.Diagnostic;
@@ -468,5 +469,11 @@ namespace SharpScript.Common
         }
     }
 
-    public record struct CompileResult(List<Diagnostic> Diagnostics, string? Decompiled, params List<string> Outputs);
+    [method: JsonConstructor]
+    public readonly struct CompileResult(List<Diagnostic> diagnostics, string? decompiled, params List<string> outputs)
+    {
+        public List<Diagnostic> Diagnostics => diagnostics;
+        public string? Decompiled => decompiled;
+        public List<string> Outputs => outputs;
+    }
 }

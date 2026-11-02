@@ -5,13 +5,17 @@ using Microsoft.JSInterop;
 using SharpScript.Common;
 using System;
 using System.Collections.Immutable;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using RoslynCompletionChange = Microsoft.CodeAnalysis.Completion.CompletionChange;
 
 namespace SharpScript.Models
 {
-    public record struct CompletionChange(ImmutableArray<TextChange> TextChanges, int? NewPosition)
+    [method: JsonConstructor]
+    public readonly struct CompletionChange(ImmutableArray<TextChange> textChanges, int? newPosition)
     {
+        public ImmutableArray<TextChange> TextChanges => textChanges;
+        public int? NewPosition => newPosition;
         public CompletionChange(RoslynCompletionChange change) : this(change.TextChanges, change.NewPosition) { }
     }
 

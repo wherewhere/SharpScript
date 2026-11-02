@@ -2,13 +2,19 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 
 namespace SharpScript.Models
 {
-    public sealed record CompilationResults(string AssemblyName, MemoryStream AssemblyStream, MemoryStream? SymbolStream = null, MemoryStream? DocumentationStream = null) : IDisposable, IAsyncDisposable
+    [method: JsonConstructor]
+    public sealed class CompilationResults(string assemblyName, MemoryStream assemblyStream, MemoryStream? symbolStream = null, MemoryStream? documentationStream = null) : IDisposable, IAsyncDisposable
     {
-        public MetadataReferenceCollection? References { get; init; }
+        public string AssemblyName => assemblyName;
+        public MemoryStream AssemblyStream => assemblyStream;
+        public MemoryStream? SymbolStream => symbolStream;
+        public MemoryStream? DocumentationStream => documentationStream;
+        public MetadataReferenceCollection? References { get; }
 
         public long Position
         {
@@ -20,7 +26,7 @@ namespace SharpScript.Models
             }
         }
 
-        public CompilationResults(string AssemblyName, MemoryStream AssemblyStream, MemoryStream SymbolStream, MemoryStream DocumentationStream, MetadataReferenceCollection references) : this(AssemblyName, AssemblyStream, SymbolStream, DocumentationStream) => References = references;
+        public CompilationResults(string assemblyName, MemoryStream assemblyStream, MemoryStream symbolStream, MemoryStream documentationStream, MetadataReferenceCollection references) : this(assemblyName, assemblyStream, symbolStream, documentationStream) => References = references;
 
         public void Seek(long offset, SeekOrigin loc)
         {

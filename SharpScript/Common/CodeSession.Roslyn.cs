@@ -544,15 +544,15 @@ namespace SharpScript.Common
 
         private async ValueTask PreprocessCodeAsync(CancellationToken cancellationToken = default)
         {
-            (List<string> references, Dictionary<string, string> features, string? assemblyName, List<TextChange> changes) = FileLevelDirectiveParser.Parse(SourceCode, _language, _comment);
-            if (assemblyName != null && assemblyName != AssemblyName)
+            FileLevelDirectives result = FileLevelDirectiveParser.Parse(SourceCode, _language, _comment);
+            if (result.Assembly != null && result.Assembly != AssemblyName)
             {
                 Workspace = new CustomWorkspace();
                 ProjectId projectId = ProjectId.CreateNewId();
                 DocumentId docId = DocumentId.CreateNewId(projectId, "SharpScript.CodeSession");
                 Project oldProject = _currentDocument.Project;
                 Solution solution = Workspace.CurrentSolution
-                    .AddProject(projectId, oldProject.Name, assemblyName, oldProject.Language)
+                    .AddProject(projectId, oldProject.Name, result.Assembly, oldProject.Language)
                     .AddMetadataReferences(projectId, oldProject.MetadataReferences)
                     .WithProjectCompilationOptions(projectId, oldProject.CompilationOptions!)
                     .WithProjectParseOptions(projectId, oldProject.ParseOptions!)
@@ -561,10 +561,10 @@ namespace SharpScript.Common
                 Workspace.OpenDocument(docId);
                 _currentDocument = Workspace.CurrentSolution.GetDocument(docId)!;
             }
-            if (references.Count > 0)
+            if (result.References.Count > 0)
             {
                 using HttpClient client = new() { BaseAddress = new Uri(_baseUrl!) };
-                MetadataReferenceHost?[] results = await Task.WhenAll(references.Select(async path =>
+                MetadataReferenceHost?[] results = await Task.WhenAll(result.References.Select(async path =>
                 {
                     if (!string.IsNullOrEmpty(path) && !References.Any(x => path.Equals(x.Display, StringComparison.OrdinalIgnoreCase)))
                     {
@@ -581,16 +581,16 @@ namespace SharpScript.Common
                     _currentDocument = Workspace.SetCurrentSolution(solution).GetDocument(_currentDocument.Id)!;
                 }
             }
-            if (!features.SequenceEqual(_features))
+            if (!result.Features.SequenceEqual(_features))
             {
-                _features = features;
+                _features = result.Features;
                 if (_currentDocument.Project.ParseOptions is ParseOptions options)
                 {
-                    Solution solution = Workspace.CurrentSolution.WithProjectParseOptions(_currentDocument.Project.Id, options.WithFeatures(features));
+                    Solution solution = Workspace.CurrentSolution.WithProjectParseOptions(_currentDocument.Project.Id, options.WithFeatures(result.Features));
                     _currentDocument = Workspace.SetCurrentSolution(solution).GetDocument(_currentDocument.Id)!;
                 }
             }
-            SourceText = changes.Count > 0 ? SourceCode.WithChanges(changes) : SourceCode;
+            SourceText = result.Changes.Count > 0 ? SourceCode.WithChanges(result.Changes) : SourceCode;
         }
 
         public partial class AsyncLocker : IDisposable

@@ -4,6 +4,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Text;
 using System;
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
 
 namespace SharpScript.Common
 {
@@ -147,5 +148,12 @@ namespace SharpScript.Common
         }
     }
 
-    public record FileLevelDirectives(List<string> References, Dictionary<string, string> Features, string? Assembly, List<TextChange> Changes);
+    [method: JsonConstructor]
+    public class FileLevelDirectives(List<string> references, Dictionary<string, string> features, string? assembly, List<TextChange> changes)
+    {
+        public List<string> References => references;
+        public Dictionary<string, string> Features => features;
+        public string? Assembly => assembly;
+        public List<TextChange> Changes => changes;
+    }
 }
