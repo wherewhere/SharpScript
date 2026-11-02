@@ -3,7 +3,6 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.QuickInfo;
 using Microsoft.CodeAnalysis.Text;
 using SharpScript.Models;
-using SharpScript.RoslynAccess;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -14,7 +13,7 @@ namespace SharpScript.Common
     {
         private static bool _outOfDate;
 
-        public static AdhocWorkspace Workspace { get; }
+        public static CustomWorkspace Workspace { get; } = new CustomWorkspace();
 
         public static SourceText SourceText
         {
@@ -27,7 +26,7 @@ namespace SharpScript.Common
                     _outOfDate = true;
                 }
             }
-        }
+        } = SourceText.From(string.Empty);
 
         private static Document _currentDocument;
 
@@ -43,8 +42,6 @@ namespace SharpScript.Common
 
         static InfoTipServer()
         {
-            SourceText = SourceText.From(string.Empty);
-            Workspace = RoslynHost.Workspace;
             ProjectId projectId = ProjectId.CreateNewId();
             DocumentId docId = DocumentId.CreateNewId(projectId, "SharpScript.CodeSession");
             Solution solution = Workspace.CurrentSolution
@@ -56,7 +53,7 @@ namespace SharpScript.Common
                         DocumentationMode.Parse,
                         SourceCodeKind.Regular))
                 .AddDocument(docId, "SharpScript.CodeSession.Document", SourceText);
-            _ = Workspace.TryApplyChanges(solution);
+            _ = Workspace.SetCurrentSolution(solution);
             Workspace.OpenDocument(docId);
             _currentDocument = Workspace.CurrentSolution.GetDocument(docId)!;
         }
@@ -65,8 +62,7 @@ namespace SharpScript.Common
         {
             if (!_outOfDate) { return; }
             Document document = _currentDocument.WithText(SourceText);
-            _ = Workspace.TryApplyChanges(document.Project.Solution);
-            _currentDocument = Workspace.CurrentSolution.GetDocument(_currentDocument.Id)!;
+            _currentDocument = Workspace.SetCurrentSolution(document.Project.Solution).GetDocument(_currentDocument.Id)!;
             _outOfDate = false;
         }
 

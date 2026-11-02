@@ -3,6 +3,7 @@ using Microsoft.CodeAnalysis.Text;
 using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
 using SharpScript.Common;
+using SharpScript.RoslynAccess;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -33,13 +34,12 @@ namespace SharpScript.Models
                 {
                     operation.Apply(session.Workspace, default);
                 }
-                return await session.RollbackWorkspaceChangesAsync().ConfigureAwait(false);
             }
             catch (Exception ex)
             {
                 session._logger.LogError(ex, "Error while applying code action '{title}'.", action.Title);
-                return null;
             }
+            return await session.RollbackWorkspaceChangesAsync().ConfigureAwait(false);
         }
 
         public static IEnumerable<RoslynCodeAction> FlatActions(CodeAction action, RoslynCodeSession session)
@@ -54,7 +54,7 @@ namespace SharpScript.Models
                     }
                 }
             }
-            else
+            else if (!RoslynHost.IsCodeActionNotSupportedByLSP(action))
             {
                 yield return new RoslynCodeAction(action, session);
             }

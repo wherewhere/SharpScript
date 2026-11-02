@@ -11,7 +11,6 @@ using Microsoft.CodeAnalysis.Text;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using SharpScript.Models;
-using SharpScript.RoslynAccess;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -53,7 +52,7 @@ namespace SharpScript.Common
 
         public static MetadataReferenceCollection References { get; private set; } = [];
 
-        public AdhocWorkspace Workspace { get; private set; }
+        public CustomWorkspace Workspace { get; private set; }
 
         public string AssemblyName => _currentDocument.Project.AssemblyName;
 
@@ -132,7 +131,7 @@ namespace SharpScript.Common
             _isConsole = isConsole;
             _logger = logger ?? NullLogger<RoslynCodeSession>.Instance;
             SourceCode = code;
-            Workspace = RoslynHost.Workspace;
+            Workspace = new CustomWorkspace();
             ProjectId projectId = ProjectId.CreateNewId();
             DocumentId docId = DocumentId.CreateNewId(projectId, "SharpScript.CodeSession");
             options.GetOptions(isConsole, out CompilationOptions compilation, out ParseOptions parse);
@@ -143,7 +142,7 @@ namespace SharpScript.Common
                 .WithProjectCompilationOptions(projectId, compilation)
                 .WithProjectParseOptions(projectId, parse)
                 .AddDocument(docId, "Program.cs", code);
-            _ = Workspace.TryApplyChanges(solution);
+            _ = Workspace.SetCurrentSolution(solution);
             Workspace.OpenDocument(docId);
             _currentDocument = Workspace.CurrentSolution.GetDocument(docId)!;
             List<string> assemblyNames = ["Microsoft.CodeAnalysis.NetAnalyzers"];
@@ -212,8 +211,7 @@ namespace SharpScript.Common
         {
             if (!_outOfDate) { return; }
             Document document = _currentDocument.WithText(SourceText);
-            _ = Workspace.TryApplyChanges(document.Project.Solution);
-            _currentDocument = Workspace.CurrentSolution.GetDocument(_currentDocument.Id)!;
+            _currentDocument = Workspace.SetCurrentSolution(document.Project.Solution).GetDocument(_currentDocument.Id)!;
             _outOfDate = false;
         }
 
@@ -251,8 +249,7 @@ namespace SharpScript.Common
             }
 
             SourceText newText = await newProject.GetDocument(_currentDocument.Id)!.GetTextAsync(cancellationToken).ConfigureAwait(false);
-            Workspace.TryApplyChanges(oldProject.Solution);
-            _currentDocument = Workspace.CurrentSolution.GetDocument(_currentDocument.Id)!;
+            _currentDocument = Workspace.SetCurrentSolution(oldProject.Solution).GetDocument(_currentDocument.Id)!;
 
             return newText.GetTextChanges(SourceText);
         }
@@ -550,7 +547,7 @@ namespace SharpScript.Common
             (List<string> references, Dictionary<string, string> features, string? assemblyName, List<TextChange> changes) = FileLevelDirectiveParser.Parse(SourceCode, _language, _comment);
             if (assemblyName != null && assemblyName != AssemblyName)
             {
-                Workspace = RoslynHost.Workspace;
+                Workspace = new CustomWorkspace();
                 ProjectId projectId = ProjectId.CreateNewId();
                 DocumentId docId = DocumentId.CreateNewId(projectId, "SharpScript.CodeSession");
                 Project oldProject = _currentDocument.Project;
@@ -560,7 +557,7 @@ namespace SharpScript.Common
                     .WithProjectCompilationOptions(projectId, oldProject.CompilationOptions!)
                     .WithProjectParseOptions(projectId, oldProject.ParseOptions!)
                     .AddDocument(docId, "SharpScript.CodeSession.Document", SourceText);
-                _ = Workspace.TryApplyChanges(solution);
+                _ = Workspace.SetCurrentSolution(solution);
                 Workspace.OpenDocument(docId);
                 _currentDocument = Workspace.CurrentSolution.GetDocument(docId)!;
             }
@@ -581,8 +578,7 @@ namespace SharpScript.Common
                 {
                     _addon = addon;
                     Solution solution = Workspace.CurrentSolution.WithProjectMetadataReferences(_currentDocument.Project.Id, References.Concat(addon));
-                    _ = Workspace.TryApplyChanges(solution);
-                    _currentDocument = Workspace.CurrentSolution.GetDocument(_currentDocument.Id)!;
+                    _currentDocument = Workspace.SetCurrentSolution(solution).GetDocument(_currentDocument.Id)!;
                 }
             }
             if (!features.SequenceEqual(_features))
@@ -591,8 +587,7 @@ namespace SharpScript.Common
                 if (_currentDocument.Project.ParseOptions is ParseOptions options)
                 {
                     Solution solution = Workspace.CurrentSolution.WithProjectParseOptions(_currentDocument.Project.Id, options.WithFeatures(features));
-                    _ = Workspace.TryApplyChanges(solution);
-                    _currentDocument = Workspace.CurrentSolution.GetDocument(_currentDocument.Id)!;
+                    _currentDocument = Workspace.SetCurrentSolution(solution).GetDocument(_currentDocument.Id)!;
                 }
             }
             SourceText = changes.Count > 0 ? SourceCode.WithChanges(changes) : SourceCode;
