@@ -167,10 +167,6 @@ function renderSignatureTo(parent: HTMLElement, signature: SignatureHelpItemData
     renderPartsTo(title, signature.prefixDisplayParts, false);
     const parameterCount = signature.parameterCount;
     if (parameterCount) {
-        const parameter = createSection();
-        parent.appendChild(parameter);
-        const italic = document.createElement('i');
-        parent.appendChild(italic);
         let i = 0;
         while (true) {
             if (i === argumentIndex) {
@@ -182,6 +178,10 @@ function renderSignatureTo(parent: HTMLElement, signature: SignatureHelpItemData
 
                 const documentation = parameter.documentation;
                 if (documentation && documentation.length) {
+                    const section = createSection();
+                    parent.appendChild(section);
+                    const italic = document.createElement('i');
+                    section.appendChild(italic);
                     bold = document.createElement('b');
                     bold.textContent = `${parameter.name}: `;
                     italic.appendChild(bold);
@@ -206,89 +206,91 @@ function renderSignatureList(signatures: SignatureHelpItemsData) {
     const container = document.createElement("div");
     container.className = "signature-tooltip";
 
-    const title = document.createElement("div");
-    title.className = "signature-title";
-    container.appendChild(title);
-
-    const nav = document.createElement("div");
-    nav.className = "signature-nav";
-    title.appendChild(nav);
-
     let current = signatures.selectedItemIndex || 0;
-    const left = document.createElement("button");
-    left.className = "signature-nav-button";
-    left.innerHTML = CaretLeft16Filled;
-    left.addEventListener("click", () => switchSignature(-1));
-    if (current === 0) { left.disabled = true; }
-    nav.appendChild(left);
+    if (signatures.items.length > 1) {
+        const title = document.createElement("div");
+        title.className = "signature-title";
+        container.appendChild(title);
 
-    const indexer = document.createElement("span");
-    indexer.textContent = `${current + 1} / ${signatures.items.length}`;
-    nav.appendChild(indexer);
+        const nav = document.createElement("div");
+        nav.className = "signature-nav";
+        title.appendChild(nav);
 
-    const right = document.createElement("button");
-    right.className = "signature-nav-button";
-    right.innerHTML = CaretRight16Filled;
-    right.addEventListener("click", () => switchSignature(1));
-    if (current === signatures.items.length - 1) { right.disabled = true; }
-    nav.appendChild(right);
+        const left = document.createElement("button");
+        left.className = "signature-nav-button";
+        left.innerHTML = CaretLeft16Filled;
+        left.addEventListener("click", () => switchSignature(-1));
+        if (current === 0) { left.disabled = true; }
+        nav.appendChild(left);
 
-    const dot = document.createElement('i');
-    dot.className = "signature-dot";
-    dot.style.opacity = signatures.selectedItemIndex === current ? '1' : '0';
-    title.appendChild(dot);
+        const indexer = document.createElement("span");
+        indexer.textContent = `${current + 1} / ${signatures.items.length}`;
+        nav.appendChild(indexer);
+
+        const right = document.createElement("button");
+        right.className = "signature-nav-button";
+        right.innerHTML = CaretRight16Filled;
+        right.addEventListener("click", () => switchSignature(1));
+        if (current === signatures.items.length - 1) { right.disabled = true; }
+        nav.appendChild(right);
+
+        const dot = document.createElement('i');
+        dot.className = "signature-dot";
+        dot.style.opacity = signatures.selectedItemIndex === current ? '1' : '0';
+        title.appendChild(dot);
+
+        title.addEventListener("wheel", event => {
+            const delta = Math.abs(event.deltaY) >= Math.abs(event.deltaX) ? event.deltaY : event.deltaX;
+            if (delta === 0) { return; }
+            const direction = delta > 0 ? 1 : -1;
+            if ((direction < 0 && current === 0) || (direction > 0 && current === signatures.items.length - 1)) { return; }
+            event.preventDefault();
+            switchSignature(direction);
+        }, { passive: false });
+
+        let pointerStart: { id: number, x: number, y: number } | undefined;
+        container.addEventListener("pointerdown", event => {
+            if (!event.isPrimary || getSelection()?.toString()
+                || (event.pointerType !== "touch" && event.pointerType !== "pen")
+                || (event.target instanceof Element && event.target.closest("button"))) {
+                pointerStart = undefined;
+                return;
+            }
+            pointerStart = { id: event.pointerId, x: event.clientX, y: event.clientY };
+        });
+        container.addEventListener("pointerup", event => {
+            if (!pointerStart || event.pointerId !== pointerStart.id) { return; }
+            const deltaX = event.clientX - pointerStart.x;
+            const deltaY = event.clientY - pointerStart.y;
+            pointerStart = undefined;
+            const absDeltaX = Math.abs(deltaX);
+            if (absDeltaX < 30 || absDeltaX <= Math.abs(deltaY)) { return; }
+            switchSignature(deltaX < 0 ? 1 : -1);
+        });
+        container.addEventListener("pointercancel", () => pointerStart = undefined);
+
+        function switchSignature(pos: -1 | 0 | 1) {
+            const newIndex = current + pos;
+            if (newIndex >= 0) {
+                const length = signatures.items.length;
+                if (newIndex < length) {
+                    current = newIndex;
+                    content.innerHTML = '';
+                    indexer.textContent = `${current + 1} / ${length}`;
+                    left.disabled = current === 0;
+                    right.disabled = current === length - 1;
+                    dot.style.opacity = signatures.selectedItemIndex === current ? '1' : '0';
+                    renderSignatureTo(content, signatures.items[current], signatures.argumentIndex);
+                }
+            }
+        }
+    }
 
     const content = document.createElement("div");
     content.className = "signature-content";
     container.appendChild(content);
 
     renderSignatureTo(content, signatures.items[current], signatures.argumentIndex);
-
-    title.addEventListener("wheel", event => {
-        const delta = Math.abs(event.deltaY) >= Math.abs(event.deltaX) ? event.deltaY : event.deltaX;
-        if (delta === 0) { return; }
-        const direction = delta > 0 ? 1 : -1;
-        if ((direction < 0 && current === 0) || (direction > 0 && current === signatures.items.length - 1)) { return; }
-        event.preventDefault();
-        switchSignature(direction);
-    }, { passive: false });
-
-    let pointerStart: { id: number, x: number, y: number } | undefined;
-    container.addEventListener("pointerdown", event => {
-        if (!event.isPrimary || getSelection()?.toString()
-            || (event.pointerType !== "touch" && event.pointerType !== "pen")
-            || (event.target instanceof Element && event.target.closest("button"))) {
-            pointerStart = undefined;
-            return;
-        }
-        pointerStart = { id: event.pointerId, x: event.clientX, y: event.clientY };
-    });
-    container.addEventListener("pointerup", event => {
-        if (!pointerStart || event.pointerId !== pointerStart.id) { return; }
-        const deltaX = event.clientX - pointerStart.x;
-        const deltaY = event.clientY - pointerStart.y;
-        pointerStart = undefined;
-        const absDeltaX = Math.abs(deltaX);
-        if (absDeltaX < 30 || absDeltaX <= Math.abs(deltaY)) { return; }
-        switchSignature(deltaX < 0 ? 1 : -1);
-    });
-    container.addEventListener("pointercancel", () => pointerStart = undefined);
-
-    function switchSignature(pos: -1 | 0 | 1) {
-        const newIndex = current + pos;
-        if (newIndex >= 0) {
-            const length = signatures.items.length;
-            if (newIndex < length) {
-                current = newIndex;
-                content.innerHTML = '';
-                indexer.textContent = `${current + 1} / ${length}`;
-                left.disabled = current === 0;
-                right.disabled = current === length - 1;
-                dot.style.opacity = signatures.selectedItemIndex === current ? '1' : '0';
-                renderSignatureTo(content, signatures.items[current], signatures.argumentIndex);
-            }
-        }
-    }
 
     return container;
 }
