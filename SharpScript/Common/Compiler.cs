@@ -83,9 +83,11 @@ namespace SharpScript.Common
             get => ((IInputOptions)InputOptions).LanguageVersion?.ToString();
             set
             {
-                if (!string.IsNullOrWhiteSpace(value) && ((IInputOptions)InputOptions).LanguageVersion?.GetType() is Type @enum)
+                if (!string.IsNullOrWhiteSpace(value)
+                    && ((IInputOptions)InputOptions).LanguageVersion?.GetType() is Type @enum
+                    && Enum.TryParse(@enum, value, true, out object? result))
                 {
-                    ((IInputOptions)InputOptions).LanguageVersion = (Enum)Enum.Parse(@enum, value, true);
+                    ((IInputOptions)InputOptions).LanguageVersion = (Enum)result;
                     UpdateCodeSession(OutputType == OutputType.Run);
                 }
             }
@@ -135,9 +137,11 @@ namespace SharpScript.Common
             get => ((IOutputOptions)OutputOptions).LanguageVersion?.ToString();
             set
             {
-                if (!string.IsNullOrWhiteSpace(value) && ((IOutputOptions)OutputOptions).LanguageVersion?.GetType() is Type @enum)
+                if (!string.IsNullOrWhiteSpace(value)
+                    && ((IOutputOptions)OutputOptions).LanguageVersion?.GetType() is Type @enum
+                    && Enum.TryParse(@enum, value, true, out object? result))
                 {
-                    ((IOutputOptions)OutputOptions).LanguageVersion = (Enum)Enum.Parse(@enum, value, true);
+                    ((IOutputOptions)OutputOptions).LanguageVersion = (Enum)result;
                 }
             }
         }

@@ -42,11 +42,11 @@
         () => language,
         async (newValue, oldValue) => {
             if (newValue !== oldValue) {
-                const lang = await getLanguageAsync(newValue!);
-                editor!.dispatch({ effects: languageSet.reconfigure(lang) });
-                updateSignature();
-                updateTooltip();
-                updateCompletionAsync();
+                if (await updateLanguage(newValue)) {
+                    updateSignature();
+                    updateTooltip();
+                    updateCompletionAsync();
+                }
             }
         });
     watch(
@@ -158,6 +158,17 @@
         }
     }
 
+    let languageRequest = 0;
+    async function updateLanguage(lang?: lang) {
+        const request = ++languageRequest;
+        const extension = await getLanguageAsync(lang);
+        if (request !== languageRequest) {
+            return false;
+        }
+        editor!.dispatch({ effects: languageSet.reconfigure(extension) });
+        return true;
+    }
+
     const emit = defineEmits<{
         change: [update: ViewUpdate]
     }>();
@@ -201,12 +212,8 @@
                 autocompletionSet.of(empty)
             ]
         });
-        editor.dispatch({
-            effects: [
-                languageSet.reconfigure(await getLanguageAsync(language)),
-                autocompletionSet.reconfigure(await getCompletionAsync())
-            ]
-        });
+        await updateLanguage(language);
+        editor.dispatch({ effects: autocompletionSet.reconfigure(await getCompletionAsync()) });
     });
     onUnmounted(() => {
         if (typeof scheme !== "undefined") {
@@ -824,6 +831,7 @@
                 content: url("../assets/vs-icon/light/EnumerationInternal.svg");
             }
 
+            &.cm-completionIcon-feature,
             &.cm-completionIcon-enummember-public {
                 content: url("../assets/vs-icon/light/EnumerationItemPublic.svg");
             }
@@ -1081,6 +1089,7 @@
                     content: url("../assets/vs-icon/dark/EnumerationInternal.svg");
                 }
 
+                &.cm-completionIcon-feature,
                 &.cm-completionIcon-enummember-public {
                     content: url("../assets/vs-icon/dark/EnumerationItemPublic.svg");
                 }

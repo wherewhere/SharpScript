@@ -237,8 +237,12 @@
                     }
                     await (newValue === "IL" || newValue === "CIL" ? initDotNetAsync() : initCompilerAsync());
                     await dotnet!.setLanguageTypeAsync(newValue);
+                    await dotnet!.setInputLanguageVersionAsync(inputLanguage.value);
                     inputLanguages.value = await dotnet!.getInputLanguageVersionsAsync();
-                    inputLanguage.value = await dotnet!.getInputLanguageVersionAsync();
+                    const currentInputLanguage = await dotnet!.getInputLanguageVersionAsync();
+                    if (currentInputLanguage) {
+                        inputLanguage.value = currentInputLanguage;
+                    }
                     message.value = mes;
                 }
                 catch (e: any) {
@@ -310,8 +314,12 @@
                     }
                     else {
                         await dotnet!.setOutputTypeAsync(newValue);
+                        await dotnet!.setOutputLanguageVersionAsync(outputLanguage.value);
                         outputLanguages.value = await dotnet!.getOutputLanguageVersionsAsync();
-                        outputLanguage.value = await dotnet!.getOutputLanguageVersionAsync();
+                        const currentOutputLanguage = await dotnet!.getOutputLanguageVersionAsync();
+                        if (currentOutputLanguage) {
+                            outputLanguage.value = currentOutputLanguage;
+                        }
                     }
                     message.value = mes;
                 }
