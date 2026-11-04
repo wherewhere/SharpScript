@@ -471,10 +471,11 @@
             }
 
             &.signature-tooltip {
-                row-gap: 8px;
+                row-gap: 6px;
                 word-wrap: break-word;
                 word-break: break-word;
                 touch-action: pan-y;
+                font-family: var(--font-monospace);
 
                 .signature-title {
                     display: flex;
@@ -484,11 +485,20 @@
                         display: flex;
                         align-items: center;
                         user-select: none;
+                        line-height: 16px;
 
                         .signature-nav-button {
                             background: none;
                             border: none;
                             padding: 0;
+
+                            &.left {
+                                margin: -1px 3px 0 -5px;
+                            }
+
+                            &.right {
+                                margin: -1px 0 0 3px;
+                            }
 
                             svg {
                                 transition: color colors.$control-faster-animation-duration linear;
@@ -513,7 +523,6 @@
                     row-gap: 2px;
                     display: flex;
                     flex-direction: column;
-                    font-family: var(--font-monospace);
                 }
             }
         }

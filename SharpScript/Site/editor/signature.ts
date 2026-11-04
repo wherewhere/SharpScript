@@ -217,7 +217,7 @@ function renderSignatureList(signatures: SignatureHelpItemsData) {
         title.appendChild(nav);
 
         const left = document.createElement("button");
-        left.className = "signature-nav-button";
+        left.className = "signature-nav-button left";
         left.innerHTML = CaretLeft16Filled;
         left.addEventListener("click", () => switchSignature(-1));
         if (current === 0) { left.disabled = true; }
@@ -228,7 +228,7 @@ function renderSignatureList(signatures: SignatureHelpItemsData) {
         nav.appendChild(indexer);
 
         const right = document.createElement("button");
-        right.className = "signature-nav-button";
+        right.className = "signature-nav-button right";
         right.innerHTML = CaretRight16Filled;
         right.addEventListener("click", () => switchSignature(1));
         if (current === signatures.items.length - 1) { right.disabled = true; }
