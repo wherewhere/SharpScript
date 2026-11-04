@@ -84,7 +84,7 @@ declare module "sharp-script" {
          * @param args Arguments to pass to the method, each of which must be JSON-serializable.
          * @returns A promise representing the result of the operation.
          */
-        invokeMethodAsync<T>(methodIdentifier: string, ...args: any[]): Promise<T>;
+        invokeMethodAsync<T>(methodIdentifier: string, ...args: readonly any[]): Promise<T>;
         /**
          * Dispose the specified .NET instance.
          */
@@ -92,7 +92,7 @@ declare module "sharp-script" {
     }
 
     export type ICodeActionObject = {
-        invokeMethodAsync(methodIdentifier: "InvokeAsync"): Promise<TextChange[] | undefined>;
+        invokeMethodAsync(methodIdentifier: "InvokeAsync"): Promise<readonly TextChange[] | undefined>;
     } & DotNetObject;
 
     export interface ICodeAction {
@@ -105,14 +105,14 @@ declare module "sharp-script" {
         readonly location: LinePositionSpan;
         readonly message?: string;
         readonly severity: DiagnosticSeverity;
-        readonly tags: string[];
-        readonly actions: ICodeAction[];
+        readonly tags: readonly string[];
+        readonly actions: readonly ICodeAction[];
     };
 
     export type CompileResult = {
-        readonly diagnostics: Diagnostic[];
+        readonly diagnostics: readonly Diagnostic[];
         readonly decompiled?: string;
-        readonly outputs: string[];
+        readonly outputs: readonly string[];
     };
 
     /**
@@ -120,7 +120,7 @@ declare module "sharp-script" {
      */
     export type TaggedText = {
         /**
-         * A descriptive tag from Microsoft.CodeAnalysis.TextTags.
+         * A descriptive tag from `Microsoft.CodeAnalysis.TextTags`.
          */
         readonly tag: string;
         /**
@@ -130,12 +130,12 @@ declare module "sharp-script" {
     }
 
     export type CompletionChange = {
-        readonly textChanges: TextChange[];
+        readonly textChanges: readonly TextChange[];
         readonly newPosition?: number;
     };
 
     export type ICompletionItemObject = {
-        invokeMethodAsync(methodIdentifier: "GetDescriptionAsync"): Promise<TaggedText[]>;
+        invokeMethodAsync(methodIdentifier: "GetDescriptionAsync"): Promise<readonly TaggedText[]>;
         invokeMethodAsync(methodIdentifier: "GetChangeAsync", ...args: any[]): Promise<CompletionChange>;
     } & DotNetObject;
 
@@ -144,25 +144,65 @@ declare module "sharp-script" {
         readonly filterText: string;
         readonly sortText: string;
         readonly inlineDescription: string;
-        readonly tags: string[];
+        readonly tags: readonly string[];
         readonly span: TextSpan;
         readonly self: ICompletionItemObject;
     }
 
-    export type InfoTipTaggedText = {
-        readonly tag: string;
-        readonly text: string;
-    };
-
-    export type InfoTipSection = {
+    export type QuickInfoSection = {
+        /**
+         * The kind of this section. Use `Microsoft.CodeAnalysis.QuickInfo.QuickInfoSectionKinds` for the most common kinds.
+         */
         readonly kind: string;
-        readonly parts: InfoTipTaggedText[];
+        /**
+         * The individual tagged parts of this section.
+         */
+        readonly taggedParts: readonly TaggedText[];
     };
 
-    export type InfoTipItem = {
-        readonly tags: string[];
+    export type QuickInfoItem = {
+        /**
+         * The span of the document that the item is based on.
+         */
         readonly span: TextSpan;
-        readonly sections: InfoTipSection[];
+        /**
+         * Descriptive tags from the `Microsoft.CodeAnalysis.Tags.WellKnownTags` type.
+         * These tags may influence how the item is displayed.
+         */
+        readonly tags: readonly string[];
+        /**
+         * One or more {@link QuickInfoSection} describing the item.
+         */
+        readonly sections: readonly QuickInfoSection[];
+        /**
+         * Alternate regions of the document that help describe the item.
+         */
+        readonly relatedSpans: readonly TextSpan[];
+    };
+
+    export type SignatureHelpParameterData = {
+        readonly name: string;
+        readonly documentation?: readonly TaggedText[];
+        readonly displayParts: readonly TaggedText[];
+        readonly prefixDisplayParts: readonly TaggedText[];
+        readonly suffixDisplayParts: readonly TaggedText[];
+    };
+
+    export type SignatureHelpItemData = {
+        readonly documentation: readonly TaggedText[];
+        readonly prefixDisplayParts: readonly TaggedText[];
+        readonly separatorDisplayParts: readonly TaggedText[];
+        readonly suffixDisplayParts: readonly TaggedText[];
+        readonly parameters: readonly SignatureHelpParameterData[];
+        readonly parameterCount: number;
+    };
+
+    export type SignatureHelpItemsData = {
+        readonly items: readonly SignatureHelpItemData[];
+        readonly applicableSpan: TextSpan;
+        readonly argumentIndex: number;
+        readonly argumentCount: number;
+        readonly selectedItemIndex?: number;
     };
 
     export type AstItemMap = {
@@ -189,7 +229,7 @@ declare module "sharp-script" {
         readonly property?: string;
         readonly kind: string;
         readonly span: TextSpan;
-        readonly children: AstItemChild[];
+        readonly children: readonly AstItemChild[];
     } & AstItemBase<"node">;
 
     export type AstOperationItem = {
@@ -238,7 +278,7 @@ declare module "async-lock" {
          * });
          */
         acquire<T>(
-            key: string | string[],
+            key: string | readonly string[],
             fn: (() => T | PromiseLike<T>) | ((done: AsyncLock.AsyncLockDoneCallback<T>) => any),
             opts?: AsyncLock.AsyncLockOptions,
         ): Promise<T>;
@@ -260,7 +300,7 @@ declare module "share-api-polyfill" {
 }
 
 declare module "*/blazor.webassembly.js" {
-    import { CompileResult, Diagnostic, TextChanges, ICompletionItem, InfoTipItem, AstNodeItem } from "sharp-script";
+    import { CompileResult, Diagnostic, TextChanges, ICompletionItem, QuickInfoItem, SignatureHelpItemsData, AstNodeItem } from "sharp-script";
     global {
         const Blazor: {
             runtime: {
@@ -271,26 +311,27 @@ declare module "*/blazor.webassembly.js" {
         const DotNet: {
             invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "InitAsync", baseUrl: string, fingerprinting: Record<string, string>): Promise<void>;
             invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "ResetCode", code: string): Promise<void>;
-            invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "ApplyChanges", changes: TextChanges[]): Promise<void>;
-            invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "FormatCodeAsync"): Promise<TextChanges | undefined>;
+            invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "ApplyChanges", changes:  readonly Readonly<TextChanges>[]): Promise<void>;
+            invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "FormatCodeAsync"): Promise<Readonly<TextChanges> | undefined>;
             invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "ProcessAsync"): Promise<CompileResult>;
             invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "GetAssemblyAsync"): Promise<{ arrayBuffer(): Promise<ArrayBuffer> } | undefined>;
-            invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "GetDiagnosticsAsync"): Promise<Diagnostic[]>;
-            invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "GetCompletionsAsync", position: number): Promise<ICompletionItem[]>;
-            invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "GetInfoTipAsync", position: number): Promise<InfoTipItem>;
+            invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "GetDiagnosticsAsync"): Promise<readonly Diagnostic[]>;
+            invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "GetCompletionsAsync", position: number): Promise<readonly ICompletionItem[]>;
+            invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "GetInfoTipAsync", position: number): Promise<QuickInfoItem | undefined>;
+            invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "GetSignatureHelpAsync", position: number, reason: 0 | 1 | 2, triggerCharacter: string | null): Promise<SignatureHelpItemsData | undefined>;
             invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "GetAstAsync"): Promise<AstNodeItem | undefined>;
             invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "SetCSharpInfoTipLite", code: string): Promise<void>;
-            invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "GetCSharpInfoTipLiteAsync", position: number): Promise<InfoTipItem>;
-            invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "GetLanguageTypes"): Promise<string[]>;
+            invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "GetCSharpInfoTipLiteAsync", position: number): Promise<QuickInfoItem | undefined>;
+            invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "GetLanguageTypes"): Promise<readonly string[]>;
             invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "SetLanguageType", type: string): Promise<void>;
             invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "GetSourceCodeKind"): Promise<string>;
             invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "SetSourceCodeKind", kind: string): Promise<void>;
-            invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "GetOutputTypes"): Promise<string[]>;
+            invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "GetOutputTypes"): Promise<readonly string[]>;
             invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "SetOutputType", type: string): Promise<void>;
-            invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "GetInputLanguageVersions"): Promise<string[]>;
+            invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "GetInputLanguageVersions"): Promise<readonly string[]>;
             invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "GetInputLanguageVersion"): Promise<string | undefined>;
             invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "SetInputLanguageVersion", version?: string): Promise<void>;
-            invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "GetOutputLanguageVersions"): Promise<string[]>;
+            invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "GetOutputLanguageVersions"): Promise<readonly string[]>;
             invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "GetOutputLanguageVersion"): Promise<string | undefined>;
             invokeMethodAsync(assemblyName: "SharpScript", methodIdentifier: "SetOutputLanguageVersion", version?: string): Promise<void>;
             /**
@@ -301,7 +342,7 @@ declare module "*/blazor.webassembly.js" {
              * @param args Arguments to pass to the method, each of which must be JSON-serializable.
              * @returns A promise representing the result of the operation.
              */
-            invokeMethodAsync<T>(assemblyName: string, methodIdentifier: string, ...args: any[]): Promise<T>;
+            invokeMethodAsync<T>(assemblyName: string, methodIdentifier: string, ...args: readonly any[]): Promise<T>;
         }
     }
 }

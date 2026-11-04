@@ -11,6 +11,8 @@ using Microsoft.CodeAnalysis.Text;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using SharpScript.Models;
+using SharpScript.RoslynAccess;
+using SharpScript.RoslynAccess.Models;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -358,11 +360,16 @@ namespace SharpScript.Common
         public Task<CompletionChange> GetCompletionChangeAsync(CompletionItem item, CancellationToken cancellationToken = default) =>
             CompletionService!.GetChangeAsync(_currentDocument, item, cancellationToken: cancellationToken).ContinueWith(x => new CompletionChange(x.Result), TaskScheduler.Default);
 
-        public async ValueTask<InfoTipItem> GetInfoTipAsync(int position, CancellationToken cancellationToken = default)
+        public async ValueTask<QuickInfoItem?> GetInfoTipAsync(int position, CancellationToken cancellationToken = default)
         {
             await EnsureUpToDateAsync(cancellationToken).ConfigureAwait(false);
-            QuickInfoItem? info = await QuickInfoService!.GetQuickInfoAsync(_currentDocument, position, cancellationToken).ConfigureAwait(false);
-            return info is null or { Sections.IsEmpty: true } ? default : new InfoTipItem(info);
+            return await QuickInfoService!.GetQuickInfoAsync(_currentDocument, position, cancellationToken).ConfigureAwait(false);
+        }
+
+        public async ValueTask<SignatureHelpItemsData?> GetSignatureHelpAsync(int position, SignatureHelpTriggerReason reason, char? triggerCharacter, CancellationToken cancellationToken = default)
+        {
+            await EnsureUpToDateAsync(cancellationToken).ConfigureAwait(false);
+            return await CurrentDocument.GetSignatureHelpAsync(position, reason, triggerCharacter, cancellationToken).ConfigureAwait(false);
         }
 
         public async ValueTask<CompilationResults?> CompileAsync(ICollection<Diagnostic> results, CancellationToken cancellationToken = default)

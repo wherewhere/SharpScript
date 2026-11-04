@@ -2,7 +2,6 @@
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.QuickInfo;
 using Microsoft.CodeAnalysis.Text;
-using SharpScript.Models;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -68,10 +67,7 @@ namespace SharpScript.Common
 
         public static void SetSourceCode(string code) => SourceText = SourceText.From(code, Encoding.Default);
 
-        public static async ValueTask<InfoTipItem> GetInfoTipAsync(int position, CancellationToken cancellationToken = default)
-        {
-            QuickInfoItem? info = await QuickInfoService!.GetQuickInfoAsync(_currentDocument, position, cancellationToken).ConfigureAwait(false);
-            return info is null or { Sections.IsEmpty: true } ? default : new InfoTipItem(info);
-        }
+        public static Task<QuickInfoItem?> GetInfoTipAsync(int position, CancellationToken cancellationToken = default) =>
+            QuickInfoService!.GetQuickInfoAsync(_currentDocument, position, cancellationToken);
     }
 }

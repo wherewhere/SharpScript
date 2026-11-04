@@ -3,7 +3,7 @@ import type { CodeSplittingOptions, OutputOptions } from "rolldown";
 import { extname } from "path";
 import Mime from "mime";
 
-function getType(path: string[]) {
+function getType(path: readonly string[]) {
     if (path.length) {
         const type = Mime.getType(extname(path[0]).toLowerCase());
         if (type) {

@@ -6,7 +6,7 @@ export function createCompletion(
     getCompletionsAsync: typeof dotnet.getCompletionsAsync,
     completionGetDescriptionAsync: typeof dotnet.completionGetDescriptionAsync,
     completionGetChangeAsync: typeof dotnet.completionGetChangeAsync,
-    customCompletionAsync: (context: CompletionContext) => Promise<Completion[]>
+    customCompletionAsync: (context: CompletionContext) => Promise<readonly Completion[]>
 ) {
     return autocompletion({
         override: [ifNotIn([';', '{', '}'], async context => {

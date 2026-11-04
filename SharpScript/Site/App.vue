@@ -29,7 +29,7 @@
                     </div>
                 </div>
                 <CodeMirror class="editor" v-model:value="code" :language="getLauguage()" :readonly="loading"
-                            :lint-gutter="lintGutter" :linter="linter" :keymap="keymapProp" ref="editor"
+                            :lint-gutter="lintGutter" :linter="linter" :keymap="keymapProp" :signature="signature" ref="editor"
                             :roslyn-tooltip="roslynTooltip.input" :roslyn-completion="roslynCompletion" @change="onChange" />
             </template>
             <template #panel2>
@@ -127,7 +127,7 @@
 <script lang="ts" setup>
     import "./types";
     import type { Extension } from "@codemirror/state";
-    import type { AstNodeItem, InfoTipItem, TextChanges } from "sharp-script";
+    import type { AstNodeItem, TextChanges } from "sharp-script";
     import type { setProperty, DotNetWorker, DiagnosticWrapper } from "./worker";
     import type { ChangeHandler, ExtensionHandler, TooltipHandler } from "./components/CodeMirror.vue";
     import { computed, nextTick, onMounted, ref, shallowRef, useTemplateRef, watch, watchPostEffect } from "vue";
@@ -142,6 +142,7 @@
     import { createLinter } from "./editor/diagnostics";
     import { createFormatKeymap, formatAsync } from "./editor/formatting";
     import { createTooltip } from "./editor/hover";
+    import { signatureHelp } from "./editor/signature";
     import { csharpExample, vbExample, ilExample, cilExample } from "./helpers/examples";
     import { getCustomCompletionAsync } from "./helpers/fingerprinting";
     import { setTimeoutAsync } from "./helpers/utils";
@@ -488,7 +489,16 @@
         }
         catch (e) {
             console.warn(e);
-            return {} as InfoTipItem;
+        }
+    }
+
+    async function getSignatureHelpAsync(position: number, triggerKind: 0 | 1 | 2, triggerCharacter: string) {
+        try {
+            await applyChangesAsync();
+            return await dotnet!.getSignatureHelpAsync(position, triggerKind, triggerCharacter);
+        }
+        catch (e) {
+            console.warn(e);
         }
     }
 
@@ -517,7 +527,6 @@
         }
         catch (e) {
             console.warn(e);
-            return {} as InfoTipItem;
         }
     }
 
@@ -655,6 +664,7 @@
     const onChange = shallowRef<ChangeHandler>();
     const linter = ref<Extension | undefined>();
     const lintGutter = ref(false);
+    const signature = ref<Extension | undefined>();
     const roslynCompletion = ref<ExtensionHandler>();
     const roslynTooltip = ref({
         input: undefined as TooltipHandler,
@@ -706,6 +716,8 @@
 
             roslynTooltip.value.input = options => createTooltip(getInfoTipAsync, options);
             roslynTooltip.value.output = () => createTooltip(getCSharpInfoTipLiteAsync);
+
+            signature.value = signatureHelp(getSignatureHelpAsync);
 
             keymapProp.value = keymap.of(createFormatKeymap(isIL, formatCodeAsync));
 

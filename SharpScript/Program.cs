@@ -1,5 +1,6 @@
 using ICSharpCode.Decompiler.CSharp;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
+using Microsoft.CodeAnalysis.QuickInfo;
 using Microsoft.CodeAnalysis.Text;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -7,6 +8,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.JSInterop;
 using SharpScript.Common;
 using SharpScript.Models;
+using SharpScript.RoslynAccess.Models;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -59,7 +61,10 @@ namespace SharpScript
         public static Task<IEnumerable<RoslynCompletionItem>> GetCompletionsAsync(int position) => Compiler.GetCompletionsAsync(position).AsTask();
 
         [JSInvokable]
-        public static Task<InfoTipItem> GetInfoTipAsync(int position) => Compiler.GetInfoTipAsync(position).AsTask();
+        public static Task<QuickInfoItem?> GetInfoTipAsync(int position) => Compiler.GetInfoTipAsync(position).AsTask();
+
+        [JSInvokable]
+        public static Task<SignatureHelpItemsData?> GetSignatureHelpAsync(int position, SignatureHelpTriggerReason reason, char? triggerCharacter) => Compiler.GetSignatureHelpAsync(position, reason, triggerCharacter).AsTask();
 
         [JSInvokable]
         public static Task<AstNodeItem?> GetAstAsync() => Compiler.GetAstAsync().AsTask();
@@ -68,7 +73,7 @@ namespace SharpScript
         public static void SetCSharpInfoTipLite(string code) => InfoTipServer.SetSourceCode(code);
 
         [JSInvokable]
-        public static Task<InfoTipItem> GetCSharpInfoTipLiteAsync(int position) => InfoTipServer.GetInfoTipAsync(position).AsTask();
+        public static Task<QuickInfoItem?> GetCSharpInfoTipLiteAsync(int position) => InfoTipServer.GetInfoTipAsync(position);
 
         [JSInvokable]
         public static IEnumerable<string> GetLanguageTypes() => Compiler.LanguageTypes.Select(x => x.ToString());

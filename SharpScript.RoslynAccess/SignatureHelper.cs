@@ -5,12 +5,13 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using RoslynSignatureHelpTriggerReason = Microsoft.CodeAnalysis.SignatureHelp.SignatureHelpTriggerReason;
+using SignatureHelpTriggerReason = SharpScript.RoslynAccess.Models.SignatureHelpTriggerReason;
 
 namespace SharpScript.RoslynAccess
 {
     public static class SignatureHelper
     {
-        public static async Task<SignatureHelpItemsData?> GetSignatureHelpAsync(this Document document, int position, SignatureHelpTriggerReason reason, char? triggerCharacter, CancellationToken cancellationToken = default)
+        public static async ValueTask<SignatureHelpItemsData?> GetSignatureHelpAsync(this Document document, int position, SignatureHelpTriggerReason reason, char? triggerCharacter, CancellationToken cancellationToken = default)
         {
             SignatureHelpService signatureHelpService = document.Project.Solution.Services.ExportProvider.GetExports<SignatureHelpService>().Single().Value;
 
@@ -28,13 +29,13 @@ namespace SharpScript.RoslynAccess
             return items == null ? null
                 : new SignatureHelpItemsData(
                     items.Items.Select(i => new SignatureHelpItemData(
-                        i.DocumentationFactory,
+                        i.DocumentationFactory(cancellationToken),
                         prefixDisplayParts: i.PrefixDisplayParts,
                         separatorDisplayParts: i.SeparatorDisplayParts,
                         suffixDisplayParts: i.SuffixDisplayParts,
-                        parameters: i.Parameters.Select(p => new SignatureHelpParameterData(
+                        parameters: i.Parameters.Select((p, i) => new SignatureHelpParameterData(
                             p.Name,
-                            p.DocumentationFactory,
+                            i == items.SemanticParameterIndex ? p.DocumentationFactory(cancellationToken) : null,
                             displayParts: p.DisplayParts,
                             prefixDisplayParts: p.PrefixDisplayParts,
                             suffixDisplayParts: p.SuffixDisplayParts
@@ -47,12 +48,5 @@ namespace SharpScript.RoslynAccess
                     selectedItemIndex: items.SelectedItemIndex
                 );
         }
-    }
-
-    public enum SignatureHelpTriggerReason
-    {
-        InvokeSignatureHelpCommand,
-        TypeCharCommand,
-        RetriggerCommand,
     }
 }

@@ -1,7 +1,9 @@
 ﻿using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.QuickInfo;
 using Microsoft.CodeAnalysis.Text;
 using Microsoft.Extensions.Logging;
 using SharpScript.Models;
+using SharpScript.RoslynAccess.Models;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -226,7 +228,9 @@ namespace SharpScript.Common
 
         public ValueTask<IEnumerable<RoslynCompletionItem>> GetCompletionsAsync(int position, CancellationToken cancellationToken = default) => CodeSession.GetCompletionsAsync(position, cancellationToken);
 
-        public ValueTask<InfoTipItem> GetInfoTipAsync(int position, CancellationToken cancellationToken = default) => CodeSession.GetInfoTipAsync(position, cancellationToken);
+        public ValueTask<QuickInfoItem?> GetInfoTipAsync(int position, CancellationToken cancellationToken = default) => CodeSession.GetInfoTipAsync(position, cancellationToken);
+
+        public ValueTask<SignatureHelpItemsData?> GetSignatureHelpAsync(int position, SignatureHelpTriggerReason reason, char? triggerCharacter, CancellationToken cancellationToken = default) => CodeSession.GetSignatureHelpAsync(position, reason, triggerCharacter, cancellationToken);
 
         public ValueTask<AstNodeItem?> GetAstAsync(CancellationToken cancellationToken = default) => CodeSession.GetAstAsync(cancellationToken);
 

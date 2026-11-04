@@ -1,5 +1,7 @@
-﻿using Microsoft.CodeAnalysis.Text;
+﻿using Microsoft.CodeAnalysis.QuickInfo;
+using Microsoft.CodeAnalysis.Text;
 using SharpScript.Models;
+using SharpScript.RoslynAccess.Models;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -15,7 +17,8 @@ namespace SharpScript.Common
         ValueTask<IList<TextChange>?> FormatCodeAsync(CancellationToken cancellationToken = default) => ValueTask.FromResult<IList<TextChange>?>([]);
         ValueTask<T> GetDiagnosticsAsync<T>(T results, CancellationToken cancellationToken = default) where T : ICollection<Diagnostic>;
         ValueTask<IEnumerable<RoslynCompletionItem>> GetCompletionsAsync(int position, CancellationToken cancellationToken = default) => ValueTask.FromResult<IEnumerable<RoslynCompletionItem>>([]);
-        ValueTask<InfoTipItem> GetInfoTipAsync(int position, CancellationToken cancellationToken = default) => ValueTask.FromResult<InfoTipItem>(default);
+        ValueTask<QuickInfoItem?> GetInfoTipAsync(int position, CancellationToken cancellationToken = default) => ValueTask.FromResult<QuickInfoItem?>(default);
+        ValueTask<SignatureHelpItemsData?> GetSignatureHelpAsync(int position, SignatureHelpTriggerReason reason, char? triggerCharacter, CancellationToken cancellationToken = default) => ValueTask.FromResult<SignatureHelpItemsData?>(default);
         ValueTask<AstNodeItem?> GetAstAsync(CancellationToken cancellationToken = default) => ValueTask.FromResult<AstNodeItem?>(default);
         ValueTask<CompilationResults?> CompileAsync(ICollection<Diagnostic> results, CancellationToken cancellationToken = default);
     }

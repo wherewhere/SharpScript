@@ -1,22 +1,20 @@
 ﻿using Microsoft.CodeAnalysis;
-using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Text.Json.Serialization;
-using System.Threading;
 
 namespace SharpScript.RoslynAccess.Models
 {
     [method: JsonConstructor]
     public readonly struct SignatureHelpItemData(
-       Func<CancellationToken, IEnumerable<TaggedText>> documentationFactory,
+       IEnumerable<TaggedText> documentation,
        ImmutableArray<TaggedText> prefixDisplayParts,
        ImmutableArray<TaggedText> separatorDisplayParts,
        ImmutableArray<TaggedText> suffixDisplayParts,
        IEnumerable<SignatureHelpParameterData> parameters,
        int parameterCount)
     {
-        public Func<CancellationToken, IEnumerable<TaggedText>> DocumentationFactory => documentationFactory;
+        public IEnumerable<TaggedText> Documentation => documentation;
         public ImmutableArray<TaggedText> PrefixDisplayParts => prefixDisplayParts;
         public ImmutableArray<TaggedText> SeparatorDisplayParts => separatorDisplayParts;
         public ImmutableArray<TaggedText> SuffixDisplayParts => suffixDisplayParts;

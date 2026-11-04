@@ -13,12 +13,13 @@
     import { vscodeKeymap } from "@replit/codemirror-vscode-keymap";
     import { vscodeDark, vscodeLight } from "../helpers/theme";
 
-    const { language, readonly, lintGutter: lintGutterProp, keymap: keymapProp, linter, roslynTooltip, roslynCompletion } = defineProps<{
+    const { language, readonly, lintGutter: lintGutterProp, keymap: keymapProp, linter, signature: signatureProp, roslynTooltip, roslynCompletion } = defineProps<{
         language?: lang;
         readonly?: boolean;
         lintGutter?: boolean;
         linter?: Extension;
         keymap?: Extension;
+        signature?: Extension,
         roslynTooltip?: (options: Parameters<typeof hoverTooltip>[1]) => Extension;
         roslynCompletion?: () => Extension | Promise<Extension>;
     }>();
@@ -43,6 +44,7 @@
             if (newValue !== oldValue) {
                 const lang = await getLanguageAsync(newValue!);
                 editor!.dispatch({ effects: languageSet.reconfigure(lang) });
+                updateSignature();
                 updateTooltip();
                 updateCompletionAsync();
             }
@@ -84,6 +86,13 @@
             }
         });
     watch(
+        () => signatureProp,
+        (newValue, oldValue) => {
+            if (newValue !== oldValue && language !== "il") {
+                editor!.dispatch({ effects: signatureSet.reconfigure(newValue ? toRaw(newValue) : empty) });
+            }
+        });
+    watch(
         () => roslynTooltip,
         (newValue, oldValue) => {
             if (newValue !== oldValue && language !== "il") {
@@ -102,6 +111,14 @@
     const themeSet = new Compartment();
     function updateTheme(e: MediaQueryListEvent) {
         editor!.dispatch({ effects: themeSet.reconfigure(e.matches ? vscodeDark : vscodeLight) });
+    }
+
+    const signatureSet = new Compartment();
+    function getSignature() {
+        return language !== "il" && signatureProp ? toRaw(signatureProp) : empty;
+    }
+    function updateSignature() {
+        editor!.dispatch({ effects: signatureSet.reconfigure(getSignature()) });
     }
 
     const tooltipSet = new Compartment();
@@ -158,28 +175,30 @@
             }
             return themeSet.of(vscodeLight);
         };
+        const changedSet = EditorView.updateListener.of(e => {
+            if (e.docChanged) {
+                changed = true;
+                value.value = e.state.doc.toString();
+                emit("change", e);
+            }
+        });
         editor = new EditorView({
             doc: value.value,
             parent: root.value!,
             extensions: [
                 basicSetup,
                 getTheme(),
+                changedSet,
                 keymap.of(vscodeKeymap),
                 indentUnit.of("    "),
                 keymapSet.of(keymapProp || empty),
                 linterSet.of(linter || empty),
                 lintGutterSet.of(lintGutterProp ? lintGutter() : empty),
                 readonlySet.of(EditorState.readOnly.of(!!readonly)),
+                signatureSet.of(getSignature()),
                 tooltipSet.of(getTooltip()),
                 languageSet.of(empty),
-                autocompletionSet.of(empty),
-                EditorView.updateListener.of(e => {
-                    if (e.docChanged) {
-                        changed = true;
-                        value.value = e.state.doc.toString();
-                        emit("change", e);
-                    }
-                })
+                autocompletionSet.of(empty)
             ]
         });
         editor.dispatch({
@@ -441,6 +460,53 @@
 
                 .cm-diagnostic-error {
                     border-left: 3px solid #fc3e36;
+                }
+            }
+
+            &.signature-tooltip {
+                row-gap: 8px;
+                word-wrap: break-word;
+                word-break: break-word;
+                touch-action: pan-y;
+
+                .signature-title {
+                    display: flex;
+                    justify-content: space-between;
+
+                    .signature-nav {
+                        display: flex;
+                        align-items: center;
+                        user-select: none;
+
+                        .signature-nav-button {
+                            background: none;
+                            border: none;
+                            padding: 0;
+
+                            svg {
+                                transition: color colors.$control-faster-animation-duration linear;
+                            }
+                        }
+                    }
+
+                    .signature-dot {
+                        width: 4px;
+                        height: 4px;
+                        margin: 2px;
+                        border-radius: 50%;
+                        transition: $base-transition, opacity colors.$control-faster-animation-duration linear;
+
+                        @include theme.auto-theme {
+                            background: theme.themed(colors.$accent-fill-color-default);
+                        }
+                    }
+                }
+
+                .signature-content {
+                    row-gap: 2px;
+                    display: flex;
+                    flex-direction: column;
+                    font-family: var(--font-monospace);
                 }
             }
         }

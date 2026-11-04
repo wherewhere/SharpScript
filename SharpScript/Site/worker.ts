@@ -49,7 +49,7 @@ if (typeof window === "undefined") {
 }
 
 let diagnostics: ICodeActionObject[] = [], completions: ICompletionItemObject[] = [];
-function getDiagnostics(list: Diagnostic[]) {
+function getDiagnostics(list: readonly Diagnostic[]) {
     if (list instanceof Array) {
         diagnostics.forEach(x => x.dispose());
         diagnostics = [];
@@ -111,7 +111,7 @@ const dotnet = {
     resetCodeAsync(code: string) {
         return DotNet.invokeMethodAsync("SharpScript", "ResetCode", code);
     },
-    applyChangesAsync(changes: TextChanges[]) {
+    applyChangesAsync(changes: readonly Readonly<TextChanges>[]) {
         return DotNet.invokeMethodAsync("SharpScript", "ApplyChanges", changes);
     },
     async processAsync() {
@@ -146,6 +146,9 @@ const dotnet = {
     },
     getInfoTipAsync(position: number) {
         return DotNet.invokeMethodAsync("SharpScript", "GetInfoTipAsync", position);
+    },
+    getSignatureHelpAsync(position: number, reason: 0 | 1 | 2, triggerCharacter: string | null) {
+        return DotNet.invokeMethodAsync("SharpScript", "GetSignatureHelpAsync", position, reason, triggerCharacter);
     },
     getAstAsync() {
         return DotNet.invokeMethodAsync("SharpScript", "GetAstAsync");

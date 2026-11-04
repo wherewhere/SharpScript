@@ -1,6 +1,6 @@
 import type { TaggedText } from "sharp-script";
 
-function createSection() {
+export function createSection() {
     const section = document.createElement("div");
     section.className = "mirrorsharp-parts-section";
     return section;
@@ -13,7 +13,8 @@ function renderPartTo(parent: HTMLElement, part: TaggedText) {
     parent.appendChild(span);
 }
 
-export function renderPartsTo(parent: HTMLElement, parts: TaggedText[], splitLinesToSections: boolean) {
+export function renderPartsTo(parent: HTMLElement, parts: readonly TaggedText[], splitLinesToSections: boolean) {
+    if (!parts.length) { return; }
     let section = splitLinesToSections ? createSection() : parent;
     for (const part of parts) {
         if (part.tag === "linebreak" && splitLinesToSections) {
@@ -28,13 +29,13 @@ export function renderPartsTo(parent: HTMLElement, parts: TaggedText[], splitLin
     }
 }
 
-export function renderParts(parts: TaggedText[], splitLinesToSections: boolean) {
+export function renderParts(parts: readonly TaggedText[], splitLinesToSections: boolean) {
     const container = document.createElement("div");
     renderPartsTo(container, parts, splitLinesToSections);
     return container;
 }
 
-export function mapTextTagsToType(tags: string[]) {
+export function mapTextTagsToType(tags: readonly string[]) {
     switch (tags.length) {
         case 0: if (tags.length === 0)
             console.warn('No tag found for completion, falling back to "keyword".');
