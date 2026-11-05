@@ -235,13 +235,28 @@
                     if (code.value === getDefaultCode(oldValue)) {
                         code.value = getDefaultCode(newValue);
                     }
-                    await (newValue === "IL" || newValue === "CIL" ? initDotNetAsync() : initCompilerAsync());
+                    const isIL = newValue === "IL" || newValue === "CIL";
+                    await (isIL ? initDotNetAsync() : initCompilerAsync());
                     await dotnet!.setLanguageTypeAsync(newValue);
                     await dotnet!.setInputLanguageVersionAsync(inputLanguage.value);
-                    inputLanguages.value = await dotnet!.getInputLanguageVersionsAsync();
-                    const currentInputLanguage = await dotnet!.getInputLanguageVersionAsync();
+                    let currentInputLanguage;
+                    [inputLanguages.value, currentInputLanguage] = await Promise.all([
+                        dotnet!.getInputLanguageVersionsAsync(),
+                        dotnet!.getInputLanguageVersionAsync()
+                    ]);
                     if (currentInputLanguage) {
                         inputLanguage.value = currentInputLanguage;
+                    }
+                    if (output.value === "SyntaxTree") {
+                        if (isIL) {
+                            syntaxTree.value = undefined;
+                        }
+                        else {
+                            await Promise.all([
+                                updateSyntaxTreeAsync(),
+                                initLinterAsync()
+                            ]);
+                        }
                     }
                     message.value = mes;
                 }
@@ -310,13 +325,24 @@
                     await initDotNetAsync();
                     if (newValue === "SyntaxTree") {
                         outputLanguages.value = [];
-                        await initLinterAsync();
+                        if (isIL.value) {
+                            syntaxTree.value = undefined;
+                        }
+                        else {
+                            await Promise.all([
+                                updateSyntaxTreeAsync(),
+                                initLinterAsync()
+                            ]);
+                        }
                     }
                     else {
                         await dotnet!.setOutputTypeAsync(newValue);
                         await dotnet!.setOutputLanguageVersionAsync(outputLanguage.value);
-                        outputLanguages.value = await dotnet!.getOutputLanguageVersionsAsync();
-                        const currentOutputLanguage = await dotnet!.getOutputLanguageVersionAsync();
+                        let currentOutputLanguage;
+                        [outputLanguages.value, currentOutputLanguage] = await Promise.all([
+                            dotnet!.getOutputLanguageVersionsAsync(),
+                            dotnet!.getOutputLanguageVersionAsync()
+                        ]);
                         if (currentOutputLanguage) {
                             outputLanguage.value = currentOutputLanguage;
                         }
@@ -475,7 +501,7 @@
         }
         catch (e) {
             console.warn(e);
-            return [];
+            return new Promise<ReturnType<(typeof dotnet & object)["getDiagnosticsAsync"]>>(() => {});
         }
     }
 
@@ -606,6 +632,18 @@
         }
     }
 
+    let astRequest = 0;
+    async function updateSyntaxTreeAsync() {
+        if (!isIL.value) {
+            await initCompilerAsync();
+            const request = ++astRequest;
+            const ast = await getAstAsync();
+            if (request === astRequest) {
+                syntaxTree.value = ast;
+            }
+        }
+    }
+
     async function initLinterAsync() {
         try {
             loading.value = true;
@@ -704,8 +742,8 @@
 
             linter.value = createLinter(
                 () => {
-                    if (isSyntaxTree) {
-                        getAstAsync().then(x => syntaxTree.value = x!);
+                    if (isSyntaxTree.value) {
+                        updateSyntaxTreeAsync();
                     }
                 },
                 getDiagnosticsAsync,
@@ -873,8 +911,11 @@
         if (code.value) {
             settings.code = compressToEncodedURIComponent(code.value);
         }
-        location.hash = new URLSearchParams(settings).toString();
-        hasHash.value = hashChanged = true;
+        const hash = '#' + new URLSearchParams(settings).toString();
+        if (location.hash !== hash) {
+            location.hash = hash;
+            hasHash.value = hashChanged = true;
+        }
     }
 
     function renderConsole(output: readonly string[]) {

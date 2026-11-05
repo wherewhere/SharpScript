@@ -1,4 +1,4 @@
-import { linter } from "@codemirror/lint";
+import { type Diagnostic, linter } from "@codemirror/lint";
 import type { Text } from "@codemirror/state";
 import type { Ref } from "vue";
 import type { LinePosition } from "sharp-script";
@@ -25,9 +25,14 @@ export function createLinter(
         infos: DiagnosticWrapper[]
     }>,
     language: Ref<string>) {
+    let linterRequest = 0;
     return linter(async view => {
         onbefore();
+        const request = ++linterRequest;
         let diags = await getDiagnosticsAsync();
+        if (request !== linterRequest) {
+            return new Promise<readonly Diagnostic[]>(() => {});
+        }
         if (diags instanceof Array) {
             diagnostics.value = {
                 errors: [],

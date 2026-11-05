@@ -5,9 +5,11 @@ import type { dotnet } from "../worker";
 export function createTooltip(getInfoTipAsync: typeof dotnet.getInfoTipAsync, options?: Parameters<typeof hoverTooltip>[1]) {
     return hoverTooltip(async (_, pos) => {
         const tooltip = await getInfoTipAsync(pos);
-        if (!tooltip) {return null;}
+        if (!tooltip) { return null; }
+        const span = tooltip.span;
         return {
-            pos,
+            pos: span.start,
+            end: span.end,
             create() {
                 const dom = document.createElement("div")
                 dom.classList.add("mirrorsharp-infotip");
