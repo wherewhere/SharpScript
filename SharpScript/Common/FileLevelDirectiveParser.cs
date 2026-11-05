@@ -3,7 +3,6 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Text;
 using System;
-using System.Buffers;
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
 
@@ -11,8 +10,6 @@ namespace SharpScript.Common
 {
     public static class FileLevelDirectiveParser
     {
-        private static readonly SearchValues<char> featureSeparators = SearchValues.Create([',', ';', ' ']);
-
         public static FileLevelDirectives Parse(SourceText text, string language, string comment) => language switch
         {
             LanguageNames.CSharp => ParseCSharp(text, comment),
@@ -27,7 +24,6 @@ namespace SharpScript.Common
             List<TextChange> changes = [];
             SyntaxTokenParser tokenizer = SyntaxFactory.CreateTokenParser(text);
             SyntaxTokenParser.Result result = tokenizer.ParseLeadingTrivia();
-            Span<Range> parts = stackalloc Range[2];
             foreach (SyntaxTrivia trivia in result.Token.LeadingTrivia)
             {
                 if (trivia.IsKind(SyntaxKind.IgnoredDirectiveTrivia))
@@ -35,41 +31,43 @@ namespace SharpScript.Common
                     if (trivia.GetStructure() is IgnoredDirectiveTriviaSyntax { Content: { RawKind: (int)SyntaxKind.StringLiteralToken, Text: { Length: > 0 } content } })
                     {
                         ReadOnlySpan<char> message = content.AsSpan().Trim();
-                        int count = message.Split(parts, ' ', StringSplitOptions.RemoveEmptyEntries);
-                        ReadOnlySpan<char> kind = count > 0 ? message[parts[0]] : default;
-                        ReadOnlySpan<char> rest = count > 1 ? message[parts[1]] : default;
-                        switch (kind)
+                        int separatorIndex = message.IndexOf(' ');
+                        if (separatorIndex >= 0)
                         {
-                            case "property":
-                                int separatorIndex = rest.IndexOf('=');
-                                if (separatorIndex >= 0)
-                                {
-                                    ReadOnlySpan<char> name = rest[..separatorIndex].Trim();
-                                    ReadOnlySpan<char> value = rest[(separatorIndex + 1)..].Trim();
-                                    switch (name)
+                            switch (message[..separatorIndex].TrimEnd())
+                            {
+                                case "property":
+                                    ReadOnlySpan<char> rest = message[(separatorIndex + 1)..].TrimStart();
+                                    separatorIndex = rest.IndexOf('=');
+                                    if (separatorIndex >= 0)
                                     {
-                                        case "AssemblyName":
-                                            assembly = value.Trim([' ', '\'', '"']).ToString();
-                                            break;
-                                        case "Features":
-                                            foreach (Range range in value.SplitAny(featureSeparators))
-                                            {
-                                                ReadOnlySpan<char> feature = value[range];
-                                                if (feature.IsWhiteSpace()) { continue; }
-                                                int equalsIndex = feature.IndexOf('=');
-                                                if (equalsIndex < 0)
+                                        ReadOnlySpan<char> name = rest[..separatorIndex].TrimEnd();
+                                        switch (name)
+                                        {
+                                            case "AssemblyName":
+                                                assembly = rest[(separatorIndex + 1)..].TrimStart().Trim(['\'', '"']).ToString();
+                                                break;
+                                            case "Features":
+                                                ReadOnlySpan<char> value = rest[(separatorIndex + 1)..].TrimStart();
+                                                foreach (Range range in value.SplitAny([',', ';', ' ']))
                                                 {
-                                                    features[feature.ToString()] = "true";
+                                                    ReadOnlySpan<char> feature = value[range].Trim();
+                                                    if (feature.IsEmpty) { continue; }
+                                                    separatorIndex = feature.IndexOf('=');
+                                                    if (separatorIndex < 0)
+                                                    {
+                                                        features[feature.ToString()] = "true";
+                                                    }
+                                                    else
+                                                    {
+                                                        features[feature[..separatorIndex].TrimEnd().ToString()] = feature[(separatorIndex + 1)..].TrimStart().ToString();
+                                                    }
                                                 }
-                                                else
-                                                {
-                                                    features[feature[..equalsIndex].ToString()] = feature[(equalsIndex + 1)..].ToString();
-                                                }
-                                            }
-                                            break;
+                                                break;
+                                        }
                                     }
-                                }
-                                break;
+                                    break;
+                            }
                         }
                     }
                 }
@@ -78,16 +76,19 @@ namespace SharpScript.Common
                     switch (trivia.GetStructure())
                     {
                         case ReferenceDirectiveTriviaSyntax { File: { RawKind: (int)SyntaxKind.StringLiteralToken, Text: { Length: > 0 } content } } syntax:
-                            ReadOnlySpan<char> file = content.AsSpan().Trim([' ', '\'', '"']);
+                            ReadOnlySpan<char> file = content.AsSpan().Trim().Trim(['\'', '"']);
                             references.Add(file.ToString());
                             changes.Add(new TextChange(new TextSpan(syntax.SpanStart, 2), comment));
                             break;
                         case ReferenceDirectiveTriviaSyntax syntax:
-                            ReadOnlySpan<char> message = syntax.ToString().AsSpan();
-                            int count = message.Split(parts, ' ', StringSplitOptions.RemoveEmptyEntries);
-                            file = count > 1 ? message[parts[1]].Trim([' ', '\'', '"']) : default;
-                            references.Add(file.ToString());
-                            changes.Add(new TextChange(new TextSpan(syntax.SpanStart, 2), comment));
+                            ReadOnlySpan<char> message = syntax.ToString().AsSpan().Trim();
+                            int separatorIndex = message.IndexOf(' ');
+                            if (separatorIndex > 1)
+                            {
+                                file = message[(separatorIndex + 1)..].TrimStart().Trim(['\'', '"']);
+                                references.Add(file.ToString());
+                                changes.Add(new TextChange(new TextSpan(syntax.SpanStart, 2), comment));
+                            }
                             break;
                     }
                 }
@@ -99,12 +100,12 @@ namespace SharpScript.Common
                         switch (directiveName)
                         {
                             case "feature":
-                                ReadOnlySpan<char> message = syntax.ToString().AsSpan();
-                                int count = message.Split(parts, ' ', StringSplitOptions.RemoveEmptyEntries);
-                                if (count == 2)
+                                ReadOnlySpan<char> message = syntax.ToString().AsSpan().TrimEnd();
+                                int separatorIndex = message.IndexOf(' ');
+                                if (separatorIndex > 1)
                                 {
-                                    ReadOnlySpan<char> feature = message[parts[1]];
-                                    if (feature.IsWhiteSpace()) { continue; }
+                                    ReadOnlySpan<char> feature = message[(separatorIndex + 1)..].TrimStart();
+                                    if (feature.IsEmpty) { continue; }
                                     int equalsIndex = feature.IndexOf('=');
                                     if (equalsIndex < 0)
                                     {
@@ -112,17 +113,17 @@ namespace SharpScript.Common
                                     }
                                     else
                                     {
-                                        features[feature[..equalsIndex].ToString()] = feature[(equalsIndex + 1)..].ToString();
+                                        features[feature[..equalsIndex].TrimEnd().ToString()] = feature[(equalsIndex + 1)..].TrimStart().ToString();
                                     }
                                     changes.Add(new TextChange(new TextSpan(syntax.SpanStart, 2), comment));
                                 }
                                 break;
                             case "assembly":
-                                message = syntax.ToString().AsSpan();
-                                count = message.Split(parts, ' ', StringSplitOptions.RemoveEmptyEntries);
-                                if (count == 2)
+                                message = syntax.ToString().AsSpan().TrimEnd();
+                                separatorIndex = message.IndexOf(' ');
+                                if (separatorIndex > 1)
                                 {
-                                    assembly = message[parts[1]].Trim([' ', '\'', '"']).ToString();
+                                    assembly = message[(separatorIndex + 1)..].TrimStart().Trim(['\'', '"']).ToString();
                                     changes.Add(new TextChange(new TextSpan(syntax.SpanStart, 2), comment));
                                 }
                                 break;
@@ -142,7 +143,7 @@ namespace SharpScript.Common
             TextLineCollection lines = code.Lines;
             foreach (TextLine text in lines)
             {
-                string line = text.ToString().TrimStart();
+                string line = text.ToString().Trim();
                 if (string.IsNullOrWhiteSpace(line))
                 {
                     continue;
@@ -154,14 +155,14 @@ namespace SharpScript.Common
                 else if (line.StartsWith("#r ", StringComparison.OrdinalIgnoreCase))
                 {
                     ReadOnlySpan<char> temp = line.AsSpan()[3..];
-                    string path = temp.Trim([' ', '\'', '"']).ToString();
+                    string path = temp.TrimStart().Trim(['\'', '"']).ToString();
                     references.Add(path);
                     changes.Add(new TextChange(new TextSpan(text.Start, 2), comment));
                 }
                 else if (line.StartsWith("#feature ", StringComparison.OrdinalIgnoreCase))
                 {
-                    ReadOnlySpan<char> feature = line.AsSpan()[9..];
-                    if (feature.IsWhiteSpace()) { continue; }
+                    ReadOnlySpan<char> feature = line.AsSpan()[9..].TrimStart();
+                    if (feature.IsEmpty) { continue; }
                     int equalsIndex = feature.IndexOf('=');
                     if (equalsIndex < 0)
                     {
@@ -169,13 +170,13 @@ namespace SharpScript.Common
                     }
                     else
                     {
-                        features[feature[..equalsIndex].ToString()] = feature[(equalsIndex + 1)..].ToString();
+                        features[feature[..equalsIndex].TrimEnd().ToString()] = feature[(equalsIndex + 1)..].TrimStart().ToString();
                     }
                     changes.Add(new TextChange(new TextSpan(text.Start, 2), comment));
                 }
                 else if (line.StartsWith("#assembly ", StringComparison.OrdinalIgnoreCase))
                 {
-                    assembly = line.AsSpan()[10..].Trim([' ', '\'', '"']).ToString();
+                    assembly = line.AsSpan()[10..].TrimStart().Trim(['\'', '"']).ToString();
                     references.Add(assembly);
                     changes.Add(new TextChange(new TextSpan(text.Start, 2), comment));
                 }
