@@ -1,7 +1,7 @@
-﻿using ILAssembler;
-using Microsoft.CodeAnalysis;
+﻿using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.VisualBasic;
+using Microsoft.DotNet.ILAssembler;
 using System;
 using System.Diagnostics.CodeAnalysis;
 using CSharpLanguageVersion = Microsoft.CodeAnalysis.CSharp.LanguageVersion;

@@ -1,4 +1,4 @@
-﻿using ILAssembler;
+﻿using Microsoft.DotNet.ILAssembler;
 using SharpScript.Models;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -9,7 +9,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Diagnostic = SharpScript.Models.Diagnostic;
-using ILDiagnostic = ILAssembler.Diagnostic;
+using ILDiagnostic = Microsoft.DotNet.ILAssembler.Diagnostic;
 using RoslynSourceText = Microsoft.CodeAnalysis.Text.SourceText;
 
 namespace SharpScript.Common
